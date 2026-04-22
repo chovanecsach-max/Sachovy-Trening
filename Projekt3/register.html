@@ -149,7 +149,12 @@ button {
 <div class="container">
   <h2>Registrácia hráča</h2>
 
-  <input id="nameInput" placeholder="Meno hráča">
+  <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px;">
+    <input id="nameInput" placeholder="Meno *">
+    <input id="surnameInput" placeholder="Priezvisko">
+    <input id="emailInput" type="email" placeholder="E-mail">
+    <input id="eloInput" type="number" placeholder="ELO (prázdne = 1500)">
+  </div>
   <div class="buttons-top">
     <button class="primary" onclick="create()">Vytvoriť hráča</button>
     <button class="secondary" onclick="back()">Späť do menu</button>
@@ -200,9 +205,10 @@ async function render() {
     card.className = "player-card";
     card.innerHTML = `
       <div class="player-top">
-        <div class="player-name">${p.name}</div>
+        <div class="player-name">${p.name} ${p.surname || ''}</div>
         <div class="player-elo">ELO ${p.elo}</div>
       </div>
+      ${p.email ? `<div style="font-size:13px; color:#64748b; margin-bottom:10px;">📧 ${p.email}</div>` : ''}
       <div class="player-stats">
         <div class="stat-box">
           <span class="stat-label">Riešené</span>
@@ -258,14 +264,27 @@ async function render() {
 }
 
 async function create() {
-  const input = document.getElementById("nameInput");
-  const name = input.value.trim();
+  const name = document.getElementById("nameInput").value.trim();
+  const surname = document.getElementById("surnameInput").value.trim();
+  const email = document.getElementById("emailInput").value.trim();
+  const eloRaw = document.getElementById("eloInput").value.trim();
+  const elo = eloRaw ? Number(eloRaw) : 1500;
+
   if (!name) {
     alert("Zadaj meno hráča.");
     return;
   }
-  await createPlayer(name);
-  input.value = "";
+
+  if (eloRaw && (isNaN(elo) || elo < 100 || elo > 3000)) {
+    alert("ELO musí byť číslo medzi 100 a 3000.");
+    return;
+  }
+
+  await createPlayer(name, surname, email, elo);
+  document.getElementById("nameInput").value = "";
+  document.getElementById("surnameInput").value = "";
+  document.getElementById("emailInput").value = "";
+  document.getElementById("eloInput").value = "";
   await render();
 }
 
