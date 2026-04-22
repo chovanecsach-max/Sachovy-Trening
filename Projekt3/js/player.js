@@ -115,3 +115,24 @@ function getPlayerSuccessRate(player) {
   if (!played) return 0;
   return Math.round((solved / played) * 100);
 }
+
+async function deletePlayer(playerId) {
+  try {
+    // Najprv vymazať tréningový log hráča
+    await sbFetch(`training_log?player_id=eq.${playerId}`, {
+      method: "DELETE"
+    });
+    // Potom vymazať hráča
+    await sbFetch(`players?id=eq.${playerId}`, {
+      method: "DELETE"
+    });
+    // Ak bol vymazaný aktuálny hráč, odstrániť z localStorage
+    const currentId = localStorage.getItem("currentPlayer");
+    if (currentId == playerId) {
+      localStorage.removeItem("currentPlayer");
+    }
+  } catch (e) {
+    console.error("Chyba pri mazaní hráča:", e);
+    alert("Chyba pri mazaní hráča: " + e.message);
+  }
+}
