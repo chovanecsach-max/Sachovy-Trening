@@ -1,7 +1,7 @@
 <!DOCTYPE html>
-<html lang="sk">
-<head>
-<meta charset="UTF-8">
+<!-- saved from url=(0052)file:///C:/Users/mchovanec/Downloads/training_1.html -->
+<html lang="sk"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Tréning</title>
 
@@ -685,8 +685,8 @@ button:disabled {
   </div>
 </div>
 
-<script src="js/player.js"></script>
-<script src="js/training.js"></script>
+<script src="file:///C:/Users/mchovanec/Downloads/js/player.js"></script>
+<script src="file:///C:/Users/mchovanec/Downloads/js/training.js"></script>
 
 <script>
 const files = ['a','b','c','d','e','f','g','h'];
@@ -778,12 +778,12 @@ function formatLongTime(seconds) {
 function getPieceImagePath(pieceChar) {
   const color = isWhitePiece(pieceChar) ? 'w' : 'b';
   const piece = pieceChar.toUpperCase();
-  return `img/pieces/${color}${piece}.svg`;
+  return `img/Pieces/${color}${piece}.svg`;
 }
 
 function getPromotionImagePath(isWhite, code) {
   const color = isWhite ? 'w' : 'b';
-  return `img/pieces/${color}${code.toUpperCase()}.svg`;
+  return `img/Pieces/${color}${code.toUpperCase()}.svg`;
 }
 
 function updateAdminBadge() {
@@ -1923,5 +1923,5 @@ async function init() {
 
 init();
 </script>
-</body>
-</html>
+
+</body></html>
