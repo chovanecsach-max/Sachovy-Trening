@@ -33,11 +33,13 @@ async function loadPlayers() {
   }
 }
 
-async function createPlayer(name) {
+async function createPlayer(name, surname = '', email = '', elo = 1500) {
   const newPlayer = {
     id: Date.now(),
     name: name,
-    elo: 1500,
+    surname: surname,
+    email: email,
+    elo: elo,
     played: 0,
     solved: 0,
     total_time: 0
