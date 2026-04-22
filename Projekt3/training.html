@@ -844,8 +844,10 @@ function finishTrainingAndGoHome() {
 async function updatePlayerUI() {
   currentPlayer = await getCurrentPlayer();
   if (!currentPlayer) return;
-  document.getElementById('playerName').textContent = currentPlayer.name;
-  document.getElementById('playerElo').textContent = currentPlayer.elo;
+  const mode = getTrainingMode();
+  const eloLabel = { taktika: 'Taktika', strategia: 'Stratégia', koncovka: 'Koncovka', mix: 'Mix' }[mode] || 'Mix';
+  document.getElementById('playerName').textContent = currentPlayer.name + (currentPlayer.surname ? ' ' + currentPlayer.surname : '');
+  document.getElementById('playerElo').textContent = getPlayerEloByMode(currentPlayer, mode) + ' (' + eloLabel + ')';
 }
 
 function updateTimerUI() {
@@ -900,7 +902,7 @@ function recordResultOnce(result) {
   if (!currentPuzzleIsAdmin) {
     addTrainingResult(currentPlayer.id, current.id, result);
     registerPlayerResult(currentPlayer.id, result, usedTime);
-    updatePlayerElo(currentPlayer.id, current.elo, result);
+    updatePlayerElo(currentPlayer.id, current.elo, result, getTrainingMode());
     updateSessionStats(result, usedTime);
   }
 
