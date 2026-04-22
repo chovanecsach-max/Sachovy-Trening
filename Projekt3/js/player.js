@@ -3,8 +3,6 @@ const SUPABASE_KEY = "sb_publishable_45gFQhgPScrDjDCVC0B4Iw_q6uZKf9m";
 
 const CURRENT_KEY = "currentPlayer";
 
-// ─── Pomocná funkcia pre volanie Supabase REST API ───────────────────────────
-
 async function sbFetch(path, options = {}) {
   const url = `${SUPABASE_URL}/rest/v1/${path}`;
   const res = await fetch(url, {
@@ -25,8 +23,6 @@ async function sbFetch(path, options = {}) {
   return text ? JSON.parse(text) : null;
 }
 
-// ─── Načítanie hráčov ────────────────────────────────────────────────────────
-
 async function loadPlayers() {
   try {
     const data = await sbFetch("players?order=created_at.asc");
@@ -37,8 +33,6 @@ async function loadPlayers() {
   }
 }
 
-// ─── Vytvorenie hráča ────────────────────────────────────────────────────────
-
 async function createPlayer(name) {
   const newPlayer = {
     id: Date.now(),
@@ -48,7 +42,6 @@ async function createPlayer(name) {
     solved: 0,
     total_time: 0
   };
-
   try {
     await sbFetch("players", {
       method: "POST",
@@ -62,8 +55,6 @@ async function createPlayer(name) {
   }
 }
 
-// ─── Aktuálny hráč (localStorage) ───────────────────────────────────────────
-
 function setCurrentPlayer(id) {
   localStorage.setItem(CURRENT_KEY, id);
 }
@@ -71,7 +62,6 @@ function setCurrentPlayer(id) {
 async function getCurrentPlayer() {
   const id = localStorage.getItem(CURRENT_KEY);
   if (!id) return null;
-
   try {
     const data = await sbFetch(`players?id=eq.${id}&limit=1`);
     return data && data.length ? data[0] : null;
@@ -81,18 +71,14 @@ async function getCurrentPlayer() {
   }
 }
 
-// ─── Aktualizácia hráča ──────────────────────────────────────────────────────
-
 async function updatePlayerElo(playerId, puzzleElo, result) {
   try {
     const players = await sbFetch(`players?id=eq.${playerId}&limit=1`);
     if (!players || !players.length) return;
-
     const player = players[0];
     const diff = Number(puzzleElo) - Number(player.elo);
     let change = result === "win" ? 10 + diff / 50 : -(10 - diff / 50);
     const newElo = Math.max(100, Math.round(player.elo + change));
-
     await sbFetch(`players?id=eq.${playerId}`, {
       method: "PATCH",
       body: JSON.stringify({ elo: newElo })
@@ -106,7 +92,6 @@ async function registerPlayerResult(playerId, result, timeSpent = 0) {
   try {
     const players = await sbFetch(`players?id=eq.${playerId}&limit=1`);
     if (!players || !players.length) return;
-
     const player = players[0];
     const updates = {
       played: Number(player.played || 0) + 1,
@@ -115,7 +100,6 @@ async function registerPlayerResult(playerId, result, timeSpent = 0) {
     if (result === "win") {
       updates.solved = Number(player.solved || 0) + 1;
     }
-
     await sbFetch(`players?id=eq.${playerId}`, {
       method: "PATCH",
       body: JSON.stringify(updates)
