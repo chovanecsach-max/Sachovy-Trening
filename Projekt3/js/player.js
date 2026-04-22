@@ -23,6 +23,21 @@ async function sbFetch(path, options = {}) {
   return text ? JSON.parse(text) : null;
 }
 
+// ─── ELO podľa režimu ───────────────────────────────────────────────────────
+
+function getEloField(mode) {
+  if (mode === "taktika") return "elo_taktika";
+  if (mode === "strategia") return "elo_strategia";
+  if (mode === "koncovka") return "elo_koncovka";
+  return "elo";
+}
+
+function getPlayerEloByMode(player, mode) {
+  return Number(player[getEloField(mode)] || 1500);
+}
+
+// ─── Hráči ──────────────────────────────────────────────────────────────────
+
 async function loadPlayers() {
   try {
     const data = await sbFetch("players?order=created_at.asc");
@@ -40,6 +55,9 @@ async function createPlayer(name, surname = '', email = '', elo = 1500) {
     surname: surname,
     email: email,
     elo: elo,
+    elo_taktika: elo,
+    elo_strategia: elo,
+    elo_koncovka: elo,
     played: 0,
     solved: 0,
     total_time: 0
@@ -73,17 +91,21 @@ async function getCurrentPlayer() {
   }
 }
 
-async function updatePlayerElo(playerId, puzzleElo, result) {
+async function updatePlayerElo(playerId, puzzleElo, result, mode) {
   try {
     const players = await sbFetch(`players?id=eq.${playerId}&limit=1`);
     if (!players || !players.length) return;
     const player = players[0];
-    const diff = Number(puzzleElo) - Number(player.elo);
+
+    const eloField = getEloField(mode);
+    const currentElo = Number(player[eloField] || 1500);
+    const diff = Number(puzzleElo) - currentElo;
     let change = result === "win" ? 10 + diff / 50 : -(10 - diff / 50);
-    const newElo = Math.max(100, Math.round(player.elo + change));
+    const newElo = Math.max(100, Math.round(currentElo + change));
+
     await sbFetch(`players?id=eq.${playerId}`, {
       method: "PATCH",
-      body: JSON.stringify({ elo: newElo })
+      body: JSON.stringify({ [eloField]: newElo })
     });
   } catch (e) {
     console.error("Chyba pri aktualizácii ELO:", e);
@@ -120,19 +142,10 @@ function getPlayerSuccessRate(player) {
 
 async function deletePlayer(playerId) {
   try {
-    // Najprv vymazať tréningový log hráča
-    await sbFetch(`training_log?player_id=eq.${playerId}`, {
-      method: "DELETE"
-    });
-    // Potom vymazať hráča
-    await sbFetch(`players?id=eq.${playerId}`, {
-      method: "DELETE"
-    });
-    // Ak bol vymazaný aktuálny hráč, odstrániť z localStorage
+    await sbFetch(`training_log?player_id=eq.${playerId}`, { method: "DELETE" });
+    await sbFetch(`players?id=eq.${playerId}`, { method: "DELETE" });
     const currentId = localStorage.getItem("currentPlayer");
-    if (currentId == playerId) {
-      localStorage.removeItem("currentPlayer");
-    }
+    if (currentId == playerId) localStorage.removeItem("currentPlayer");
   } catch (e) {
     console.error("Chyba pri mazaní hráča:", e);
     alert("Chyba pri mazaní hráča: " + e.message);
