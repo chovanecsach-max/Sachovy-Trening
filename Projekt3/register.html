@@ -53,6 +53,7 @@ button {
 
 .primary { background: #111827; color: white; }
 .secondary { background: #e5e7eb; color: #111827; }
+.danger { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
 
 .player-list { display: grid; gap: 10px; }
 
@@ -225,11 +226,18 @@ async function render() {
       </div>
       <div class="player-actions">
         <button class="primary">Vybrať hráča</button>
+        <button class="danger">Vymazať hráča</button>
       </div>
     `;
 
-    card.querySelector("button").onclick = async () => {
+    card.querySelector(".primary").onclick = async () => {
       setCurrentPlayer(p.id);
+      await render();
+    };
+
+    card.querySelector(".danger").onclick = async () => {
+      if (!confirm(`Naozaj chceš vymazať hráča "${p.name}"? Táto akcia je nevratná.`)) return;
+      await deletePlayer(p.id);
       await render();
     };
 
