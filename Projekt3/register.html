@@ -51,20 +51,10 @@ button {
   font-size: 14px;
 }
 
-.primary {
-  background: #111827;
-  color: white;
-}
+.primary { background: #111827; color: white; }
+.secondary { background: #e5e7eb; color: #111827; }
 
-.secondary {
-  background: #e5e7eb;
-  color: #111827;
-}
-
-.player-list {
-  display: grid;
-  gap: 10px;
-}
+.player-list { display: grid; gap: 10px; }
 
 .player-card {
   border: 1px solid #d1d5db;
@@ -81,11 +71,7 @@ button {
   margin-bottom: 10px;
 }
 
-.player-name {
-  font-size: 18px;
-  font-weight: bold;
-  color: #111827;
-}
+.player-name { font-size: 18px; font-weight: bold; color: #111827; }
 
 .player-elo {
   display: inline-block;
@@ -121,11 +107,7 @@ button {
   text-transform: uppercase;
 }
 
-.stat-value {
-  font-size: 18px;
-  font-weight: bold;
-  color: #0f172a;
-}
+.stat-value { font-size: 18px; font-weight: bold; color: #0f172a; }
 
 .player-time {
   margin-bottom: 12px;
@@ -137,11 +119,7 @@ button {
   font-size: 14px;
 }
 
-.player-actions {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
+.player-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 
 .selected-info {
   margin-top: 16px;
@@ -152,36 +130,21 @@ button {
   color: #334155;
 }
 
-.empty {
-  color: #64748b;
-  font-style: italic;
-}
+.empty { color: #64748b; font-style: italic; }
 
 @media (max-width: 800px) {
-  .player-stats {
-    grid-template-columns: repeat(2, 1fr);
-  }
+  .player-stats { grid-template-columns: repeat(2, 1fr); }
 }
 
 @media (max-width: 640px) {
-  .player-top {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .player-stats {
-    grid-template-columns: 1fr;
-  }
-
-  .player-actions button {
-    flex: 1 1 auto;
-  }
+  .player-top { flex-direction: column; align-items: flex-start; }
+  .player-stats { grid-template-columns: 1fr; }
+  .player-actions button { flex: 1 1 auto; }
 }
 </style>
 </head>
 
 <body>
-
 <div class="container">
   <h2>Registrácia hráča</h2>
 
@@ -209,13 +172,11 @@ function formatTotalTime(totalSeconds) {
   const hours = Math.floor(safe / 3600);
   const minutes = Math.floor((safe % 3600) / 60);
   const seconds = safe % 60;
-
   return String(hours).padStart(2, '0') + ':' +
          String(minutes).padStart(2, '0') + ':' +
          String(seconds).padStart(2, '0');
 }
 
-function render() {
 async function render() {
   const list = await loadPlayers();
   const el = document.getElementById("players");
@@ -225,23 +186,22 @@ async function render() {
 
   if (!list.length) {
     el.innerHTML = '<div class="empty">Zatiaľ nie je vytvorený žiadny hráč.</div>';
+    return;
   }
 
   list.forEach(p => {
     const played = Number(p.played) || 0;
     const solved = Number(p.solved) || 0;
     const accuracy = percent(solved, played);
-    const totalTime = formatTotalTime(p.total_time || p.totalTime);
+    const totalTime = formatTotalTime(p.total_time || p.totalTime || 0);
 
     const card = document.createElement("div");
     card.className = "player-card";
-
     card.innerHTML = `
       <div class="player-top">
         <div class="player-name">${p.name}</div>
         <div class="player-elo">ELO ${p.elo}</div>
       </div>
-
       <div class="player-stats">
         <div class="stat-box">
           <span class="stat-label">Riešené</span>
@@ -260,19 +220,17 @@ async function render() {
           <div class="stat-value">${p.elo}</div>
         </div>
       </div>
-
       <div class="player-time">
         <strong>Celkový čas tréningu:</strong> ${totalTime}
       </div>
-
       <div class="player-actions">
         <button class="primary">Vybrať hráča</button>
       </div>
     `;
 
-    card.querySelector("button").onclick = () => {
+    card.querySelector("button").onclick = async () => {
       setCurrentPlayer(p.id);
-      render();
+      await render();
     };
 
     el.appendChild(card);
@@ -283,8 +241,7 @@ async function render() {
     const played = Number(selected.played) || 0;
     const solved = Number(selected.solved) || 0;
     const accuracy = percent(solved, played);
-    const totalTime = formatTotalTime(selected.total_time || selected.totalTime);
-
+    const totalTime = formatTotalTime(selected.total_time || selected.totalTime || 0);
     info.textContent =
       `Aktuálne vybraný hráč: ${selected.name} | ELO ${selected.elo} | Úspešnosť ${accuracy}% | Celkový čas ${totalTime}`;
   } else {
@@ -295,12 +252,10 @@ async function render() {
 async function create() {
   const input = document.getElementById("nameInput");
   const name = input.value.trim();
-
   if (!name) {
     alert("Zadaj meno hráča.");
     return;
   }
-
   await createPlayer(name);
   input.value = "";
   await render();
@@ -312,5 +267,5 @@ function back() {
 
 render();
 </script>
-
 </body>
+</html>
