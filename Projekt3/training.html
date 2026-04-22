@@ -818,8 +818,8 @@ function closeEndTrainingModal() {
   document.getElementById('sessionOverlay').classList.remove('active');
 }
 
-function updateSessionSummaryUI() {
-  currentPlayer = getCurrentPlayer();
+async function updateSessionSummaryUI() {
+  currentPlayer = await getCurrentPlayer();
 
   const accuracy = sessionStats.played === 0
     ? 0
@@ -841,8 +841,8 @@ function finishTrainingAndGoHome() {
   location.href = "index.html";
 }
 
-function updatePlayerUI() {
-  currentPlayer = getCurrentPlayer();
+async function updatePlayerUI() {
+  currentPlayer = await getCurrentPlayer();
   if (!currentPlayer) return;
   document.getElementById('playerName').textContent = currentPlayer.name;
   document.getElementById('playerElo').textContent = currentPlayer.elo;
@@ -1807,15 +1807,15 @@ function loadPuzzleObject(puzzle, isAdmin = false) {
   }
 }
 
-function loadPuzzleForPlayer() {
-  currentPlayer = getCurrentPlayer();
+async function loadPuzzleForPlayer() {
+  currentPlayer = await getCurrentPlayer();
   if (!currentPlayer) {
     alert("Nie je vybraný hráč.");
     location.href = "index.html";
     return;
   }
 
-  const puzzle = pickPuzzleForPlayer(currentPlayer, puzzles);
+  const puzzle = await pickPuzzleForPlayer(currentPlayer, puzzles);
   if (!puzzle) {
     alert("Nenašla sa žiadna úloha.");
     return;
@@ -1881,7 +1881,7 @@ async function showSolution() {
 }
 
 async function init() {
-  currentPlayer = getCurrentPlayer();
+  currentPlayer = await getCurrentPlayer();
   if (!currentPlayer) {
     alert("Najprv vyber hráča.");
     location.href = "index.html";
@@ -1889,22 +1889,18 @@ async function init() {
   }
 
   try {
-    const r = await fetch('./data/puzzles-test.json');
-    if (!r.ok) {
-      throw new Error('Súbor puzzles-test.json sa nenašiel');
-    }
-    puzzles = await r.json();
+    puzzles = await loadPuzzlesFromSupabase();
     if (!Array.isArray(puzzles) || !puzzles.length) {
-      throw new Error('Prázdny JSON');
+      throw new Error('Žiadne puzzle v databáze');
     }
   } catch (e) {
-    setStatus('JSON chyba: ' + e.message, 'error');
+    setStatus('Chyba pri načítaní puzzle: ' + e.message, 'error');
     return;
   }
 
   loadStats();
   updateStatsUI();
-  updatePlayerUI();
+  await updatePlayerUI();
   initSessionStats();
 
   const adminPuzzleId = localStorage.getItem("adminPuzzleId");
@@ -1912,10 +1908,8 @@ async function init() {
 
   if (adminPuzzleId) {
     const puzzle = puzzles.find(p => Number(p.id) === Number(adminPuzzleId));
-
     localStorage.removeItem("adminPuzzleId");
     localStorage.removeItem("adminMode");
-
     if (puzzle) {
       loadPuzzleObject(puzzle, adminMode);
       return;
