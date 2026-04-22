@@ -1,96 +1,133 @@
-const PLAYER_KEY = "players";
+const SUPABASE_URL = "https://wdjsilryllqksdtmaehy.supabase.co";
+const SUPABASE_KEY = "sb_publishable_45gFQhgPScrDjDCVC0B4Iw_q6uZKf9m";
+
 const CURRENT_KEY = "currentPlayer";
 
-function loadPlayers() {
-  return JSON.parse(localStorage.getItem(PLAYER_KEY) || "[]");
+// ─── Pomocná funkcia pre volanie Supabase REST API ───────────────────────────
+
+async function sbFetch(path, options = {}) {
+  const url = `${SUPABASE_URL}/rest/v1/${path}`;
+  const res = await fetch(url, {
+    ...options,
+    headers: {
+      "apikey": SUPABASE_KEY,
+      "Authorization": `Bearer ${SUPABASE_KEY}`,
+      "Content-Type": "application/json",
+      "Prefer": options.prefer || "",
+      ...(options.headers || {})
+    }
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Supabase chyba: ${err}`);
+  }
+  const text = await res.text();
+  return text ? JSON.parse(text) : null;
 }
 
-function savePlayers(players) {
-  localStorage.setItem(PLAYER_KEY, JSON.stringify(players));
+// ─── Načítanie hráčov ────────────────────────────────────────────────────────
+
+async function loadPlayers() {
+  try {
+    const data = await sbFetch("players?order=created_at.asc");
+    return data || [];
+  } catch (e) {
+    console.error("Chyba pri načítaní hráčov:", e);
+    return [];
+  }
 }
 
-function createPlayer(name) {
-  const players = loadPlayers();
+// ─── Vytvorenie hráča ────────────────────────────────────────────────────────
 
+async function createPlayer(name) {
   const newPlayer = {
     id: Date.now(),
     name: name,
     elo: 1500,
     played: 0,
     solved: 0,
-    totalTime: 0
+    total_time: 0
   };
 
-  players.push(newPlayer);
-  savePlayers(players);
+  try {
+    await sbFetch("players", {
+      method: "POST",
+      prefer: "return=representation",
+      body: JSON.stringify(newPlayer)
+    });
+    return newPlayer;
+  } catch (e) {
+    console.error("Chyba pri vytváraní hráča:", e);
+    return null;
+  }
 }
+
+// ─── Aktuálny hráč (localStorage) ───────────────────────────────────────────
 
 function setCurrentPlayer(id) {
   localStorage.setItem(CURRENT_KEY, id);
 }
 
-function getCurrentPlayer() {
+async function getCurrentPlayer() {
   const id = localStorage.getItem(CURRENT_KEY);
   if (!id) return null;
 
-  const players = loadPlayers();
-  return players.find(p => p.id == id) || null;
+  try {
+    const data = await sbFetch(`players?id=eq.${id}&limit=1`);
+    return data && data.length ? data[0] : null;
+  } catch (e) {
+    console.error("Chyba pri načítaní aktuálneho hráča:", e);
+    return null;
+  }
 }
 
-function updatePlayer(playerId, updater) {
-  const players = loadPlayers();
-  const index = players.findIndex(p => p.id == playerId);
+// ─── Aktualizácia hráča ──────────────────────────────────────────────────────
 
-  if (index === -1) return null;
+async function updatePlayerElo(playerId, puzzleElo, result) {
+  try {
+    const players = await sbFetch(`players?id=eq.${playerId}&limit=1`);
+    if (!players || !players.length) return;
 
-  updater(players[index]);
-  savePlayers(players);
-  return players[index];
-}
-
-function updatePlayerElo(playerId, puzzleElo, result) {
-  return updatePlayer(playerId, (player) => {
+    const player = players[0];
     const diff = Number(puzzleElo) - Number(player.elo);
-    let change = 0;
+    let change = result === "win" ? 10 + diff / 50 : -(10 - diff / 50);
+    const newElo = Math.max(100, Math.round(player.elo + change));
 
+    await sbFetch(`players?id=eq.${playerId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ elo: newElo })
+    });
+  } catch (e) {
+    console.error("Chyba pri aktualizácii ELO:", e);
+  }
+}
+
+async function registerPlayerResult(playerId, result, timeSpent = 0) {
+  try {
+    const players = await sbFetch(`players?id=eq.${playerId}&limit=1`);
+    if (!players || !players.length) return;
+
+    const player = players[0];
+    const updates = {
+      played: Number(player.played || 0) + 1,
+      total_time: Number(player.total_time || 0) + Number(timeSpent || 0)
+    };
     if (result === "win") {
-      change = 10 + diff / 50;
-    } else {
-      change = -(10 - diff / 50);
+      updates.solved = Number(player.solved || 0) + 1;
     }
 
-    player.elo = Math.max(100, Math.round(player.elo + change));
-  });
-}
-
-function addPlayerPlayed(playerId, timeSpent = 0) {
-  return updatePlayer(playerId, (player) => {
-    player.played = Number(player.played || 0) + 1;
-    player.totalTime = Number(player.totalTime || 0) + Number(timeSpent || 0);
-  });
-}
-
-function addPlayerSolved(playerId) {
-  return updatePlayer(playerId, (player) => {
-    player.solved = Number(player.solved || 0) + 1;
-  });
-}
-
-function registerPlayerResult(playerId, result, timeSpent = 0) {
-  return updatePlayer(playerId, (player) => {
-    player.played = Number(player.played || 0) + 1;
-    player.totalTime = Number(player.totalTime || 0) + Number(timeSpent || 0);
-
-    if (result === "win") {
-      player.solved = Number(player.solved || 0) + 1;
-    }
-  });
+    await sbFetch(`players?id=eq.${playerId}`, {
+      method: "PATCH",
+      body: JSON.stringify(updates)
+    });
+  } catch (e) {
+    console.error("Chyba pri ukladaní výsledku hráča:", e);
+  }
 }
 
 function getPlayerSuccessRate(player) {
   const played = Number(player?.played || 0);
   const solved = Number(player?.solved || 0);
-
   if (!played) return 0;
   return Math.round((solved / played) * 100);
 }
