@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+<meta charset="UTF-8">
+<title>Registrácia hráča</title>
+
+<style>
+body {
+  font-family: Arial, sans-serif;
+  background: #f4f4f6;
+  display: flex;
+  justify-content: center;
+  padding: 30px;
+  margin: 0;
+}
+
+.container {
+  background: white;
+  padding: 20px;
+  border-radius: 12px;
+  width: min(900px, 100%);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+}
+
+h2, h3 {
+  margin-top: 0;
+}
+
+input {
+  width: 100%;
+  padding: 10px;
+  margin-bottom: 10px;
+  box-sizing: border-box;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 14px;
+}
+
+.buttons-top {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+
+button {
+  padding: 10px 12px;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.primary {
+  background: #111827;
+  color: white;
+}
+
+.secondary {
+  background: #e5e7eb;
+  color: #111827;
+}
+
+.player-list {
+  display: grid;
+  gap: 10px;
+}
+
+.player-card {
+  border: 1px solid #d1d5db;
+  border-radius: 12px;
+  padding: 14px;
+  background: #ffffff;
+}
+
+.player-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.player-name {
+  font-size: 18px;
+  font-weight: bold;
+  color: #111827;
+}
+
+.player-elo {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #93c5fd;
+  font-weight: bold;
+  font-size: 13px;
+}
+
+.player-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.stat-box {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 10px 8px;
+  text-align: center;
+}
+
+.stat-label {
+  display: block;
+  font-size: 11px;
+  color: #64748b;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+}
+
+.stat-value {
+  font-size: 18px;
+  font-weight: bold;
+  color: #0f172a;
+}
+
+.player-time {
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #faf5ff;
+  border: 1px solid #d8b4fe;
+  color: #6b21a8;
+  font-size: 14px;
+}
+
+.player-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.selected-info {
+  margin-top: 16px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  color: #334155;
+}
+
+.empty {
+  color: #64748b;
+  font-style: italic;
+}
+
+@media (max-width: 800px) {
+  .player-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .player-top {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .player-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .player-actions button {
+    flex: 1 1 auto;
+  }
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+  <h2>Registrácia hráča</h2>
+
+  <input id="nameInput" placeholder="Meno hráča">
+  <div class="buttons-top">
+    <button class="primary" onclick="create()">Vytvoriť hráča</button>
+    <button class="secondary" onclick="back()">Späť do menu</button>
+  </div>
+
+  <h3>Zoznam hráčov</h3>
+  <div id="players" class="player-list"></div>
+
+  <div id="selectedInfo" class="selected-info">Aktuálne vybraný hráč: nikto</div>
+</div>
+
+<script src="js/player.js"></script>
+<script>
+function percent(solved, played) {
+  if (!played) return 0;
+  return Math.round((solved / played) * 100);
+}
+
+function formatTotalTime(totalSeconds) {
+  const safe = Math.max(0, Math.floor(Number(totalSeconds) || 0));
+  const hours = Math.floor(safe / 3600);
+  const minutes = Math.floor((safe % 3600) / 60);
+  const seconds = safe % 60;
+
+  return String(hours).padStart(2, '0') + ':' +
+         String(minutes).padStart(2, '0') + ':' +
+         String(seconds).padStart(2, '0');
+}
+
+function render() {
+  const list = loadPlayers();
+  const el = document.getElementById("players");
+  const selected = getCurrentPlayer();
+
+  el.innerHTML = "";
+
+  if (!list.length) {
+    el.innerHTML = '<div class="empty">Zatiaľ nie je vytvorený žiadny hráč.</div>';
+  }
+
+  list.forEach(p => {
+    const played = Number(p.played) || 0;
+    const solved = Number(p.solved) || 0;
+    const accuracy = percent(solved, played);
+    const totalTime = formatTotalTime(p.totalTime);
+
+    const card = document.createElement("div");
+    card.className = "player-card";
+
+    card.innerHTML = `
+      <div class="player-top">
+        <div class="player-name">${p.name}</div>
+        <div class="player-elo">ELO ${p.elo}</div>
+      </div>
+
+      <div class="player-stats">
+        <div class="stat-box">
+          <span class="stat-label">Riešené</span>
+          <div class="stat-value">${played}</div>
+        </div>
+        <div class="stat-box">
+          <span class="stat-label">Vyriešené</span>
+          <div class="stat-value">${solved}</div>
+        </div>
+        <div class="stat-box">
+          <span class="stat-label">Úspešnosť</span>
+          <div class="stat-value">${accuracy}%</div>
+        </div>
+        <div class="stat-box">
+          <span class="stat-label">ELO</span>
+          <div class="stat-value">${p.elo}</div>
+        </div>
+      </div>
+
+      <div class="player-time">
+        <strong>Celkový čas tréningu:</strong> ${totalTime}
+      </div>
+
+      <div class="player-actions">
+        <button class="primary">Vybrať hráča</button>
+      </div>
+    `;
+
+    card.querySelector("button").onclick = () => {
+      setCurrentPlayer(p.id);
+      render();
+    };
+
+    el.appendChild(card);
+  });
+
+  const info = document.getElementById("selectedInfo");
+  if (selected) {
+    const played = Number(selected.played) || 0;
+    const solved = Number(selected.solved) || 0;
+    const accuracy = percent(solved, played);
+    const totalTime = formatTotalTime(selected.totalTime);
+
+    info.textContent =
+      `Aktuálne vybraný hráč: ${selected.name} | ELO ${selected.elo} | Úspešnosť ${accuracy}% | Celkový čas ${totalTime}`;
+  } else {
+    info.textContent = "Aktuálne vybraný hráč: nikto";
+  }
+}
+
+function create() {
+  const input = document.getElementById("nameInput");
+  const name = input.value.trim();
+
+  if (!name) {
+    alert("Zadaj meno hráča.");
+    return;
+  }
+
+  createPlayer(name);
+  input.value = "";
+  render();
+}
+
+function back() {
+  location.href = "index.html";
+}
+
+render();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Administrácia úloh</title>
+
+<style>
+body {
+  font-family: Arial, sans-serif;
+  background: #f4f4f6;
+  margin: 0;
+  padding: 12px;
+  color: #111827;
+}
+
+.app {
+  max-width: 980px;
+  margin: 0 auto;
+  background: white;
+  border-radius: 14px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+  padding: 16px;
+}
+
+h1 {
+  margin: 0 0 6px 0;
+  text-align: center;
+  font-size: 26px;
+}
+
+.subtitle {
+  text-align: center;
+  color: #475569;
+  margin: 0 0 16px 0;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.card {
+  border: 1px solid #d1d5db;
+  border-radius: 12px;
+  background: #fff;
+  padding: 14px;
+}
+
+.card h2 {
+  margin: 0 0 12px 0;
+  font-size: 18px;
+}
+
+.row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+input, textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  font-size: 14px;
+  background: #fff;
+}
+
+textarea {
+  min-height: 120px;
+  resize: vertical;
+}
+
+.row input {
+  flex: 1;
+  min-width: 160px;
+}
+
+button {
+  padding: 10px 14px;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.primary {
+  background: #111827;
+  color: white;
+}
+
+.secondary {
+  background: #e5e7eb;
+  color: #111827;
+}
+
+.admin {
+  background: #fff7ed;
+  color: #c2410c;
+  border: 1px solid #fdba74;
+}
+
+.result {
+  margin-top: 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 12px;
+  padding: 14px;
+  background: #f8fafc;
+}
+
+.result.hidden {
+  display: none;
+}
+
+.result h3 {
+  margin: 0 0 10px 0;
+  font-size: 17px;
+}
+
+.result-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.result-box {
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 10px;
+}
+
+.label {
+  font-size: 11px;
+  color: #64748b;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.value {
+  font-size: 14px;
+  font-weight: 600;
+  word-break: break-word;
+}
+
+.actions {
+  margin-top: 12px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.status {
+  margin-top: 12px;
+  padding: 10px;
+  border-radius: 10px;
+  border: 1px solid #d1d5db;
+  background: #f8fafc;
+  color: #334155;
+}
+
+.status.error {
+  background: #fef2f2;
+  border-color: #fca5a5;
+  color: #b91c1c;
+}
+
+.status.success {
+  background: #f0fdf4;
+  border-color: #86efac;
+  color: #166534;
+}
+
+.tip {
+  margin-top: 10px;
+  font-size: 13px;
+  color: #64748b;
+}
+
+@media (max-width: 900px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 700px) {
+  body {
+    padding: 6px;
+  }
+
+  .app {
+    padding: 10px;
+  }
+
+  .result-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .row {
+    flex-direction: column;
+  }
+
+  .actions {
+    flex-direction: column;
+  }
+
+  .actions button {
+    width: 100%;
+  }
+}
+</style>
+</head>
+
+<body>
+<div class="app">
+  <h1>Administrácia úloh</h1>
+  <p class="subtitle">Vyhľadanie a testovanie konkrétnej úlohy bez zápisu do tréningu hráča.</p>
+
+  <div class="layout">
+    <div class="card">
+      <h2>Vyhľadanie podľa ID</h2>
+      <div class="row">
+        <input id="puzzleIdInput" type="number" placeholder="Zadaj ID úlohy">
+        <button class="primary" onclick="findById()">Nájsť podľa ID</button>
+      </div>
+      <div class="tip">Použi, keď poznáš presné ID úlohy.</div>
+    </div>
+
+    <div class="card">
+      <h2>Vyhľadanie podľa FEN</h2>
+      <textarea id="fenInput" placeholder="Vlož FEN pozície"></textarea>
+      <div class="actions">
+        <button class="primary" onclick="findByFenExact()">Nájsť podľa celého FEN</button>
+        <button class="secondary" onclick="findByFenBoardOnly()">Nájsť podľa rozostavenia figúr</button>
+      </div>
+      <div class="tip">
+        Druhá voľba porovnáva iba prvú časť FEN, teda samotné rozostavenie figúr.
+      </div>
+    </div>
+  </div>
+
+  <div id="resultBox" class="result hidden">
+    <h3>Nájdená úloha</h3>
+
+    <div class="result-grid">
+      <div class="result-box">
+        <div class="label">ID</div>
+        <div id="resId" class="value">-</div>
+      </div>
+      <div class="result-box">
+        <div class="label">Názov</div>
+        <div id="resTitle" class="value">-</div>
+      </div>
+      <div class="result-box">
+        <div class="label">FEN</div>
+        <div id="resFen" class="value">-</div>
+      </div>
+      <div class="result-box">
+        <div class="label">ELO</div>
+        <div id="resElo" class="value">-</div>
+      </div>
+      <div class="result-box">
+        <div class="label">Kategória</div>
+        <div id="resCategory" class="value">-</div>
+      </div>
+      <div class="result-box">
+        <div class="label">Čas</div>
+        <div id="resTime" class="value">-</div>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="admin" onclick="openInAdminTraining()">Otvoriť v testovacom režime</button>
+      <button class="secondary" onclick="clearResult()">Vymazať výsledok</button>
+    </div>
+  </div>
+
+  <div id="status" class="status">Stav: pripravené</div>
+
+  <div class="actions">
+    <button class="secondary" onclick="goHome()">Späť do menu</button>
+  </div>
+</div>
+
+<script>
+let puzzles = [];
+let selectedPuzzle = null;
+
+function setStatus(text, type = "") {
+  const el = document.getElementById("status");
+  el.textContent = "Stav: " + text;
+  el.className = "status" + (type ? " " + type : "");
+}
+
+function normalizeFenBoardOnly(fen) {
+  return String(fen || "").trim().split(/\s+/)[0] || "";
+}
+
+function showPuzzle(puzzle) {
+  selectedPuzzle = puzzle;
+  document.getElementById("resultBox").classList.remove("hidden");
+  document.getElementById("resId").textContent = puzzle.id ?? "-";
+  document.getElementById("resTitle").textContent = puzzle.title || "-";
+  document.getElementById("resFen").textContent = puzzle.fen || "-";
+  document.getElementById("resElo").textContent = puzzle.elo ?? "-";
+  document.getElementById("resCategory").textContent = puzzle.category || "-";
+  document.getElementById("resTime").textContent = puzzle.time ?? "-";
+}
+
+function clearResult() {
+  selectedPuzzle = null;
+  document.getElementById("resultBox").classList.add("hidden");
+  setStatus("Výsledok bol vymazaný");
+}
+
+function findById() {
+  const wantedId = Number(document.getElementById("puzzleIdInput").value);
+
+  if (!Number.isFinite(wantedId)) {
+    setStatus("Zadaj platné ID úlohy", "error");
+    return;
+  }
+
+  const puzzle = puzzles.find(p => Number(p.id) === wantedId);
+
+  if (!puzzle) {
+    setStatus("Úloha s týmto ID neexistuje", "error");
+    return;
+  }
+
+  showPuzzle(puzzle);
+  setStatus("Úloha podľa ID bola nájdená", "success");
+}
+
+function findByFenExact() {
+  const fen = document.getElementById("fenInput").value.trim();
+
+  if (!fen) {
+    setStatus("Zadaj FEN", "error");
+    return;
+  }
+
+  const puzzle = puzzles.find(p => String(p.fen || "").trim() === fen);
+
+  if (!puzzle) {
+    setStatus("Úloha s týmto presným FEN sa nenašla", "error");
+    return;
+  }
+
+  showPuzzle(puzzle);
+  setStatus("Úloha podľa celého FEN bola nájdená", "success");
+}
+
+function findByFenBoardOnly() {
+  const fen = document.getElementById("fenInput").value.trim();
+
+  if (!fen) {
+    setStatus("Zadaj FEN", "error");
+    return;
+  }
+
+  const wantedBoard = normalizeFenBoardOnly(fen);
+  const puzzle = puzzles.find(p => normalizeFenBoardOnly(p.fen) === wantedBoard);
+
+  if (!puzzle) {
+    setStatus("Úloha podľa rozostavenia figúr sa nenašla", "error");
+    return;
+  }
+
+  showPuzzle(puzzle);
+  setStatus("Úloha podľa rozostavenia figúr bola nájdená", "success");
+}
+
+function openInAdminTraining() {
+  if (!selectedPuzzle) {
+    setStatus("Najprv nájdi úlohu", "error");
+    return;
+  }
+
+  localStorage.setItem("adminPuzzleId", String(selectedPuzzle.id));
+  localStorage.setItem("adminMode", "true");
+  location.href = "training.html";
+}
+
+function goHome() {
+  location.href = "index.html";
+}
+
+async function init() {
+  try {
+    const r = await fetch("./data/puzzles-test.json?v=" + Date.now(), { cache: "no-store" });
+    if (!r.ok) throw new Error("Súbor puzzles-test.json sa nenašiel");
+    puzzles = await r.json();
+    if (!Array.isArray(puzzles) || !puzzles.length) throw new Error("Prázdny JSON");
+    setStatus("JSON načítaný, môžeš vyhľadávať");
+  } catch (e) {
+    setStatus("Chyba pri načítaní JSON: " + e.message, "error");
+  }
+}
+
+init();
+</script>
+</body>
+</html>

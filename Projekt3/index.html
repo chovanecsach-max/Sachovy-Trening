@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Šachový tréning</title>
+
+<style>
+body {
+  font-family: Arial, sans-serif;
+  background: #f4f4f6;
+  margin: 0;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.container {
+  width: min(520px, 92vw);
+  background: white;
+  border-radius: 16px;
+  padding: 28px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+  text-align: center;
+}
+
+h1 {
+  margin: 0 0 10px 0;
+  font-size: 30px;
+}
+
+p {
+  margin: 0 0 22px 0;
+  color: #475569;
+}
+
+.menu {
+  display: grid;
+  gap: 12px;
+}
+
+button {
+  padding: 14px 16px;
+  font-size: 16px;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+}
+
+.primary {
+  background: #111827;
+  color: white;
+}
+
+.secondary {
+  background: #e5e7eb;
+  color: #111827;
+}
+
+.admin {
+  background: #fff7ed;
+  color: #c2410c;
+  border: 1px solid #fdba74;
+}
+</style>
+</head>
+
+<body>
+<div class="container">
+  <h1>Šachový tréning</h1>
+  <p>Vyber si, čo chceš robiť.</p>
+
+  <div class="menu">
+    <button class="primary" onclick="goTraining('taktika')">Tréning taktika</button>
+    <button class="primary" onclick="goTraining('strategia')">Tréning stratégia</button>
+    <button class="primary" onclick="goTraining('koncovka')">Tréning koncovka</button>
+    <button class="primary" onclick="goTraining('mix')">Mix</button>
+
+    <button class="secondary" onclick="goRegister()">Registrácia hráča</button>
+    <button class="admin" onclick="goAdmin()">Administrácia</button>
+  </div>
+</div>
+
+<script>
+function goTraining(mode) {
+  location.href = "training.html?mode=" + mode;
+}
+
+function goRegister() {
+  location.href = "register.html";
+}
+
+function goAdmin() {
+  location.href = "admin.html";
+}
+</script>
+</body>
+</html>

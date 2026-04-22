@@ -1,0 +1,1931 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tréning</title>
+
+<style>
+body {
+  font-family: Arial, sans-serif;
+  background: #f4f4f6;
+  margin: 0;
+  padding: 10px;
+  color: #111827;
+}
+
+.app {
+  max-width: 1280px;
+  margin: 0 auto;
+  background: white;
+  border-radius: 14px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+  padding: 12px;
+}
+
+h1 {
+  display: none;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(420px, 1fr) 360px;
+  gap: 12px;
+  align-items: start;
+}
+
+.left-column,
+.right-column {
+  min-width: 0;
+}
+
+.board-card,
+.panel-card,
+.stats-card {
+  border: 1px solid #d1d5db;
+  border-radius: 12px;
+  background: white;
+}
+
+.board-card {
+  padding: 10px;
+}
+
+.panel-card,
+.stats-card {
+  padding: 10px 12px;
+}
+
+
+.board-area {
+  position: relative;
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 auto;
+}
+
+.board-prompt {
+  text-align: center;
+  margin: 0 0 10px 0;
+  font-size: 22px;
+}
+
+.turn-indicator {
+  position: absolute;
+  right: -18px;
+  bottom: 56px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid #111827;
+  background: white;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+}
+
+.turn-indicator.black {
+  background: #111827;
+}
+
+.turn-indicator.white {
+  background: white;
+}
+
+.board {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  grid-template-rows: repeat(8, 1fr);
+  width: min(100%, 74vh);
+  max-width: 720px;
+  aspect-ratio: 1 / 1;
+  margin: auto;
+  border: 8px solid #5b4636;
+  border-radius: 8px;
+  overflow: hidden;
+  position: relative;
+}
+
+.square {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  cursor: grab;
+  position: relative;
+  box-sizing: border-box;
+  user-select: none;
+}
+
+.square.drag-origin {
+  opacity: 0.35;
+}
+
+.square img.piece-img {
+  width: 85%;
+  height: 85%;
+  object-fit: contain;
+  pointer-events: none;
+  user-select: none;
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.4));
+}
+
+.light { background: #f4e7c7; }
+.dark { background: #7a9b76; }
+
+.square.selected {
+  outline: 3px solid #2563eb;
+  outline-offset: -3px;
+}
+
+.square.last-from {
+  box-shadow: inset 0 0 0 9999px rgba(59, 130, 246, 0.20);
+}
+
+.square.last-to {
+  box-shadow: inset 0 0 0 9999px rgba(34, 197, 94, 0.22);
+}
+
+.square.legal::after {
+  content: "";
+  position: absolute;
+  width: 22%;
+  height: 22%;
+  border-radius: 50%;
+  background: rgba(34, 197, 94, 0.55);
+}
+
+.square.capture::after {
+  content: "";
+  position: absolute;
+  inset: 6px;
+  border: 4px solid rgba(239, 68, 68, 0.75);
+  border-radius: 50%;
+  box-sizing: border-box;
+}
+
+.coord-file,
+.coord-rank {
+  position: absolute;
+  font-size: 10px;
+  font-weight: bold;
+  opacity: 0.75;
+  z-index: 3;
+}
+
+.coord-file {
+  right: 4px;
+  bottom: 2px;
+}
+
+.coord-rank {
+  left: 4px;
+  top: 2px;
+}
+
+.panel-card h2 {
+  margin: 0 0 6px 0;
+  font-size: 18px;
+}
+
+.meta-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.meta-box {
+  border: 1px solid #e5e7eb;
+  background: #f8fafc;
+  border-radius: 10px;
+  padding: 8px;
+  min-width: 0;
+}
+
+.meta-label {
+  font-size: 11px;
+  color: #64748b;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.meta-value {
+  font-size: 14px;
+  font-weight: 600;
+  word-break: break-word;
+}
+
+.badge {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: bold;
+  border: 1px solid #d1d5db;
+  background: #f8fafc;
+  color: #334155;
+}
+
+.badge.elo {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border-color: #93c5fd;
+}
+
+.badge.time {
+  background: #f5f3ff;
+  color: #6d28d9;
+  border-color: #c4b5fd;
+}
+
+.badge.player {
+  background: #ecfeff;
+  color: #155e75;
+  border-color: #67e8f9;
+}
+
+.badge.admin {
+  background: #fff7ed;
+  color: #c2410c;
+  border-color: #fdba74;
+}
+
+.badge.timer-ok {
+  background: #ecfdf5;
+  color: #166534;
+  border-color: #86efac;
+}
+
+.badge.timer-warning {
+  background: #fff7ed;
+  color: #c2410c;
+  border-color: #fdba74;
+}
+
+.badge.timer-expired {
+  background: #fef2f2;
+  color: #b91c1c;
+  border-color: #fca5a5;
+}
+
+.buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+button {
+  padding: 10px 12px;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.primary { background:#111827; color:white; }
+.secondary { background:#e5e7eb; color:#111827; }
+.danger { background:#fee2e2; color:#991b1b; }
+.accent { background:#dbeafe; color:#1d4ed8; }
+
+.status {
+  text-align: center;
+  padding: 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  background: #f9fafb;
+  color: #111827;
+  font-size: 14px;
+}
+
+.status.info {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+  color: #334155;
+}
+
+.status.success {
+  background: #f0fdf4;
+  border-color: #86efac;
+  color: #166534;
+}
+
+.status.error {
+  background: #fef2f2;
+  border-color: #fca5a5;
+  color: #b91c1c;
+}
+
+.status.warning {
+  background: #fff7ed;
+  border-color: #fdba74;
+  color: #c2410c;
+}
+
+.stats-card {
+  margin-top: 12px;
+}
+
+.stats-card h3 {
+  margin: 0 0 10px 0;
+  font-size: 15px;
+  text-align: center;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.stat-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 10px 8px;
+  text-align: center;
+}
+
+.stat-label {
+  display: block;
+  font-size: 11px;
+  color: #64748b;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+}
+
+.stat-value {
+  font-size: 18px;
+  font-weight: bold;
+  color: #0f172a;
+}
+
+.drag-piece {
+  position: fixed;
+  pointer-events: none;
+  z-index: 9999;
+  transform: translate(-50%, -50%);
+  display: none;
+}
+
+.drag-piece img {
+  width: clamp(36px, 6vh, 52px);
+  height: clamp(36px, 6vh, 52px);
+  object-fit: contain;
+  filter: drop-shadow(0 3px 8px rgba(0,0,0,0.25));
+}
+
+.promotion-overlay,
+.session-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.35);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 9998;
+}
+
+.promotion-overlay.active,
+.session-overlay.active {
+  display: flex;
+}
+
+.promotion-modal,
+.session-modal {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+  padding: 14px;
+  max-width: 90vw;
+}
+
+.promotion-modal {
+  min-width: 320px;
+}
+
+.session-modal {
+  min-width: 360px;
+  max-width: 520px;
+}
+
+.promotion-modal-title,
+.session-modal-title {
+  font-size: 15px;
+  font-weight: bold;
+  margin-bottom: 12px;
+  color: #111827;
+  text-align: left;
+}
+
+.promotion-modal-options {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+
+.promotion-option {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  cursor: pointer;
+  background: #ffffff;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.promotion-option:hover {
+  background: #eef2ff;
+  transform: translateY(-1px);
+}
+
+.promotion-option img {
+  width: 44px;
+  height: 44px;
+  object-fit: contain;
+  pointer-events: none;
+}
+
+.session-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.session-box {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 10px;
+}
+
+.session-box-label {
+  font-size: 11px;
+  color: #64748b;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.session-box-value {
+  font-size: 18px;
+  font-weight: bold;
+  color: #0f172a;
+}
+
+.session-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+@media (max-width: 1024px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+
+  .board {
+    width: min(100%, 82vw);
+  }
+
+  .turn-indicator {
+    right: -16px;
+    bottom: 48px;
+  }
+
+  .right-column {
+    order: -1;
+  }
+}
+
+@media (max-width: 700px) {
+  body {
+    padding: 6px;
+  }
+
+  .app {
+    padding: 8px;
+  }
+
+  h1 {
+    font-size: 20px;
+    margin-bottom: 8px;
+  }
+
+  .meta-grid,
+  .session-grid,
+  .session-actions,
+  .buttons,
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .promotion-modal {
+    min-width: 280px;
+  }
+
+  .session-modal {
+    min-width: 280px;
+  }
+
+  .board-prompt {
+    font-size: 18px;
+    margin-bottom: 8px;
+  }
+
+  .turn-indicator {
+    right: -12px;
+    bottom: 38px;
+    width: 18px;
+    height: 18px;
+  }
+}
+</style>
+</head>
+
+<body>
+<div class="app">
+  <div class="layout">
+    <div class="left-column">
+      <div class="board-card">
+        <div class="board-area">
+          <h2 id="promptText" class="board-prompt">Nájdi najlepší ťah</h2>
+          <div id="board" class="board"></div>
+          <div id="turnIndicator" class="turn-indicator white" aria-label="Na ťahu"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="right-column">
+      <div class="panel-card">
+
+        <div class="meta-grid">
+          <div class="meta-box">
+            <div class="meta-label">Hráč</div>
+            <div class="meta-value"><span id="playerName" class="badge player">-</span></div>
+          </div>
+          <div class="meta-box">
+            <div class="meta-label">ELO hráča</div>
+            <div class="meta-value"><span id="playerElo" class="badge player">-</span></div>
+          </div>
+          <div class="meta-box">
+            <div class="meta-label">Úloha</div>
+            <div id="puzzleTitle" class="meta-value">-</div>
+          </div>
+          <div class="meta-box">
+            <div class="meta-label">ID pozície</div>
+            <div id="puzzleId" class="meta-value">-</div>
+          </div>
+          <div class="meta-box">
+            <div class="meta-label">Kategória</div>
+            <div class="meta-value"><span id="puzzleCategory" class="badge">-</span></div>
+          </div>
+          <div class="meta-box">
+            <div class="meta-label">ELO úlohy</div>
+            <div class="meta-value"><span id="puzzleElo" class="badge elo">-</span></div>
+          </div>
+          <div class="meta-box">
+            <div class="meta-label">Odporúčaný čas</div>
+            <div class="meta-value"><span id="puzzleTime" class="badge time">-</span></div>
+          </div>
+          <div class="meta-box">
+            <div class="meta-label">Zostáva</div>
+            <div class="meta-value"><span id="puzzleTimer" class="badge timer-ok">-</span></div>
+          </div>
+          <div class="meta-box">
+            <div class="meta-label">Režim</div>
+            <div class="meta-value"><span id="adminModeBadge" class="badge admin" style="display:none;">Admin test</span><span id="normalModeText">Bežný tréning</span></div>
+          </div>
+        </div>
+
+        <div class="buttons">
+          <button class="primary" id="nextPuzzleBtn" onclick="nextPuzzle()">Ďalšia úloha</button>
+          <button class="secondary" id="restartBtn" onclick="restart()">Od začiatku</button>
+          <button class="accent" id="retryBtn" onclick="retryPuzzle()">Skús znova</button>
+          <button class="accent" id="showSolutionBtn" onclick="showSolution()">Ukáž riešenie</button>
+          <button class="secondary" onclick="goHome()">Menu</button>
+          <button class="danger" id="endTrainingBtn" onclick="openEndTrainingModal()">Ukončiť tréning</button>
+        </div>
+
+        <div id="status" class="status info">Stav: pripravené</div>
+      </div>
+
+      <div class="stats-card">
+        <h3>Štatistika tréningu</h3>
+        <div class="stats-grid">
+          <div class="stat-card">
+            <span class="stat-label">Riešené úlohy</span>
+            <div class="stat-value" id="statPlayed">0</div>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">Vyriešené úlohy</span>
+            <div class="stat-value" id="statSolved">0</div>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">Úspešnosť</span>
+            <div class="stat-value" id="statAccuracy">0%</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="dragPiece" class="drag-piece"></div>
+
+<div id="promotionOverlay" class="promotion-overlay">
+  <div class="promotion-modal">
+    <div class="promotion-modal-title">Vyber figúru na premenu</div>
+    <div id="promotionModalOptions" class="promotion-modal-options"></div>
+  </div>
+</div>
+
+<div id="sessionOverlay" class="session-overlay">
+  <div class="session-modal">
+    <div class="session-modal-title">Súhrn tréningu</div>
+
+    <div class="session-grid">
+      <div class="session-box">
+        <div class="session-box-label">Hráč</div>
+        <div id="sessionPlayer" class="session-box-value">-</div>
+      </div>
+      <div class="session-box">
+        <div class="session-box-label">Zmena ELO</div>
+        <div id="sessionEloChange" class="session-box-value">0</div>
+      </div>
+      <div class="session-box">
+        <div class="session-box-label">Riešené úlohy</div>
+        <div id="sessionPlayed" class="session-box-value">0</div>
+      </div>
+      <div class="session-box">
+        <div class="session-box-label">Vyriešené úlohy</div>
+        <div id="sessionSolved" class="session-box-value">0</div>
+      </div>
+      <div class="session-box">
+        <div class="session-box-label">Úspešnosť</div>
+        <div id="sessionAccuracy" class="session-box-value">0%</div>
+      </div>
+      <div class="session-box">
+        <div class="session-box-label">Spotrebovaný čas</div>
+        <div id="sessionTimeSpent" class="session-box-value">00:00:00</div>
+      </div>
+    </div>
+
+    <div class="session-actions">
+      <button class="accent" onclick="closeEndTrainingModal()">Pokračovať v tréningu</button>
+      <button class="primary" onclick="finishTrainingAndGoHome()">Späť do menu</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/player.js"></script>
+<script src="js/training.js"></script>
+
+<script>
+const files = ['a','b','c','d','e','f','g','h'];
+const STATS_STORAGE_KEY = 'sachovy_trening_stats_v2';
+const SOLUTION_STEP_DELAY = 800;
+const DEFAULT_ELO = 1700;
+const DEFAULT_TIME = 300;
+
+let currentPlayer = null;
+let puzzles = [];
+let index = 0;
+let board = [];
+let meta = null;
+let selected = null;
+let flipped = false;
+let current = null;
+let solved = false;
+let failed = false;
+let pendingPromotion = null;
+let legalTargets = [];
+let puzzleCounted = false;
+let puzzleSolvedCounted = false;
+let resultLogged = false;
+let lastMove = null;
+let isAnimatingSolution = false;
+
+let timerInterval = null;
+let timerRemaining = 0;
+let timerExpired = false;
+
+let dragState = {
+  active: false,
+  fromIndex: null,
+  piece: '',
+  startedFromSquare: false
+};
+
+let solutionRoot = [];
+let activeBranches = [];
+let currentPuzzleIsAdmin = false;
+
+let sessionStats = {
+  startElo: 0,
+  played: 0,
+  solved: 0,
+  timeSpent: 0
+};
+
+const stats = {
+  played: 0,
+  solved: 0
+};
+
+function goHome() {
+  location.href = "index.html";
+}
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function normalizeTimeValue(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n <= 0) return DEFAULT_TIME;
+  return Math.round(n);
+}
+
+function normalizeEloValue(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n <= 0) return DEFAULT_ELO;
+  return Math.round(n);
+}
+
+function formatTime(seconds) {
+  const safe = Math.max(0, Math.floor(seconds));
+  const min = Math.floor(safe / 60);
+  const sec = safe % 60;
+  return `${min}:${String(sec).padStart(2, '0')}`;
+}
+
+function formatLongTime(seconds) {
+  const safe = Math.max(0, Math.floor(seconds));
+  const hours = Math.floor(safe / 3600);
+  const minutes = Math.floor((safe % 3600) / 60);
+  const secs = safe % 60;
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+}
+
+function getPieceImagePath(pieceChar) {
+  const color = isWhitePiece(pieceChar) ? 'w' : 'b';
+  const piece = pieceChar.toUpperCase();
+  return `img/pieces/${color}${piece}.svg`;
+}
+
+function getPromotionImagePath(isWhite, code) {
+  const color = isWhite ? 'w' : 'b';
+  return `img/pieces/${color}${code.toUpperCase()}.svg`;
+}
+
+function updateAdminBadge() {
+  const badge = document.getElementById('adminModeBadge');
+  const normalText = document.getElementById('normalModeText');
+
+  badge.style.display = currentPuzzleIsAdmin ? 'inline-block' : 'none';
+  normalText.style.display = currentPuzzleIsAdmin ? 'none' : 'inline';
+}
+
+function initSessionStats() {
+  sessionStats = {
+    startElo: currentPlayer ? Number(currentPlayer.elo || 0) : 0,
+    played: 0,
+    solved: 0,
+    timeSpent: 0
+  };
+}
+
+function updateSessionStats(result, usedTime) {
+  sessionStats.played += 1;
+  sessionStats.timeSpent += Math.max(0, Number(usedTime || 0));
+  if (result === "win") sessionStats.solved += 1;
+}
+
+function openEndTrainingModal() {
+  updateSessionSummaryUI();
+  document.getElementById('sessionOverlay').classList.add('active');
+}
+
+function closeEndTrainingModal() {
+  document.getElementById('sessionOverlay').classList.remove('active');
+}
+
+function updateSessionSummaryUI() {
+  currentPlayer = getCurrentPlayer();
+
+  const accuracy = sessionStats.played === 0
+    ? 0
+    : Math.round((sessionStats.solved / sessionStats.played) * 100);
+
+  const eloNow = currentPlayer ? Number(currentPlayer.elo || 0) : sessionStats.startElo;
+  const eloChange = eloNow - sessionStats.startElo;
+  const eloText = eloChange > 0 ? `+${eloChange}` : String(eloChange);
+
+  document.getElementById('sessionPlayer').textContent = currentPlayer ? currentPlayer.name : '-';
+  document.getElementById('sessionEloChange').textContent = eloText;
+  document.getElementById('sessionPlayed').textContent = sessionStats.played;
+  document.getElementById('sessionSolved').textContent = sessionStats.solved;
+  document.getElementById('sessionAccuracy').textContent = accuracy + '%';
+  document.getElementById('sessionTimeSpent').textContent = formatLongTime(sessionStats.timeSpent);
+}
+
+function finishTrainingAndGoHome() {
+  location.href = "index.html";
+}
+
+function updatePlayerUI() {
+  currentPlayer = getCurrentPlayer();
+  if (!currentPlayer) return;
+  document.getElementById('playerName').textContent = currentPlayer.name;
+  document.getElementById('playerElo').textContent = currentPlayer.elo;
+}
+
+function updateTimerUI() {
+  const el = document.getElementById('puzzleTimer');
+  el.textContent = formatTime(timerRemaining);
+
+  if (timerExpired) {
+    el.className = 'badge timer-expired';
+    return;
+  }
+
+  if (timerRemaining <= 30) {
+    el.className = 'badge timer-warning';
+  } else {
+    el.className = 'badge timer-ok';
+  }
+}
+
+function stopPuzzleTimer() {
+  if (timerInterval) {
+    clearInterval(timerInterval);
+    timerInterval = null;
+  }
+}
+
+function markPuzzlePlayedOnce() {
+  if (currentPuzzleIsAdmin) return;
+  if (!puzzleCounted) {
+    stats.played += 1;
+    puzzleCounted = true;
+    saveStats();
+    updateStatsUI();
+  }
+}
+
+function markPuzzleSolvedOnce() {
+  if (currentPuzzleIsAdmin) return;
+  if (!puzzleSolvedCounted) {
+    markPuzzlePlayedOnce();
+    stats.solved += 1;
+    puzzleSolvedCounted = true;
+    saveStats();
+    updateStatsUI();
+  }
+}
+
+function recordResultOnce(result) {
+  if (resultLogged || !currentPlayer || !current) return;
+
+  const usedTime = Math.max(0, normalizeTimeValue(current.time) - timerRemaining);
+
+  if (!currentPuzzleIsAdmin) {
+    addTrainingResult(currentPlayer.id, current.id, result);
+    registerPlayerResult(currentPlayer.id, result, usedTime);
+    updatePlayerElo(currentPlayer.id, current.elo, result);
+    updateSessionStats(result, usedTime);
+  }
+
+  resultLogged = true;
+  updatePlayerUI();
+}
+
+function loseOnTime() {
+  if (solved || failed) return;
+  failed = true;
+  solved = true;
+  timerExpired = true;
+  stopPuzzleTimer();
+  markPuzzlePlayedOnce();
+  recordResultOnce("loss");
+  updateTimerUI();
+  updateUiLocks();
+  setStatus(currentPuzzleIsAdmin ? 'Čas vypršal – admin kontrola bez zápisu' : 'Čas vypršal – prehra', currentPuzzleIsAdmin ? 'warning' : 'error');
+}
+
+function startPuzzleTimer(seconds) {
+  stopPuzzleTimer();
+  timerRemaining = normalizeTimeValue(seconds);
+  timerExpired = false;
+  updateTimerUI();
+
+  timerInterval = setInterval(() => {
+    if (solved || failed || isAnimatingSolution || pendingPromotion) return;
+
+    timerRemaining -= 1;
+
+    if (timerRemaining <= 0) {
+      timerRemaining = 0;
+      loseOnTime();
+      return;
+    }
+
+    updateTimerUI();
+  }, 1000);
+}
+
+function inferCategory(puzzle) {
+  if (puzzle.category) return puzzle.category;
+
+  const prompt = (puzzle.prompt || '').toLowerCase();
+  if (prompt.includes('mat v 1') || prompt.includes('mat 1')) return 'Mat 1';
+  if (prompt.includes('mat v 2') || prompt.includes('mat 2')) return 'Mat 2';
+  if (prompt.includes('mat v 3') || prompt.includes('mat 3')) return 'Mat 3';
+
+  return 'Taktika';
+}
+
+function updatePuzzleMetaUI(puzzle) {
+  const category = inferCategory(puzzle);
+  const elo = normalizeEloValue(puzzle.elo);
+  const timeValue = normalizeTimeValue(puzzle.time);
+
+  document.getElementById('puzzleTitle').textContent = puzzle.title || '';
+  document.getElementById('puzzleId').textContent = puzzle.id ?? '-';
+  document.getElementById('puzzleCategory').textContent = category;
+  document.getElementById('puzzleElo').textContent = String(elo);
+  document.getElementById('puzzleTime').textContent = formatTime(timeValue);
+}
+
+function updateUiLocks() {
+  const disabled = isAnimatingSolution || pendingPromotion !== null || failed;
+  document.getElementById('nextPuzzleBtn').disabled = isAnimatingSolution || pendingPromotion !== null;
+  document.getElementById('restartBtn').disabled = isAnimatingSolution || pendingPromotion !== null;
+  document.getElementById('retryBtn').disabled = isAnimatingSolution || pendingPromotion !== null;
+  document.getElementById('showSolutionBtn').disabled = disabled || solved;
+  document.getElementById('endTrainingBtn').disabled = isAnimatingSolution || pendingPromotion !== null;
+}
+
+function saveStats() {
+  try {
+    localStorage.setItem(STATS_STORAGE_KEY, JSON.stringify(stats));
+  } catch (e) {
+    console.warn('Nepodarilo sa uložiť štatistiku.', e);
+  }
+}
+
+function loadStats() {
+  try {
+    const raw = localStorage.getItem(STATS_STORAGE_KEY);
+    if (!raw) return;
+
+    const parsed = JSON.parse(raw);
+    stats.played = Number(parsed.played) || 0;
+    stats.solved = Number(parsed.solved) || 0;
+  } catch (e) {
+    console.warn('Nepodarilo sa načítať štatistiku.', e);
+  }
+}
+
+function updateStatsUI() {
+  const accuracy = stats.played === 0 ? 0 : Math.round((stats.solved / stats.played) * 100);
+  document.getElementById('statPlayed').innerText = stats.played;
+  document.getElementById('statSolved').innerText = stats.solved;
+  document.getElementById('statAccuracy').innerText = accuracy + '%';
+}
+
+function setStatus(text, type = 'info') {
+  const status = document.getElementById('status');
+  status.innerText = 'Stav: ' + text;
+  status.className = 'status ' + type;
+}
+
+function cloneMeta(m) {
+  return {
+    activeColor: m.activeColor,
+    castling: m.castling,
+    enPassant: m.enPassant,
+    halfmove: m.halfmove,
+    fullmove: m.fullmove
+  };
+}
+
+function parseFen(fen) {
+  const parts = fen.trim().split(/\s+/);
+  const rows = parts[0].split('/');
+  const b = [];
+
+  rows.forEach(r => {
+    for (const c of r) {
+      if (!isNaN(c)) {
+        for (let i = 0; i < Number(c); i++) b.push('');
+      } else {
+        b.push(c);
+      }
+    }
+  });
+
+  return {
+    board: b,
+    meta: {
+      activeColor: parts[1] || 'w',
+      castling: parts[2] || '-',
+      enPassant: parts[3] || '-',
+      halfmove: parts[4] || '0',
+      fullmove: parts[5] || '1'
+    }
+  };
+}
+
+function name(i) {
+  return files[i % 8] + (8 - Math.floor(i / 8));
+}
+
+function sqToIndex(sq) {
+  return files.indexOf(sq[0]) + 8 * (8 - Number(sq[1]));
+}
+
+function idx(m) {
+  return {
+    from: files.indexOf(m[0]) + 8 * (8 - Number(m[1])),
+    to: files.indexOf(m[2]) + 8 * (8 - Number(m[3])),
+    promotion: m.length >= 5 ? m[4] : ''
+  };
+}
+
+function map(i) {
+  return flipped ? 63 - i : i;
+}
+
+function isWhitePiece(p) {
+  return p && p === p.toUpperCase();
+}
+
+function pieceColor(p) {
+  if (!p) return '';
+  return isWhitePiece(p) ? 'w' : 'b';
+}
+
+function rowOf(i) { return Math.floor(i / 8); }
+function colOf(i) { return i % 8; }
+function toIndex(r, c) { return r * 8 + c; }
+
+function inside(r, c) {
+  return r >= 0 && r < 8 && c >= 0 && c < 8;
+}
+
+function render() {
+  const el = document.getElementById('board');
+  el.innerHTML = '';
+
+  for (let i = 0; i < 64; i++) {
+    const bi = map(i);
+    const d = document.createElement('div');
+    const r = Math.floor(i / 8);
+    const c = i % 8;
+
+    d.className = 'square ' + ((r + c) % 2 === 0 ? 'light' : 'dark');
+    d.dataset.boardIndex = bi;
+
+    if (selected === bi) d.classList.add('selected');
+    if (lastMove && lastMove.from === bi) d.classList.add('last-from');
+    if (lastMove && lastMove.to === bi) d.classList.add('last-to');
+    if (dragState.active && dragState.fromIndex === bi) d.classList.add('drag-origin');
+
+    const legalInfo = legalTargets.find(x => x.index === bi);
+    if (legalInfo) d.classList.add(legalInfo.capture ? 'capture' : 'legal');
+
+    if (board[bi]) {
+      const img = document.createElement('img');
+      img.src = getPieceImagePath(board[bi]);
+      img.className = 'piece-img';
+      img.alt = board[bi];
+      img.draggable = false;
+      d.appendChild(img);
+    }
+
+    if (r === 7) {
+      const f = document.createElement('span');
+      f.className = 'coord-file';
+      f.innerText = files[flipped ? 7 - c : c];
+      d.appendChild(f);
+    }
+
+    if (c === 0) {
+      const rk = document.createElement('span');
+      rk.className = 'coord-rank';
+      rk.innerText = flipped ? (1 + r) : (8 - r);
+      d.appendChild(rk);
+    }
+
+    d.onmousedown = (e) => startDrag(e, bi);
+    d.onclick = () => click(bi);
+    el.appendChild(d);
+  }
+}
+
+function updateDragPiece(x, y) {
+  const dragPiece = document.getElementById('dragPiece');
+  dragPiece.style.left = x + 'px';
+  dragPiece.style.top = y + 'px';
+}
+
+function clearDragState() {
+  dragState.active = false;
+  dragState.fromIndex = null;
+  dragState.piece = '';
+  dragState.startedFromSquare = false;
+
+  const dragPiece = document.getElementById('dragPiece');
+  dragPiece.style.display = 'none';
+  dragPiece.innerHTML = '';
+  render();
+}
+
+function startDrag(event, boardIndex) {
+  if (event.button !== 0) return;
+  if (!current || solved || failed || pendingPromotion || isAnimatingSolution) return;
+  if (!board[boardIndex]) return;
+  if (pieceColor(board[boardIndex]) !== meta.activeColor) return;
+
+  event.preventDefault();
+
+  dragState.active = true;
+  dragState.fromIndex = boardIndex;
+  dragState.piece = board[boardIndex];
+  dragState.startedFromSquare = true;
+
+  selected = boardIndex;
+  legalTargets = getLegalTargets(boardIndex);
+
+  const dragPiece = document.getElementById('dragPiece');
+  dragPiece.innerHTML = `<img src="${getPieceImagePath(dragState.piece)}" alt="">`;
+  dragPiece.style.display = 'block';
+  updateDragPiece(event.clientX, event.clientY);
+
+  render();
+  setStatus('Ťahaj figúrku na cieľové pole', 'info');
+}
+
+function boardIndexFromPoint(clientX, clientY) {
+  const el = document.elementFromPoint(clientX, clientY);
+  if (!el) return null;
+  const square = el.closest('.square');
+  if (!square) return null;
+  const val = square.dataset.boardIndex;
+  if (val === undefined) return null;
+  return Number(val);
+}
+
+function finishDrop(targetIndex) {
+  if (!dragState.active) return;
+
+  const fromIndex = dragState.fromIndex;
+  clearDragState();
+
+  if (targetIndex === null || targetIndex === undefined) {
+    selected = null;
+    legalTargets = [];
+    render();
+    setStatus('Ťah zrušený', 'info');
+    return;
+  }
+
+  if (targetIndex === fromIndex) {
+    selected = fromIndex;
+    legalTargets = getLegalTargets(fromIndex);
+    render();
+    return setStatus('Vybraná figúrka: ' + name(fromIndex), 'info');
+  }
+
+  handleMoveAttempt(fromIndex, targetIndex);
+}
+
+function isValidTreeNode(node) {
+  return node && typeof node.move === 'string';
+}
+
+function cloneTreeNode(node) {
+  return {
+    move: String(node.move),
+    next: Array.isArray(node.next) ? node.next.map(cloneTreeNode) : []
+  };
+}
+
+function buildSolutionTreeFromLine(line) {
+  if (!Array.isArray(line) || !line.length) return [];
+  let root = [];
+  let currentLevel = root;
+
+  line.forEach(move => {
+    const node = { move: String(move), next: [] };
+    currentLevel.push(node);
+    currentLevel = node.next;
+  });
+
+  return root;
+}
+
+function getPuzzleSolutionRoot(puzzle) {
+  if (Array.isArray(puzzle.solutionTree) && puzzle.solutionTree.length) {
+    return puzzle.solutionTree.filter(isValidTreeNode).map(cloneTreeNode);
+  }
+  if (Array.isArray(puzzle.line) && puzzle.line.length) {
+    return buildSolutionTreeFromLine(puzzle.line);
+  }
+  return [];
+}
+
+function findMatchingBranch(branches, move) {
+  if (!Array.isArray(branches)) return null;
+  return branches.find(branch => branch.move === move) || null;
+}
+
+function getFirstBranch(branches) {
+  if (!Array.isArray(branches) || !branches.length) return null;
+  return branches[0];
+}
+
+function handleMoveAttempt(fromIndex, targetIndex) {
+  if (!current || solved || failed || pendingPromotion || isAnimatingSolution) return;
+
+  if (board[targetIndex] && pieceColor(board[targetIndex]) === meta.activeColor) {
+    selected = targetIndex;
+    legalTargets = getLegalTargets(targetIndex);
+    render();
+    return setStatus('Vybraná figúrka: ' + name(targetIndex), 'info');
+  }
+
+  if (isPromotionMove(fromIndex, targetIndex)) {
+    selected = fromIndex;
+    legalTargets = getLegalTargets(fromIndex);
+    render();
+    showPromotionPanel(fromIndex, targetIndex);
+    return;
+  }
+
+  const attempted = name(fromIndex) + name(targetIndex);
+
+  if (!isLegalMove(fromIndex, targetIndex)) {
+    render();
+    return setStatus('Nelegálny ťah', 'warning');
+  }
+
+  const matchedBranch = findMatchingBranch(activeBranches, attempted);
+
+  if (!matchedBranch) {
+    markPuzzlePlayedOnce();
+    failed = true;
+    solved = true;
+    stopPuzzleTimer();
+    recordResultOnce("loss");
+    selected = null;
+    legalTargets = [];
+    render();
+    updateUiLocks();
+    return setStatus(currentPuzzleIsAdmin ? 'Zlé riešenie – admin kontrola bez zápisu' : 'Zlé riešenie – prehra', currentPuzzleIsAdmin ? 'warning' : 'error');
+  }
+
+  finishTurn(matchedBranch, attempted);
+}
+
+document.addEventListener('mousemove', (event) => {
+  if (!dragState.active) return;
+  updateDragPiece(event.clientX, event.clientY);
+});
+
+document.addEventListener('mouseup', (event) => {
+  if (!dragState.active) return;
+  const targetIndex = boardIndexFromPoint(event.clientX, event.clientY);
+  finishDrop(targetIndex);
+});
+
+function hidePromotionPanel() {
+  document.getElementById('promotionOverlay').classList.remove('active');
+  document.getElementById('promotionModalOptions').innerHTML = '';
+  pendingPromotion = null;
+  updateUiLocks();
+}
+
+function showPromotionPanel(fromIndex, toIndex) {
+  const piece = board[fromIndex];
+  const isWhite = piece === 'P';
+
+  const overlay = document.getElementById('promotionOverlay');
+  const options = document.getElementById('promotionModalOptions');
+
+  options.innerHTML = '';
+
+  ['q', 'r', 'b', 'n'].forEach(code => {
+    const div = document.createElement('div');
+    div.className = 'promotion-option';
+    div.innerHTML = `<img src="${getPromotionImagePath(isWhite, code)}" alt="${code}">`;
+    div.onclick = () => {
+      hidePromotionPanel();
+      finishPromotionChoice(code, fromIndex, toIndex);
+    };
+    options.appendChild(div);
+  });
+
+  pendingPromotion = { fromIndex, toIndex };
+  overlay.classList.add('active');
+  updateUiLocks();
+  setStatus('Vyber figúru na premenu', 'info');
+}
+
+function removeCastlingRight(castling, ch) {
+  const result = castling.replace(ch, '');
+  return result === '' ? '-' : result;
+}
+
+function findKingIndex(b, color) {
+  const target = color === 'w' ? 'K' : 'k';
+  return b.findIndex(p => p === target);
+}
+
+function isPathClear(b, fromRow, fromCol, toRow, toCol) {
+  const rowStep = Math.sign(toRow - fromRow);
+  const colStep = Math.sign(toCol - fromCol);
+
+  let r = fromRow + rowStep;
+  let c = fromCol + colStep;
+
+  while (r !== toRow || c !== toCol) {
+    if (b[toIndex(r, c)]) return false;
+    r += rowStep;
+    c += colStep;
+  }
+  return true;
+}
+
+function isSquareAttacked(b, squareIndex, byColor) {
+  const row = rowOf(squareIndex);
+  const col = colOf(squareIndex);
+
+  const pawnSymbol = byColor === 'w' ? 'P' : 'p';
+  const pawnDirs = byColor === 'w' ? [[1, -1], [1, 1]] : [[-1, -1], [-1, 1]];
+
+  for (const [dr, dc] of pawnDirs) {
+    const r = row + dr;
+    const c = col + dc;
+    if (inside(r, c) && b[toIndex(r, c)] === pawnSymbol) return true;
+  }
+
+  const knightSymbol = byColor === 'w' ? 'N' : 'n';
+  const knightMoves = [[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]];
+  for (const [dr, dc] of knightMoves) {
+    const r = row + dr;
+    const c = col + dc;
+    if (inside(r, c) && b[toIndex(r, c)] === knightSymbol) return true;
+  }
+
+  const kingSymbol = byColor === 'w' ? 'K' : 'k';
+  for (let dr = -1; dr <= 1; dr++) {
+    for (let dc = -1; dc <= 1; dc++) {
+      if (dr === 0 && dc === 0) continue;
+      const r = row + dr;
+      const c = col + dc;
+      if (inside(r, c) && b[toIndex(r, c)] === kingSymbol) return true;
+    }
+  }
+
+  const bishopAttackers = byColor === 'w' ? ['B', 'Q'] : ['b', 'q'];
+  const rookAttackers = byColor === 'w' ? ['R', 'Q'] : ['r', 'q'];
+  const diagDirs = [[-1,-1],[-1,1],[1,-1],[1,1]];
+  const straightDirs = [[-1,0],[1,0],[0,-1],[0,1]];
+
+  for (const [dr, dc] of diagDirs) {
+    let r = row + dr, c = col + dc;
+    while (inside(r, c)) {
+      const p = b[toIndex(r, c)];
+      if (p) {
+        if (bishopAttackers.includes(p)) return true;
+        break;
+      }
+      r += dr; c += dc;
+    }
+  }
+
+  for (const [dr, dc] of straightDirs) {
+    let r = row + dr, c = col + dc;
+    while (inside(r, c)) {
+      const p = b[toIndex(r, c)];
+      if (p) {
+        if (rookAttackers.includes(p)) return true;
+        break;
+      }
+      r += dr; c += dc;
+    }
+  }
+
+  return false;
+}
+
+function isKingInCheck(b, color) {
+  const kingIndex = findKingIndex(b, color);
+  if (kingIndex === -1) return false;
+  const attacker = color === 'w' ? 'b' : 'w';
+  return isSquareAttacked(b, kingIndex, attacker);
+}
+
+function applyPromotionPiece(piece, promotionChar) {
+  if (!promotionChar) return piece;
+  if (piece === 'P') return promotionChar.toUpperCase();
+  if (piece === 'p') return promotionChar.toLowerCase();
+  return piece;
+}
+
+function applyMoveToState(b, m, fromIndex, toIndexTarget, promotionChar = '') {
+  const newBoard = [...b];
+  const newMeta = cloneMeta(m);
+
+  const piece = newBoard[fromIndex];
+  const target = newBoard[toIndexTarget];
+  const fromRow = rowOf(fromIndex);
+  const fromCol = colOf(fromIndex);
+  const toRow = rowOf(toIndexTarget);
+  const toCol = colOf(toIndexTarget);
+
+  newBoard[toIndexTarget] = piece;
+  newBoard[fromIndex] = '';
+
+  if ((piece === 'P' && toRow === 0) || (piece === 'p' && toRow === 7)) {
+    newBoard[toIndexTarget] = applyPromotionPiece(piece, promotionChar || 'q');
+  }
+
+  if (piece === 'P' || piece === 'p') {
+    if (m.enPassant !== '-' && toIndexTarget === sqToIndex(m.enPassant) && !target && fromCol !== toCol) {
+      const capturedPawnRow = piece === 'P' ? toRow + 1 : toRow - 1;
+      newBoard[toIndex(capturedPawnRow, toCol)] = '';
+    }
+  }
+
+  if (piece === 'K' && Math.abs(toCol - fromCol) === 2) {
+    if (toCol === 6) {
+      newBoard[toIndex(7, 5)] = 'R';
+      newBoard[toIndex(7, 7)] = '';
+    } else if (toCol === 2) {
+      newBoard[toIndex(7, 3)] = 'R';
+      newBoard[toIndex(7, 0)] = '';
+    }
+  }
+
+  if (piece === 'k' && Math.abs(toCol - fromCol) === 2) {
+    if (toCol === 6) {
+      newBoard[toIndex(0, 5)] = 'r';
+      newBoard[toIndex(0, 7)] = '';
+    } else if (toCol === 2) {
+      newBoard[toIndex(0, 3)] = 'r';
+      newBoard[toIndex(0, 0)] = '';
+    }
+  }
+
+  if (piece === 'K') {
+    newMeta.castling = removeCastlingRight(newMeta.castling, 'K');
+    newMeta.castling = removeCastlingRight(newMeta.castling, 'Q');
+  }
+  if (piece === 'k') {
+    newMeta.castling = removeCastlingRight(newMeta.castling, 'k');
+    newMeta.castling = removeCastlingRight(newMeta.castling, 'q');
+  }
+
+  if (fromIndex === toIndex(7,0) || toIndexTarget === toIndex(7,0)) newMeta.castling = removeCastlingRight(newMeta.castling, 'Q');
+  if (fromIndex === toIndex(7,7) || toIndexTarget === toIndex(7,7)) newMeta.castling = removeCastlingRight(newMeta.castling, 'K');
+  if (fromIndex === toIndex(0,0) || toIndexTarget === toIndex(0,0)) newMeta.castling = removeCastlingRight(newMeta.castling, 'q');
+  if (fromIndex === toIndex(0,7) || toIndexTarget === toIndex(0,7)) newMeta.castling = removeCastlingRight(newMeta.castling, 'k');
+
+  if ((piece === 'P' || piece === 'p') && Math.abs(toRow - fromRow) === 2) {
+    const midRow = (fromRow + toRow) / 2;
+    newMeta.enPassant = name(toIndex(midRow, fromCol));
+  } else {
+    newMeta.enPassant = '-';
+  }
+
+  newMeta.activeColor = m.activeColor === 'w' ? 'b' : 'w';
+  return { board: newBoard, meta: newMeta };
+}
+
+function isPseudoLegalMove(fromIndex, toIndexTarget) {
+  if (fromIndex === toIndexTarget) return false;
+
+  const piece = board[fromIndex];
+  const target = board[toIndexTarget];
+  if (!piece) return false;
+
+  const movingColor = pieceColor(piece);
+  if (movingColor !== meta.activeColor) return false;
+  if (target && pieceColor(target) === movingColor) return false;
+
+  const fromRow = rowOf(fromIndex);
+  const fromCol = colOf(fromIndex);
+  const toRow = rowOf(toIndexTarget);
+  const toCol = colOf(toIndexTarget);
+
+  const rowDiff = toRow - fromRow;
+  const colDiff = toCol - fromCol;
+  const absRow = Math.abs(rowDiff);
+  const absCol = Math.abs(colDiff);
+  const lower = piece.toLowerCase();
+
+  if (lower === 'p') {
+    const dir = piece === 'P' ? -1 : 1;
+    const startRow = piece === 'P' ? 6 : 1;
+    const enPassantIndex = meta.enPassant !== '-' ? sqToIndex(meta.enPassant) : -1;
+
+    if (colDiff === 0 && rowDiff === dir && !target) return true;
+
+    if (colDiff === 0 && rowDiff === 2 * dir && fromRow === startRow && !target) {
+      const mid = toIndex(fromRow + dir, fromCol);
+      return !board[mid];
+    }
+
+    if (absCol === 1 && rowDiff === dir) {
+      if (target && pieceColor(target) !== movingColor) return true;
+      if (!target && toIndexTarget === enPassantIndex) return true;
+    }
+    return false;
+  }
+
+  if (lower === 'n') return (absRow === 2 && absCol === 1) || (absRow === 1 && absCol === 2);
+  if (lower === 'b') return absRow === absCol && isPathClear(board, fromRow, fromCol, toRow, toCol);
+  if (lower === 'r') return (fromRow === toRow || fromCol === toCol) && isPathClear(board, fromRow, fromCol, toRow, toCol);
+  if (lower === 'q') {
+    const diagonal = absRow === absCol;
+    const straight = fromRow === toRow || fromCol === toCol;
+    return (diagonal || straight) && isPathClear(board, fromRow, fromCol, toRow, toCol);
+  }
+
+  if (lower === 'k') {
+    if (absRow <= 1 && absCol <= 1) return true;
+
+    if (piece === 'K' && fromRow === 7 && fromCol === 4 && toRow === 7 && toCol === 6) {
+      return meta.castling.includes('K')
+        && !board[toIndex(7,5)] && !board[toIndex(7,6)]
+        && !isKingInCheck(board, 'w')
+        && !isSquareAttacked(board, toIndex(7,5), 'b')
+        && !isSquareAttacked(board, toIndex(7,6), 'b');
+    }
+
+    if (piece === 'K' && fromRow === 7 && fromCol === 4 && toRow === 7 && toCol === 2) {
+      return meta.castling.includes('Q')
+        && !board[toIndex(7,1)] && !board[toIndex(7,2)] && !board[toIndex(7,3)]
+        && !isKingInCheck(board, 'w')
+        && !isSquareAttacked(board, toIndex(7,3), 'b')
+        && !isSquareAttacked(board, toIndex(7,2), 'b');
+    }
+
+    if (piece === 'k' && fromRow === 0 && fromCol === 4 && toRow === 0 && toCol === 6) {
+      return meta.castling.includes('k')
+        && !board[toIndex(0,5)] && !board[toIndex(0,6)]
+        && !isKingInCheck(board, 'b')
+        && !isSquareAttacked(board, toIndex(0,5), 'w')
+        && !isSquareAttacked(board, toIndex(0,6), 'w');
+    }
+
+    if (piece === 'k' && fromRow === 0 && fromCol === 4 && toRow === 0 && toCol === 2) {
+      return meta.castling.includes('q')
+        && !board[toIndex(0,1)] && !board[toIndex(0,2)] && !board[toIndex(0,3)]
+        && !isKingInCheck(board, 'b')
+        && !isSquareAttacked(board, toIndex(0,3), 'w')
+        && !isSquareAttacked(board, toIndex(0,2), 'w');
+    }
+  }
+
+  return false;
+}
+
+function isLegalMove(fromIndex, toIndexTarget, promotionChar = '') {
+  if (!isPseudoLegalMove(fromIndex, toIndexTarget)) return false;
+
+  const piece = board[fromIndex];
+  const color = pieceColor(piece);
+  const state = applyMoveToState(board, meta, fromIndex, toIndexTarget, promotionChar);
+  return !isKingInCheck(state.board, color);
+}
+
+function isPromotionMove(fromIndex, toIndexTarget) {
+  const piece = board[fromIndex];
+  if (!piece) return false;
+  const targetRow = rowOf(toIndexTarget);
+  return (piece === 'P' && targetRow === 0) || (piece === 'p' && targetRow === 7);
+}
+
+function getLegalTargets(fromIndex) {
+  const result = [];
+  for (let target = 0; target < 64; target++) {
+    if (target === fromIndex) continue;
+
+    if (isPromotionMove(fromIndex, target)) {
+      let legalPromotion = false;
+      for (const promo of ['q', 'r', 'b', 'n']) {
+        if (isLegalMove(fromIndex, target, promo)) {
+          legalPromotion = true;
+          break;
+        }
+      }
+      if (legalPromotion) {
+        result.push({
+          index: target,
+          capture: !!board[target] || (board[fromIndex].toLowerCase() === 'p' && meta.enPassant !== '-' && target === sqToIndex(meta.enPassant) && colOf(fromIndex) !== colOf(target))
+        });
+      }
+    } else {
+      if (isLegalMove(fromIndex, target)) {
+        result.push({
+          index: target,
+          capture: !!board[target]
+        });
+      }
+    }
+  }
+  return result;
+}
+
+function finishTurn(playerBranch, playedMove) {
+  const parsed = idx(playedMove);
+  const state = applyMoveToState(board, meta, parsed.from, parsed.to, parsed.promotion);
+  board = state.board;
+  meta = state.meta;
+  lastMove = { from: parsed.from, to: parsed.to };
+
+  selected = null;
+  legalTargets = [];
+  render();
+
+  activeBranches = Array.isArray(playerBranch.next) ? playerBranch.next : [];
+
+  if (!activeBranches.length) {
+    solved = true;
+    failed = false;
+    stopPuzzleTimer();
+    markPuzzleSolvedOnce();
+    recordResultOnce("win");
+    updateUiLocks();
+    return setStatus(currentPuzzleIsAdmin ? '✔ Hotovo – admin kontrola bez zápisu' : '✔ Hotovo', 'success');
+  }
+
+  const autoBranch = getFirstBranch(activeBranches);
+  if (!autoBranch) {
+    solved = true;
+    failed = false;
+    stopPuzzleTimer();
+    markPuzzleSolvedOnce();
+    recordResultOnce("win");
+    updateUiLocks();
+    return setStatus(currentPuzzleIsAdmin ? '✔ Hotovo – admin kontrola bez zápisu' : '✔ Hotovo', 'success');
+  }
+
+  const autoParsed = idx(autoBranch.move);
+  const autoState = applyMoveToState(board, meta, autoParsed.from, autoParsed.to, autoParsed.promotion);
+  board = autoState.board;
+  meta = autoState.meta;
+  lastMove = { from: autoParsed.from, to: autoParsed.to };
+
+  activeBranches = Array.isArray(autoBranch.next) ? autoBranch.next : [];
+  render();
+
+  if (!activeBranches.length) {
+    solved = true;
+    failed = false;
+    stopPuzzleTimer();
+    markPuzzleSolvedOnce();
+    recordResultOnce("win");
+    updateUiLocks();
+    return setStatus(currentPuzzleIsAdmin ? '✔ Hotovo – admin kontrola bez zápisu' : '✔ Hotovo', 'success');
+  }
+
+  updateUiLocks();
+  setStatus('Správne', 'success');
+}
+
+function finishPromotionChoice(chosenPiece, fromIndex, toIndexTarget) {
+  const attempted = name(fromIndex) + name(toIndexTarget) + chosenPiece;
+
+  if (!isLegalMove(fromIndex, toIndexTarget, chosenPiece)) {
+    render();
+    return setStatus('Nelegálny ťah', 'warning');
+  }
+
+  const matchedBranch = findMatchingBranch(activeBranches, attempted);
+
+  if (!matchedBranch) {
+    markPuzzlePlayedOnce();
+    failed = true;
+    solved = true;
+    stopPuzzleTimer();
+    recordResultOnce("loss");
+    selected = null;
+    legalTargets = [];
+    render();
+    updateUiLocks();
+    return setStatus(currentPuzzleIsAdmin ? 'Zlé riešenie – admin kontrola bez zápisu' : 'Zlé riešenie – prehra', currentPuzzleIsAdmin ? 'warning' : 'error');
+  }
+
+  finishTurn(matchedBranch, attempted);
+}
+
+function click(i) {
+  if (!current || solved || failed || pendingPromotion || isAnimatingSolution) return;
+  if (dragState.startedFromSquare) {
+    dragState.startedFromSquare = false;
+    return;
+  }
+
+  if (selected === null) {
+    if (!board[i]) return setStatus('Vyber figúrku', 'info');
+    if (pieceColor(board[i]) !== meta.activeColor) return setStatus('Vyber správnu stranu', 'warning');
+    selected = i;
+    legalTargets = getLegalTargets(i);
+    render();
+    return setStatus('Vybraná figúrka: ' + name(i), 'info');
+  }
+
+  if (selected === i) {
+    selected = null;
+    legalTargets = [];
+    render();
+    return setStatus('Výber zrušený', 'info');
+  }
+
+  handleMoveAttempt(selected, i);
+}
+
+function resetPuzzleState() {
+  selected = null;
+  solved = false;
+  failed = false;
+  pendingPromotion = null;
+  legalTargets = [];
+  puzzleCounted = false;
+  puzzleSolvedCounted = false;
+  resultLogged = false;
+  lastMove = null;
+  isAnimatingSolution = false;
+  clearDragState();
+  hidePromotionPanel();
+}
+
+function loadPuzzleObject(puzzle, isAdmin = false) {
+  current = puzzle;
+  currentPuzzleIsAdmin = !!isAdmin;
+  index = puzzles.findIndex(p => p.id === puzzle.id);
+
+  const parsed = parseFen(current.fen);
+  board = parsed.board;
+  meta = parsed.meta;
+
+  solutionRoot = getPuzzleSolutionRoot(current);
+  activeBranches = solutionRoot;
+
+  resetPuzzleState();
+
+  flipped = (current.turnText || '').includes('Čierny');
+
+  document.getElementById('promptText').innerText = current.prompt || 'Nájdi najlepší ťah';
+  const turnIndicator = document.getElementById('turnIndicator');
+  turnIndicator.className = 'turn-indicator ' + (((current.turnText || '').includes('Čierny')) ? 'black' : 'white');
+  updatePuzzleMetaUI(current);
+  updatePlayerUI();
+  updateAdminBadge();
+
+  render();
+  updateUiLocks();
+  startPuzzleTimer(current.time);
+
+  if (currentPuzzleIsAdmin) {
+    setStatus('Načítaná úloha v admin režime – bez zápisu do štatistiky', 'warning');
+  } else {
+    setStatus('Pripravené', 'info');
+  }
+}
+
+function loadPuzzleForPlayer() {
+  currentPlayer = getCurrentPlayer();
+  if (!currentPlayer) {
+    alert("Nie je vybraný hráč.");
+    location.href = "index.html";
+    return;
+  }
+
+  const puzzle = pickPuzzleForPlayer(currentPlayer, puzzles);
+  if (!puzzle) {
+    alert("Nenašla sa žiadna úloha.");
+    return;
+  }
+
+  loadPuzzleObject(puzzle, false);
+}
+
+function nextPuzzle() {
+  if (!puzzles.length || isAnimatingSolution || dragState.active || pendingPromotion) return;
+  loadPuzzleForPlayer();
+}
+
+function restart() {
+  if (!current || isAnimatingSolution || dragState.active || pendingPromotion) return;
+  loadPuzzleObject(current, currentPuzzleIsAdmin);
+}
+
+function retryPuzzle() {
+  if (!current || isAnimatingSolution || dragState.active || pendingPromotion) return;
+  loadPuzzleObject(current, currentPuzzleIsAdmin);
+  setStatus(currentPuzzleIsAdmin ? 'Admin úloha bola resetovaná' : 'Úloha bola resetovaná', 'info');
+}
+
+async function showSolution() {
+  if (!current || solved || failed || isAnimatingSolution || dragState.active || pendingPromotion) return;
+
+  isAnimatingSolution = true;
+  selected = null;
+  legalTargets = [];
+  hidePromotionPanel();
+  stopPuzzleTimer();
+  markPuzzlePlayedOnce();
+  recordResultOnce("loss");
+  updateUiLocks();
+
+  setStatus(currentPuzzleIsAdmin ? 'Prehrávam riešenie v admin režime...' : 'Prehrávam riešenie...', 'info');
+  render();
+
+  let branches = activeBranches;
+
+  while (Array.isArray(branches) && branches.length) {
+    const branch = getFirstBranch(branches);
+    if (!branch) break;
+
+    const parsed = idx(branch.move);
+    const state = applyMoveToState(board, meta, parsed.from, parsed.to, parsed.promotion);
+    board = state.board;
+    meta = state.meta;
+    lastMove = { from: parsed.from, to: parsed.to };
+    render();
+    await sleep(SOLUTION_STEP_DELAY);
+
+    branches = Array.isArray(branch.next) ? branch.next : [];
+  }
+
+  activeBranches = [];
+  solved = true;
+  failed = true;
+  isAnimatingSolution = false;
+  updateUiLocks();
+  setStatus(currentPuzzleIsAdmin ? 'Riešenie bolo prehraté – admin režim bez zápisu' : 'Riešenie bolo prehraté', 'info');
+}
+
+async function init() {
+  currentPlayer = getCurrentPlayer();
+  if (!currentPlayer) {
+    alert("Najprv vyber hráča.");
+    location.href = "index.html";
+    return;
+  }
+
+  try {
+    const r = await fetch('./data/puzzles-test.json');
+    if (!r.ok) {
+      throw new Error('Súbor puzzles-test.json sa nenašiel');
+    }
+    puzzles = await r.json();
+    if (!Array.isArray(puzzles) || !puzzles.length) {
+      throw new Error('Prázdny JSON');
+    }
+  } catch (e) {
+    setStatus('JSON chyba: ' + e.message, 'error');
+    return;
+  }
+
+  loadStats();
+  updateStatsUI();
+  updatePlayerUI();
+  initSessionStats();
+
+  const adminPuzzleId = localStorage.getItem("adminPuzzleId");
+  const adminMode = localStorage.getItem("adminMode") === "true";
+
+  if (adminPuzzleId) {
+    const puzzle = puzzles.find(p => Number(p.id) === Number(adminPuzzleId));
+
+    localStorage.removeItem("adminPuzzleId");
+    localStorage.removeItem("adminMode");
+
+    if (puzzle) {
+      loadPuzzleObject(puzzle, adminMode);
+      return;
+    }
+  }
+
+  loadPuzzleForPlayer();
+}
+
+init();
+</script>
+</body>
+</html>
