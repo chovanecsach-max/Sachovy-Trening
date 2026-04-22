@@ -1,33 +1,8 @@
-const SUPABASE_URL = "https://wdjsilryllqksdtmaehy.supabase.co";
-const SUPABASE_KEY = "sb_publishable_45gFQhgPScrDjDCVC0B4Iw_q6uZKf9m";
-
-// ─── Pomocná funkcia pre volanie Supabase REST API ───────────────────────────
-
-async function sbFetchTraining(path, options = {}) {
-  const url = `${SUPABASE_URL}/rest/v1/${path}`;
-  const res = await fetch(url, {
-    ...options,
-    headers: {
-      "apikey": SUPABASE_KEY,
-      "Authorization": `Bearer ${SUPABASE_KEY}`,
-      "Content-Type": "application/json",
-      "Prefer": options.prefer || "",
-      ...(options.headers || {})
-    }
-  });
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`Supabase chyba: ${err}`);
-  }
-  const text = await res.text();
-  return text ? JSON.parse(text) : null;
-}
-
-// ─── Tréningový log ──────────────────────────────────────────────────────────
+const TRAINING_KEY = "trainingLog";
 
 async function addTrainingResult(playerId, puzzleId, result) {
   try {
-    await sbFetchTraining("training_log", {
+    await sbFetch("training_log", {
       method: "POST",
       prefer: "return=minimal",
       body: JSON.stringify({
@@ -43,7 +18,7 @@ async function addTrainingResult(playerId, puzzleId, result) {
 
 async function getSolvedPuzzleIds(playerId) {
   try {
-    const data = await sbFetchTraining(
+    const data = await sbFetch(
       `training_log?player_id=eq.${playerId}&select=puzzle_id`
     );
     return data ? data.map(x => x.puzzle_id) : [];
@@ -52,8 +27,6 @@ async function getSolvedPuzzleIds(playerId) {
     return [];
   }
 }
-
-// ─── Výber úlohy pre hráča ───────────────────────────────────────────────────
 
 function getTrainingMode() {
   const params = new URLSearchParams(window.location.search);
@@ -65,7 +38,6 @@ async function pickPuzzleForPlayer(player, puzzles) {
   const mode = getTrainingMode();
 
   let filtered = puzzles;
-
   if (mode === "taktika") {
     filtered = puzzles.filter(p => p.category === "Taktika");
   } else if (mode === "strategia") {
@@ -89,14 +61,10 @@ async function pickPuzzleForPlayer(player, puzzles) {
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
-// ─── Načítanie puzzle zo Supabase ────────────────────────────────────────────
-
 async function loadPuzzlesFromSupabase() {
   try {
-    const data = await sbFetchTraining("puzzles?order=id.asc&limit=1000");
+    const data = await sbFetch("puzzles?order=id.asc&limit=2000");
     if (!data || !data.length) throw new Error("Žiadne puzzle v databáze");
-
-    // Prevedieme snake_case na camelCase pre kompatibilitu s existujúcim kódom
     return data.map(p => ({
       id: p.id,
       title: p.title,
