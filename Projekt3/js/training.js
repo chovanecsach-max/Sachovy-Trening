@@ -37,6 +37,7 @@ async function pickPuzzleForPlayer(player, puzzles) {
   const solved = await getSolvedPuzzleIds(player.id);
   const mode = getTrainingMode();
 
+  // Filtruj podľa kategórie
   let filtered = puzzles;
   if (mode === "taktika") {
     filtered = puzzles.filter(p => p.category === "Taktika");
@@ -46,10 +47,13 @@ async function pickPuzzleForPlayer(player, puzzles) {
     filtered = puzzles.filter(p => p.category === "Koncovka");
   }
 
+  // Použi správne ELO hráča podľa režimu
+  const playerElo = getPlayerEloByMode(player, mode);
+
   const unsolved = filtered.filter(p => !solved.includes(p.id));
 
   function filterByRange(pool, range) {
-    return pool.filter(p => Math.abs(p.elo - player.elo) <= range);
+    return pool.filter(p => Math.abs(p.elo - playerElo) <= range);
   }
 
   let pool = filterByRange(unsolved, 100);
