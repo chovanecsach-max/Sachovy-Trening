@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- saved from url=(0049)file:///C:/Users/mchovanec/Downloads/admin_2.html -->
+<!-- saved from url=(0049)file:///C:/Users/mchovanec/Downloads/admin_3.html -->
 <html lang="sk"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -330,6 +330,7 @@ button {
   <div id="status" class="status success">Stav: Načítaných 1000 puzzle — môžeš vyhľadávať</div>
 
   <div class="actions" style="margin-top: 12px;">
+    <button class="primary" onclick="reloadPuzzles()">🔄 Obnoviť zoznam</button>
     <button class="secondary" onclick="goHome()">Späť do menu</button>
   </div>
 </div>
@@ -503,6 +504,11 @@ function openInAdminTraining() {
   localStorage.setItem("adminPuzzleId", String(selectedPuzzle.id));
   localStorage.setItem("adminMode", "true");
   location.href = "training.html";
+}
+
+async function reloadPuzzles() {
+  clearResult();
+  await init();
 }
 
 function goHome() {
