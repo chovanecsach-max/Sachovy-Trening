@@ -88,6 +88,7 @@ button {
 .player-stats {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
+  grid-template-rows: auto;
   gap: 8px;
   margin-bottom: 12px;
 }
@@ -223,8 +224,20 @@ async function render() {
           <div class="stat-value">${accuracy}%</div>
         </div>
         <div class="stat-box">
-          <span class="stat-label">ELO</span>
+          <span class="stat-label">ELO Mix</span>
           <div class="stat-value">${p.elo}</div>
+        </div>
+        <div class="stat-box">
+          <span class="stat-label">ELO Taktika</span>
+          <div class="stat-value">${p.elo_taktika || p.elo}</div>
+        </div>
+        <div class="stat-box">
+          <span class="stat-label">ELO Stratégia</span>
+          <div class="stat-value">${p.elo_strategia || p.elo}</div>
+        </div>
+        <div class="stat-box">
+          <span class="stat-label">ELO Koncovka</span>
+          <div class="stat-value">${p.elo_koncovka || p.elo}</div>
         </div>
       </div>
       <div class="player-time">
