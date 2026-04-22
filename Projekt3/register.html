@@ -216,9 +216,10 @@ function formatTotalTime(totalSeconds) {
 }
 
 function render() {
-  const list = loadPlayers();
+async function render() {
+  const list = await loadPlayers();
   const el = document.getElementById("players");
-  const selected = getCurrentPlayer();
+  const selected = await getCurrentPlayer();
 
   el.innerHTML = "";
 
@@ -230,7 +231,7 @@ function render() {
     const played = Number(p.played) || 0;
     const solved = Number(p.solved) || 0;
     const accuracy = percent(solved, played);
-    const totalTime = formatTotalTime(p.totalTime);
+    const totalTime = formatTotalTime(p.total_time || p.totalTime);
 
     const card = document.createElement("div");
     card.className = "player-card";
@@ -282,7 +283,7 @@ function render() {
     const played = Number(selected.played) || 0;
     const solved = Number(selected.solved) || 0;
     const accuracy = percent(solved, played);
-    const totalTime = formatTotalTime(selected.totalTime);
+    const totalTime = formatTotalTime(selected.total_time || selected.totalTime);
 
     info.textContent =
       `Aktuálne vybraný hráč: ${selected.name} | ELO ${selected.elo} | Úspešnosť ${accuracy}% | Celkový čas ${totalTime}`;
@@ -291,7 +292,7 @@ function render() {
   }
 }
 
-function create() {
+async function create() {
   const input = document.getElementById("nameInput");
   const name = input.value.trim();
 
@@ -300,9 +301,9 @@ function create() {
     return;
   }
 
-  createPlayer(name);
+  await createPlayer(name);
   input.value = "";
-  render();
+  await render();
 }
 
 function back() {
@@ -313,4 +314,3 @@ render();
 </script>
 
 </body>
-</html>
