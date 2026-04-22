@@ -1,7 +1,7 @@
 <!DOCTYPE html>
-<html lang="sk">
-<head>
-<meta charset="UTF-8">
+<!-- saved from url=(0049)file:///C:/Users/mchovanec/Downloads/admin_2.html -->
+<html lang="sk"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Administrácia úloh</title>
 
@@ -59,7 +59,7 @@ h1 {
   flex-wrap: wrap;
 }
 
-input, textarea {
+input, textarea, select {
   width: 100%;
   box-sizing: border-box;
   padding: 10px 12px;
@@ -70,13 +70,13 @@ input, textarea {
 }
 
 textarea {
-  min-height: 120px;
+  min-height: 80px;
   resize: vertical;
 }
 
-.row input {
+.row input, .row select {
   flex: 1;
-  min-width: 160px;
+  min-width: 120px;
 }
 
 button {
@@ -87,21 +87,11 @@ button {
   font-size: 14px;
 }
 
-.primary {
-  background: #111827;
-  color: white;
-}
-
-.secondary {
-  background: #e5e7eb;
-  color: #111827;
-}
-
-.admin {
-  background: #fff7ed;
-  color: #c2410c;
-  border: 1px solid #fdba74;
-}
+.primary { background: #111827; color: white; }
+.secondary { background: #e5e7eb; color: #111827; }
+.success { background: #dcfce7; color: #166534; border: 1px solid #86efac; }
+.danger { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
+.admin { background: #fff7ed; color: #c2410c; border: 1px solid #fdba74; }
 
 .result {
   margin-top: 12px;
@@ -111,9 +101,7 @@ button {
   background: #f8fafc;
 }
 
-.result.hidden {
-  display: none;
-}
+.result.hidden { display: none; }
 
 .result h3 {
   margin: 0 0 10px 0;
@@ -124,6 +112,7 @@ button {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 8px;
+  margin-bottom: 12px;
 }
 
 .result-box {
@@ -144,6 +133,40 @@ button {
   font-size: 14px;
   font-weight: 600;
   word-break: break-word;
+}
+
+/* Edit formulár */
+.edit-section {
+  margin-top: 14px;
+  border-top: 1px solid #e2e8f0;
+  padding-top: 14px;
+}
+
+.edit-section h4 {
+  margin: 0 0 10px 0;
+  font-size: 15px;
+  color: #1d4ed8;
+}
+
+.edit-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.edit-field label {
+  display: block;
+  font-size: 11px;
+  color: #64748b;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.edit-field input,
+.edit-field select,
+.edit-field textarea {
+  margin: 0;
 }
 
 .actions {
@@ -181,35 +204,17 @@ button {
 }
 
 @media (max-width: 900px) {
-  .layout {
-    grid-template-columns: 1fr;
-  }
+  .layout { grid-template-columns: 1fr; }
+  .edit-grid { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 700px) {
-  body {
-    padding: 6px;
-  }
-
-  .app {
-    padding: 10px;
-  }
-
-  .result-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .row {
-    flex-direction: column;
-  }
-
-  .actions {
-    flex-direction: column;
-  }
-
-  .actions button {
-    width: 100%;
-  }
+  body { padding: 6px; }
+  .app { padding: 10px; }
+  .result-grid { grid-template-columns: 1fr; }
+  .row { flex-direction: column; }
+  .actions { flex-direction: column; }
+  .actions button { width: 100%; }
 }
 </style>
 </head>
@@ -217,14 +222,14 @@ button {
 <body>
 <div class="app">
   <h1>Administrácia úloh</h1>
-  <p class="subtitle">Vyhľadanie a testovanie konkrétnej úlohy bez zápisu do tréningu hráča.</p>
+  <p class="subtitle">Vyhľadanie, testovanie a editácia puzzle.</p>
 
   <div class="layout">
     <div class="card">
       <h2>Vyhľadanie podľa ID</h2>
       <div class="row">
         <input id="puzzleIdInput" type="number" placeholder="Zadaj ID úlohy">
-        <button class="primary" onclick="findById()">Nájsť podľa ID</button>
+        <button class="primary" onclick="findById()">Nájsť</button>
       </div>
       <div class="tip">Použi, keď poznáš presné ID úlohy.</div>
     </div>
@@ -233,15 +238,14 @@ button {
       <h2>Vyhľadanie podľa FEN</h2>
       <textarea id="fenInput" placeholder="Vlož FEN pozície"></textarea>
       <div class="actions">
-        <button class="primary" onclick="findByFenExact()">Nájsť podľa celého FEN</button>
-        <button class="secondary" onclick="findByFenBoardOnly()">Nájsť podľa rozostavenia figúr</button>
+        <button class="primary" onclick="findByFenExact()">Celý FEN</button>
+        <button class="secondary" onclick="findByFenBoardOnly()">Len rozostavenie</button>
       </div>
-      <div class="tip">
-        Druhá voľba porovnáva iba prvú časť FEN, teda samotné rozostavenie figúr.
-      </div>
+      <div class="tip">Druhá voľba porovnáva iba rozostavenie figúr.</div>
     </div>
   </div>
 
+  <!-- Výsledok + editácia -->
   <div id="resultBox" class="result hidden">
     <h3>Nájdená úloha</h3>
 
@@ -254,40 +258,108 @@ button {
         <div class="label">Názov</div>
         <div id="resTitle" class="value">-</div>
       </div>
-      <div class="result-box">
+      <div class="result-box" style="grid-column: span 2;">
         <div class="label">FEN</div>
         <div id="resFen" class="value">-</div>
-      </div>
-      <div class="result-box">
-        <div class="label">ELO</div>
-        <div id="resElo" class="value">-</div>
       </div>
       <div class="result-box">
         <div class="label">Kategória</div>
         <div id="resCategory" class="value">-</div>
       </div>
       <div class="result-box">
-        <div class="label">Čas</div>
+        <div class="label">ELO úlohy</div>
+        <div id="resElo" class="value">-</div>
+      </div>
+      <div class="result-box">
+        <div class="label">Čas (sek)</div>
         <div id="resTime" class="value">-</div>
+      </div>
+      <div class="result-box">
+        <div class="label">Prompt</div>
+        <div id="resPrompt" class="value">-</div>
       </div>
     </div>
 
     <div class="actions">
       <button class="admin" onclick="openInAdminTraining()">Otvoriť v testovacom režime</button>
-      <button class="secondary" onclick="clearResult()">Vymazať výsledok</button>
+      <button class="secondary" onclick="clearResult()">Zavrieť</button>
+    </div>
+
+    <!-- Editácia -->
+    <div class="edit-section">
+      <h4>✏️ Editácia úlohy</h4>
+
+      <div class="edit-grid">
+        <div class="edit-field">
+          <label>Názov</label>
+          <input id="editTitle" type="text" placeholder="Názov úlohy">
+        </div>
+        <div class="edit-field">
+          <label>Kategória</label>
+          <select id="editCategory">
+            <option value="Taktika">Taktika</option>
+            <option value="Strategia">Strategia</option>
+            <option value="Koncovka">Koncovka</option>
+          </select>
+        </div>
+        <div class="edit-field">
+          <label>ELO úlohy</label>
+          <input id="editElo" type="number" placeholder="napr. 1500">
+        </div>
+        <div class="edit-field">
+          <label>Odporúčaný čas (sek)</label>
+          <input id="editTime" type="number" placeholder="napr. 120">
+        </div>
+        <div class="edit-field" style="grid-column: span 2;">
+          <label>Prompt (text nad šachovnicou)</label>
+          <input id="editPrompt" type="text" placeholder="napr. Nájdi najlepší ťah">
+        </div>
+        <div class="edit-field" style="grid-column: span 2;">
+          <label>Riešenie (JSON — solutionTree)</label>
+          <textarea id="editSolutionTree" placeholder="napr. [{&quot;move&quot;:&quot;e2e4&quot;,&quot;next&quot;:[]}]"></textarea>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button class="success" onclick="savePuzzle()">💾 Uložiť zmeny</button>
+        <button class="danger" onclick="deletePuzzle()">🗑️ Vymazať úlohu</button>
+      </div>
     </div>
   </div>
 
-  <div id="status" class="status">Stav: pripravené</div>
+  <div id="status" class="status success">Stav: Načítaných 1000 puzzle — môžeš vyhľadávať</div>
 
-  <div class="actions">
+  <div class="actions" style="margin-top: 12px;">
     <button class="secondary" onclick="goHome()">Späť do menu</button>
   </div>
 </div>
 
 <script>
+const SUPABASE_URL = "https://wdjsilryllqksdtmaehy.supabase.co";
+const SUPABASE_KEY = "sb_publishable_45gFQhgPScrDjDCVC0B4Iw_q6uZKf9m";
+
 let puzzles = [];
 let selectedPuzzle = null;
+
+async function sbFetch(path, options = {}) {
+  const url = `${SUPABASE_URL}/rest/v1/${path}`;
+  const res = await fetch(url, {
+    ...options,
+    headers: {
+      "apikey": SUPABASE_KEY,
+      "Authorization": `Bearer ${SUPABASE_KEY}`,
+      "Content-Type": "application/json",
+      "Prefer": options.prefer || "",
+      ...(options.headers || {})
+    }
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(err);
+  }
+  const text = await res.text();
+  return text ? JSON.parse(text) : null;
+}
 
 function setStatus(text, type = "") {
   const el = document.getElementById("status");
@@ -302,12 +374,23 @@ function normalizeFenBoardOnly(fen) {
 function showPuzzle(puzzle) {
   selectedPuzzle = puzzle;
   document.getElementById("resultBox").classList.remove("hidden");
+
   document.getElementById("resId").textContent = puzzle.id ?? "-";
   document.getElementById("resTitle").textContent = puzzle.title || "-";
   document.getElementById("resFen").textContent = puzzle.fen || "-";
   document.getElementById("resElo").textContent = puzzle.elo ?? "-";
   document.getElementById("resCategory").textContent = puzzle.category || "-";
   document.getElementById("resTime").textContent = puzzle.time ?? "-";
+  document.getElementById("resPrompt").textContent = puzzle.prompt || "-";
+
+  // Naplň edit formulár
+  document.getElementById("editTitle").value = puzzle.title || "";
+  document.getElementById("editCategory").value = puzzle.category || "Taktika";
+  document.getElementById("editElo").value = puzzle.elo ?? "";
+  document.getElementById("editTime").value = puzzle.time ?? "";
+  document.getElementById("editPrompt").value = puzzle.prompt || "";
+  document.getElementById("editSolutionTree").value =
+    JSON.stringify(puzzle.solution_tree || puzzle.solutionTree || [], null, 2);
 }
 
 function clearResult() {
@@ -318,68 +401,105 @@ function clearResult() {
 
 function findById() {
   const wantedId = Number(document.getElementById("puzzleIdInput").value);
-
   if (!Number.isFinite(wantedId)) {
     setStatus("Zadaj platné ID úlohy", "error");
     return;
   }
-
   const puzzle = puzzles.find(p => Number(p.id) === wantedId);
-
   if (!puzzle) {
     setStatus("Úloha s týmto ID neexistuje", "error");
     return;
   }
-
   showPuzzle(puzzle);
   setStatus("Úloha podľa ID bola nájdená", "success");
 }
 
 function findByFenExact() {
   const fen = document.getElementById("fenInput").value.trim();
-
-  if (!fen) {
-    setStatus("Zadaj FEN", "error");
-    return;
-  }
-
+  if (!fen) { setStatus("Zadaj FEN", "error"); return; }
   const puzzle = puzzles.find(p => String(p.fen || "").trim() === fen);
-
-  if (!puzzle) {
-    setStatus("Úloha s týmto presným FEN sa nenašla", "error");
-    return;
-  }
-
+  if (!puzzle) { setStatus("Úloha s týmto presným FEN sa nenašla", "error"); return; }
   showPuzzle(puzzle);
   setStatus("Úloha podľa celého FEN bola nájdená", "success");
 }
 
 function findByFenBoardOnly() {
   const fen = document.getElementById("fenInput").value.trim();
-
-  if (!fen) {
-    setStatus("Zadaj FEN", "error");
-    return;
-  }
-
+  if (!fen) { setStatus("Zadaj FEN", "error"); return; }
   const wantedBoard = normalizeFenBoardOnly(fen);
   const puzzle = puzzles.find(p => normalizeFenBoardOnly(p.fen) === wantedBoard);
-
-  if (!puzzle) {
-    setStatus("Úloha podľa rozostavenia figúr sa nenašla", "error");
-    return;
-  }
-
+  if (!puzzle) { setStatus("Úloha podľa rozostavenia figúr sa nenašla", "error"); return; }
   showPuzzle(puzzle);
   setStatus("Úloha podľa rozostavenia figúr bola nájdená", "success");
 }
 
-function openInAdminTraining() {
-  if (!selectedPuzzle) {
-    setStatus("Najprv nájdi úlohu", "error");
+async function savePuzzle() {
+  if (!selectedPuzzle) { setStatus("Najprv nájdi úlohu", "error"); return; }
+
+  const title = document.getElementById("editTitle").value.trim();
+  const category = document.getElementById("editCategory").value;
+  const elo = Number(document.getElementById("editElo").value);
+  const time = Number(document.getElementById("editTime").value);
+  const prompt = document.getElementById("editPrompt").value.trim();
+  const solutionRaw = document.getElementById("editSolutionTree").value.trim();
+
+  if (!title) { setStatus("Zadaj názov úlohy", "error"); return; }
+  if (!elo || elo < 100) { setStatus("Zadaj platné ELO (min. 100)", "error"); return; }
+  if (!time || time < 10) { setStatus("Zadaj platný čas (min. 10 sekúnd)", "error"); return; }
+
+  let solutionTree;
+  try {
+    solutionTree = JSON.parse(solutionRaw);
+  } catch (e) {
+    setStatus("Riešenie nie je platný JSON", "error");
     return;
   }
 
+  try {
+    setStatus("Ukladám zmeny...");
+    await sbFetch(`puzzles?id=eq.${selectedPuzzle.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({
+        title,
+        category,
+        elo,
+        time,
+        prompt,
+        solution_tree: solutionTree
+      })
+    });
+
+    // Aktualizuj lokálne pole
+    const idx = puzzles.findIndex(p => p.id === selectedPuzzle.id);
+    if (idx !== -1) {
+      puzzles[idx] = { ...puzzles[idx], title, category, elo, time, prompt, solution_tree: solutionTree };
+      selectedPuzzle = puzzles[idx];
+    }
+
+    showPuzzle(selectedPuzzle);
+    setStatus(`Úloha ID ${selectedPuzzle.id} bola úspešne uložená`, "success");
+  } catch (e) {
+    setStatus("Chyba pri ukladaní: " + e.message, "error");
+  }
+}
+
+async function deletePuzzle() {
+  if (!selectedPuzzle) { setStatus("Najprv nájdi úlohu", "error"); return; }
+  if (!confirm(`Naozaj chceš vymazať úlohu ID ${selectedPuzzle.id} — "${selectedPuzzle.title}"? Táto akcia je nevratná.`)) return;
+
+  try {
+    setStatus("Mažem úlohu...");
+    await sbFetch(`puzzles?id=eq.${selectedPuzzle.id}`, { method: "DELETE" });
+    puzzles = puzzles.filter(p => p.id !== selectedPuzzle.id);
+    clearResult();
+    setStatus(`Úloha bola vymazaná`, "success");
+  } catch (e) {
+    setStatus("Chyba pri mazaní: " + e.message, "error");
+  }
+}
+
+function openInAdminTraining() {
+  if (!selectedPuzzle) { setStatus("Najprv nájdi úlohu", "error"); return; }
   localStorage.setItem("adminPuzzleId", String(selectedPuzzle.id));
   localStorage.setItem("adminMode", "true");
   location.href = "training.html";
@@ -391,17 +511,18 @@ function goHome() {
 
 async function init() {
   try {
-    const r = await fetch("./data/puzzles-test.json?v=" + Date.now(), { cache: "no-store" });
-    if (!r.ok) throw new Error("Súbor puzzles-test.json sa nenašiel");
-    puzzles = await r.json();
-    if (!Array.isArray(puzzles) || !puzzles.length) throw new Error("Prázdny JSON");
-    setStatus("JSON načítaný, môžeš vyhľadávať");
+    setStatus("Načítavam puzzle zo Supabase...");
+    const data = await sbFetch("puzzles?order=id.asc&limit=2000");
+    if (!data || !data.length) throw new Error("Žiadne puzzle v databáze");
+    puzzles = data;
+    setStatus(`Načítaných ${puzzles.length} puzzle — môžeš vyhľadávať`, "success");
   } catch (e) {
-    setStatus("Chyba pri načítaní JSON: " + e.message, "error");
+    setStatus("Chyba pri načítaní: " + e.message, "error");
   }
 }
 
 init();
 </script>
-</body>
-</html>
+
+
+</body></html>
