@@ -1,7 +1,7 @@
 <!DOCTYPE html>
-<html lang="sk">
-<head>
-<meta charset="UTF-8">
+<!-- saved from url=(0048)file:///C:/Users/mchovanec/Downloads/skills.html -->
+<html lang="sk"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Šachové zručnosti</title>
 
@@ -423,11 +423,8 @@ button:disabled { opacity: 0.6; cursor: not-allowed; }
   </div>
 </div>
 
-<script src="js/player.js"></script>
+<script src="file:///C:/Users/mchovanec/Downloads/js/player.js"></script>
 <script>
-const SUPABASE_URL = "https://wdjsilryllqksdtmaehy.supabase.co";
-const SUPABASE_KEY = "sb_publishable_45gFQhgPScrDjDCVC0B4Iw_q6uZKf9m";
-
 const files = ['a','b','c','d','e','f','g','h'];
 
 let currentPlayer = null;
@@ -787,24 +784,7 @@ async function recordResult(result) {
   }
 }
 
-// ─── Supabase ─────────────────────────────────────────────────────────────────
-
-async function sbFetch(path, options = {}) {
-  const url = `${SUPABASE_URL}/rest/v1/${path}`;
-  const res = await fetch(url, {
-    ...options,
-    headers: {
-      "apikey": SUPABASE_KEY,
-      "Authorization": `Bearer ${SUPABASE_KEY}`,
-      "Content-Type": "application/json",
-      "Prefer": options.prefer || "",
-      ...(options.headers || {})
-    }
-  });
-  if (!res.ok) { const err = await res.text(); throw new Error(err); }
-  const text = await res.text();
-  return text ? JSON.parse(text) : null;
-}
+// sbFetch je dostupný z player.js
 
 async function loadPuzzles() {
   const data = await sbFetch("skill_puzzles?order=id.asc&limit=2000");
@@ -898,5 +878,6 @@ async function init() {
 
 init();
 </script>
-</body>
-</html>
+
+
+</body></html>
