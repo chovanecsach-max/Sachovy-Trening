@@ -1,0 +1,902 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Šachové zručnosti</title>
+
+<style>
+body {
+  font-family: Arial, sans-serif;
+  background: #f4f4f6;
+  margin: 0;
+  padding: 10px;
+  color: #111827;
+}
+
+.app {
+  max-width: 1280px;
+  margin: 0 auto;
+  background: white;
+  border-radius: 14px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+  padding: 12px;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 12px;
+  align-items: start;
+}
+
+.board-card, .panel-card, .stats-card {
+  border: 1px solid #d1d5db;
+  border-radius: 12px;
+  background: white;
+}
+
+.board-card { padding: 10px; }
+.panel-card, .stats-card { padding: 10px 12px; }
+
+.board-area {
+  position: relative;
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 auto;
+}
+
+.board-prompt {
+  text-align: center;
+  margin: 0 0 10px 0;
+  font-size: 22px;
+}
+
+.turn-indicator {
+  position: absolute;
+  right: -18px;
+  bottom: 56px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid #111827;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+}
+
+.turn-indicator.white { background: white; }
+.turn-indicator.black { background: #111827; }
+
+.board {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  grid-template-rows: repeat(8, 1fr);
+  width: min(100%, 74vh);
+  max-width: 720px;
+  aspect-ratio: 1 / 1;
+  margin: auto;
+  border: 8px solid #5b4636;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.square {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
+  position: relative;
+  box-sizing: border-box;
+  user-select: none;
+}
+
+.square img.piece-img {
+  width: 85%;
+  height: 85%;
+  object-fit: contain;
+  pointer-events: none;
+  user-select: none;
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.4));
+}
+
+.light { background: #f4e7c7; }
+.dark { background: #7a9b76; }
+
+.square.selected {
+  outline: 3px solid #2563eb;
+  outline-offset: -3px;
+}
+
+.square.legal::after {
+  content: "";
+  position: absolute;
+  width: 22%;
+  height: 22%;
+  border-radius: 50%;
+  background: rgba(34, 197, 94, 0.55);
+}
+
+.square.capture::after {
+  content: "";
+  position: absolute;
+  inset: 6px;
+  border: 4px solid rgba(239, 68, 68, 0.75);
+  border-radius: 50%;
+  box-sizing: border-box;
+}
+
+.square.found-move {
+  box-shadow: inset 0 0 0 9999px rgba(34, 197, 94, 0.35);
+}
+
+.square.found-move-to {
+  box-shadow: inset 0 0 0 9999px rgba(34, 197, 94, 0.50);
+}
+
+.coord-file {
+  position: absolute;
+  right: 4px;
+  bottom: 2px;
+  font-size: 10px;
+  font-weight: bold;
+  opacity: 0.75;
+  z-index: 3;
+}
+
+.coord-rank {
+  position: absolute;
+  left: 4px;
+  top: 2px;
+  font-size: 10px;
+  font-weight: bold;
+  opacity: 0.75;
+  z-index: 3;
+}
+
+/* Panel */
+.panel-card h2 { margin: 0 0 8px 0; font-size: 18px; }
+
+.meta-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.meta-box {
+  border: 1px solid #e5e7eb;
+  background: #f8fafc;
+  border-radius: 10px;
+  padding: 8px;
+}
+
+.meta-label {
+  font-size: 11px;
+  color: #64748b;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.meta-value { font-size: 14px; font-weight: 600; word-break: break-word; }
+
+.badge {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: bold;
+  border: 1px solid #d1d5db;
+  background: #f8fafc;
+  color: #334155;
+}
+
+.badge.player { background: #ecfeff; color: #155e75; border-color: #67e8f9; }
+.badge.elo { background: #eff6ff; color: #1d4ed8; border-color: #93c5fd; }
+.badge.time { background: #f5f3ff; color: #6d28d9; border-color: #c4b5fd; }
+.badge.timer-ok { background: #ecfdf5; color: #166534; border-color: #86efac; }
+.badge.timer-warning { background: #fff7ed; color: #c2410c; border-color: #fdba74; }
+.badge.timer-expired { background: #fef2f2; color: #b91c1c; border-color: #fca5a5; }
+
+/* Počítadlo zostávajúcich ťahov */
+.remaining-box {
+  margin-bottom: 10px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 2px solid #3b82f6;
+  background: #eff6ff;
+  text-align: center;
+}
+
+.remaining-label {
+  font-size: 12px;
+  color: #1d4ed8;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.remaining-count {
+  font-size: 36px;
+  font-weight: bold;
+  color: #1d4ed8;
+  line-height: 1;
+}
+
+.remaining-box.done {
+  border-color: #22c55e;
+  background: #f0fdf4;
+}
+
+.remaining-box.done .remaining-label,
+.remaining-box.done .remaining-count {
+  color: #166534;
+}
+
+/* Zoznam nájdených ťahov */
+.found-list {
+  margin-bottom: 10px;
+}
+
+.found-list-title {
+  font-size: 12px;
+  color: #64748b;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+
+.found-moves {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.found-move-badge {
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: #dcfce7;
+  color: #166534;
+  border: 1px solid #86efac;
+  font-size: 13px;
+  font-family: monospace;
+  font-weight: bold;
+}
+
+/* Tlačidlá */
+.buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+button {
+  padding: 10px 12px;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+button:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.primary { background: #111827; color: white; }
+.secondary { background: #e5e7eb; color: #111827; }
+.accent { background: #dbeafe; color: #1d4ed8; }
+.danger { background: #fee2e2; color: #991b1b; }
+
+.status {
+  text-align: center;
+  padding: 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  background: #f9fafb;
+  font-size: 14px;
+}
+
+.status.info { background: #f8fafc; border-color: #cbd5e1; color: #334155; }
+.status.success { background: #f0fdf4; border-color: #86efac; color: #166534; }
+.status.error { background: #fef2f2; border-color: #fca5a5; color: #b91c1c; }
+.status.warning { background: #fff7ed; border-color: #fdba74; color: #c2410c; }
+
+/* Štatistika */
+.stats-card { margin-top: 12px; }
+.stats-card h3 { margin: 0 0 10px 0; font-size: 15px; text-align: center; }
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.stat-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 10px 8px;
+  text-align: center;
+}
+
+.stat-label {
+  display: block;
+  font-size: 11px;
+  color: #64748b;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+}
+
+.stat-value { font-size: 18px; font-weight: bold; color: #0f172a; }
+
+@media (max-width: 780px) {
+  .layout { grid-template-columns: 1fr; }
+  .board { width: min(100%, 82vw); }
+  .right-column { order: -1; }
+  .meta-grid { grid-template-columns: 1fr; }
+  .stats-grid { grid-template-columns: 1fr; }
+  .buttons { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+
+<body>
+<div class="app">
+  <div class="layout">
+    <div class="left-column">
+      <div class="board-card">
+        <div class="board-area">
+          <h2 id="promptText" class="board-prompt">Nájdi všetky šachy</h2>
+          <div id="board" class="board"></div>
+          <div id="turnIndicator" class="turn-indicator white"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="right-column">
+      <div class="panel-card">
+
+        <div class="meta-grid">
+          <div class="meta-box">
+            <div class="meta-label">Hráč</div>
+            <div class="meta-value"><span id="playerName" class="badge player">-</span></div>
+          </div>
+          <div class="meta-box">
+            <div class="meta-label">ELO hráča</div>
+            <div class="meta-value"><span id="playerElo" class="badge player">-</span></div>
+          </div>
+          <div class="meta-box">
+            <div class="meta-label">ID pozície</div>
+            <div id="puzzleId" class="meta-value">-</div>
+          </div>
+          <div class="meta-box">
+            <div class="meta-label">ELO úlohy</div>
+            <div class="meta-value"><span id="puzzleElo" class="badge elo">-</span></div>
+          </div>
+          <div class="meta-box">
+            <div class="meta-label">Odporúčaný čas</div>
+            <div class="meta-value"><span id="puzzleTime" class="badge time">-</span></div>
+          </div>
+          <div class="meta-box">
+            <div class="meta-label">Zostáva</div>
+            <div class="meta-value"><span id="puzzleTimer" class="badge timer-ok">-</span></div>
+          </div>
+        </div>
+
+        <!-- Počítadlo zostávajúcich ťahov -->
+        <div id="remainingBox" class="remaining-box">
+          <div class="remaining-label" id="remainingLabel">Zostáva nájsť</div>
+          <div class="remaining-count" id="remainingCount">-</div>
+        </div>
+
+        <!-- Nájdené ťahy -->
+        <div class="found-list">
+          <div class="found-list-title">Nájdené ťahy</div>
+          <div id="foundMoves" class="found-moves"></div>
+        </div>
+
+        <div class="buttons">
+          <button class="primary" id="nextBtn" onclick="nextPuzzle()">Ďalšia úloha</button>
+          <button class="secondary" id="restartBtn" onclick="restart()">Od začiatku</button>
+          <button class="accent" id="showSolutionBtn" onclick="showSolution()">Ukáž riešenie</button>
+          <button class="secondary" onclick="goHome()">Menu</button>
+        </div>
+
+        <div id="status" class="status info">Stav: pripravené</div>
+      </div>
+
+      <div class="stats-card">
+        <h3>Štatistika tréningu</h3>
+        <div class="stats-grid">
+          <div class="stat-card">
+            <span class="stat-label">Riešené</span>
+            <div class="stat-value" id="statPlayed">0</div>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">Vyriešené</span>
+            <div class="stat-value" id="statSolved">0</div>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">Úspešnosť</span>
+            <div class="stat-value" id="statAccuracy">0%</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="js/player.js"></script>
+<script>
+const SUPABASE_URL = "https://wdjsilryllqksdtmaehy.supabase.co";
+const SUPABASE_KEY = "sb_publishable_45gFQhgPScrDjDCVC0B4Iw_q6uZKf9m";
+
+const files = ['a','b','c','d','e','f','g','h'];
+
+let currentPlayer = null;
+let puzzles = [];
+let board = [];
+let meta = null;
+let current = null;
+let selected = null;
+let flipped = false;
+
+let solutions = [];       // všetky správne ťahy
+let foundMoves = [];      // už nájdené ťahy
+let puzzleDone = false;
+let puzzleFailed = false;
+let resultLogged = false;
+let puzzleCounted = false;
+let puzzleSolvedCounted = false;
+
+let timerInterval = null;
+let timerRemaining = 0;
+let timerExpired = false;
+
+let stats = { played: 0, solved: 0 };
+
+// ─── Pomocné funkcie ─────────────────────────────────────────────────────────
+
+function goHome() { location.href = "index.html"; }
+
+function formatTime(seconds) {
+  const safe = Math.max(0, Math.floor(seconds));
+  return `${Math.floor(safe/60)}:${String(safe%60).padStart(2,'0')}`;
+}
+
+function setStatus(text, type = 'info') {
+  const el = document.getElementById('status');
+  el.textContent = 'Stav: ' + text;
+  el.className = 'status ' + type;
+}
+
+function updateStatsUI() {
+  const acc = stats.played === 0 ? 0 : Math.round((stats.solved/stats.played)*100);
+  document.getElementById('statPlayed').textContent = stats.played;
+  document.getElementById('statSolved').textContent = stats.solved;
+  document.getElementById('statAccuracy').textContent = acc + '%';
+}
+
+function updatePlayerUI() {
+  if (!currentPlayer) return;
+  document.getElementById('playerName').textContent =
+    currentPlayer.name + (currentPlayer.surname ? ' ' + currentPlayer.surname : '');
+  document.getElementById('playerElo').textContent = currentPlayer.elo;
+}
+
+function updateTimerUI() {
+  const el = document.getElementById('puzzleTimer');
+  el.textContent = formatTime(timerRemaining);
+  if (timerExpired) { el.className = 'badge timer-expired'; return; }
+  el.className = timerRemaining <= 30 ? 'badge timer-warning' : 'badge timer-ok';
+}
+
+function stopTimer() {
+  if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+}
+
+function startTimer(seconds) {
+  stopTimer();
+  timerRemaining = Math.max(1, Math.round(seconds));
+  timerExpired = false;
+  updateTimerUI();
+  timerInterval = setInterval(() => {
+    if (puzzleDone) return;
+    timerRemaining -= 1;
+    if (timerRemaining <= 0) {
+      timerRemaining = 0;
+      timerExpired = true;
+      stopTimer();
+      updateTimerUI();
+      onTimeExpired();
+      return;
+    }
+    updateTimerUI();
+  }, 1000);
+}
+
+function onTimeExpired() {
+  if (puzzleDone) return;
+  puzzleDone = true;
+  puzzleFailed = true;
+  markPlayed();
+  recordResult('loss');
+  updateRemainingUI();
+  setStatus('Čas vypršal!', 'error');
+  showAllSolutionsOnBoard();
+}
+
+// ─── Šachový engine (parsovanie FEN, render) ─────────────────────────────────
+
+function parseFen(fen) {
+  const parts = fen.trim().split(/\s+/);
+  const rows = parts[0].split('/');
+  const b = [];
+  rows.forEach(r => {
+    for (const c of r) {
+      if (!isNaN(c)) { for (let i=0; i<Number(c); i++) b.push(''); }
+      else b.push(c);
+    }
+  });
+  return {
+    board: b,
+    meta: {
+      activeColor: parts[1] || 'w',
+      castling: parts[2] || '-',
+      enPassant: parts[3] || '-',
+    }
+  };
+}
+
+function name(i) { return files[i%8] + (8 - Math.floor(i/8)); }
+function sqToIndex(sq) { return files.indexOf(sq[0]) + 8*(8-Number(sq[1])); }
+function map(i) { return flipped ? 63-i : i; }
+function isWhitePiece(p) { return p && p === p.toUpperCase(); }
+function pieceColor(p) { if (!p) return ''; return isWhitePiece(p) ? 'w' : 'b'; }
+function rowOf(i) { return Math.floor(i/8); }
+function colOf(i) { return i%8; }
+
+function getPieceImagePath(pieceChar) {
+  const color = isWhitePiece(pieceChar) ? 'w' : 'b';
+  return `img/Pieces/${color}${pieceChar.toUpperCase()}.svg`;
+}
+
+// ─── Render šachovnice ────────────────────────────────────────────────────────
+
+function getLegalTargetsForPiece(fromIndex) {
+  const result = [];
+  for (let ti = 0; ti < 64; ti++) {
+    if (ti === fromIndex) continue;
+    if (board[ti] && pieceColor(board[ti]) === meta.activeColor) continue;
+    result.push({ index: ti, capture: !!board[ti] });
+  }
+  return result;
+}
+
+function render() {
+  const el = document.getElementById('board');
+  el.innerHTML = '';
+  for (let i = 0; i < 64; i++) {
+    const bi = map(i);
+    const d = document.createElement('div');
+    const r = Math.floor(i/8);
+    const c = i%8;
+    d.className = 'square ' + ((r+c)%2===0 ? 'light' : 'dark');
+    d.dataset.boardIndex = bi;
+
+    if (selected === bi) d.classList.add('selected');
+
+    // Zvýrazni nájdené ťahy
+    foundMoves.forEach(move => {
+      const fi = sqToIndex(move.substring(0,2));
+      const ti = sqToIndex(move.substring(2,4));
+      if (bi === fi) d.classList.add('found-move');
+      if (bi === ti) d.classList.add('found-move-to');
+    });
+
+    if (board[bi]) {
+      const img = document.createElement('img');
+      img.src = getPieceImagePath(board[bi]);
+      img.className = 'piece-img';
+      img.alt = board[bi];
+      img.draggable = false;
+      d.appendChild(img);
+    }
+
+    if (r === 7) {
+      const f = document.createElement('span');
+      f.className = 'coord-file';
+      f.innerText = files[flipped ? 7-c : c];
+      d.appendChild(f);
+    }
+    if (c === 0) {
+      const rk = document.createElement('span');
+      rk.className = 'coord-rank';
+      rk.innerText = flipped ? (1+r) : (8-r);
+      d.appendChild(rk);
+    }
+
+    d.onclick = () => click(bi);
+    el.appendChild(d);
+  }
+}
+
+// ─── Klikanie na šachovnicu ───────────────────────────────────────────────────
+
+function click(i) {
+  if (puzzleDone) return;
+
+  if (selected === null) {
+    if (!board[i]) return setStatus('Vyber figúrku', 'info');
+    if (pieceColor(board[i]) !== meta.activeColor) return setStatus('Vyber správnu stranu', 'warning');
+    selected = i;
+    render();
+    return setStatus('Vybraná figúrka: ' + name(i), 'info');
+  }
+
+  if (selected === i) {
+    selected = null;
+    render();
+    return setStatus('Výber zrušený', 'info');
+  }
+
+  // Klikol na inú figúrku rovnakej farby
+  if (board[i] && pieceColor(board[i]) === meta.activeColor) {
+    selected = i;
+    render();
+    return setStatus('Vybraná figúrka: ' + name(i), 'info');
+  }
+
+  // Pokus o ťah
+  const attempted = name(selected) + name(i);
+  handleMoveAttempt(attempted);
+}
+
+function handleMoveAttempt(attempted) {
+  // Skontroluj či ťah je v riešeniach
+  const isCorrect = solutions.includes(attempted);
+
+  // Skontroluj či už bol nájdený
+  const alreadyFound = foundMoves.includes(attempted);
+
+  if (alreadyFound) {
+    selected = null;
+    render();
+    return setStatus('Tento ťah si už našiel!', 'warning');
+  }
+
+  markPlayed();
+
+  if (isCorrect) {
+    foundMoves.push(attempted);
+    selected = null;
+    render();
+    updateRemainingUI();
+    updateFoundMovesUI();
+
+    if (foundMoves.length === solutions.length) {
+      // Všetky nájdené!
+      puzzleDone = true;
+      stopTimer();
+      markSolved();
+      recordResult('win');
+      setStatus('🎉 Výborne! Našiel si všetky ' + getSkillTypeName() + '!', 'success');
+    } else {
+      setStatus('Správne! Nájdi ďalší ' + getSkillTypeSingular() + '.', 'success');
+    }
+  } else {
+    selected = null;
+    render();
+    setStatus('Toto nie je ' + getSkillTypeSingular() + '.', 'error');
+  }
+}
+
+function getSkillTypeName() {
+  if (!current) return 'ťahy';
+  return current.skill_type === 'checks' ? 'šachy' : 'brania';
+}
+
+function getSkillTypeSingular() {
+  if (!current) return 'ťah';
+  return current.skill_type === 'checks' ? 'šach' : 'branie';
+}
+
+// ─── Počítadlo a nájdené ťahy ─────────────────────────────────────────────────
+
+function updateRemainingUI() {
+  const remaining = solutions.length - foundMoves.length;
+  const box = document.getElementById('remainingBox');
+  const count = document.getElementById('remainingCount');
+  const label = document.getElementById('remainingLabel');
+
+  count.textContent = remaining;
+
+  if (remaining === 0) {
+    box.className = 'remaining-box done';
+    label.textContent = 'Všetky nájdené!';
+  } else {
+    box.className = 'remaining-box';
+    label.textContent = 'Zostáva nájsť';
+  }
+}
+
+function updateFoundMovesUI() {
+  const el = document.getElementById('foundMoves');
+  el.innerHTML = '';
+  foundMoves.forEach(move => {
+    const badge = document.createElement('span');
+    badge.className = 'found-move-badge';
+    badge.textContent = move;
+    el.appendChild(badge);
+  });
+}
+
+// ─── Riešenie ────────────────────────────────────────────────────────────────
+
+function showSolution() {
+  if (puzzleDone) return;
+  stopTimer();
+  markPlayed();
+  recordResult('loss');
+  puzzleDone = true;
+  puzzleFailed = true;
+
+  // Ukáž všetky riešenia
+  foundMoves = [...solutions];
+  render();
+  updateRemainingUI();
+  updateFoundMovesUI();
+  setStatus('Riešenie: ' + solutions.join(', '), 'warning');
+}
+
+function showAllSolutionsOnBoard() {
+  foundMoves = [...solutions];
+  render();
+  updateFoundMovesUI();
+}
+
+// ─── Štatistika ──────────────────────────────────────────────────────────────
+
+function markPlayed() {
+  if (puzzleCounted) return;
+  puzzleCounted = true;
+  stats.played += 1;
+  updateStatsUI();
+}
+
+function markSolved() {
+  if (puzzleSolvedCounted) return;
+  puzzleSolvedCounted = true;
+  stats.solved += 1;
+  updateStatsUI();
+}
+
+async function recordResult(result) {
+  if (resultLogged || !currentPlayer || !current) return;
+  resultLogged = true;
+  // Zaznamenaj do training_log
+  try {
+    await sbFetch("training_log", {
+      method: "POST",
+      prefer: "return=minimal",
+      body: JSON.stringify({
+        player_id: currentPlayer.id,
+        puzzle_id: current.id,
+        result: result
+      })
+    });
+  } catch(e) {
+    console.error("Chyba pri zápise logu:", e);
+  }
+}
+
+// ─── Supabase ─────────────────────────────────────────────────────────────────
+
+async function sbFetch(path, options = {}) {
+  const url = `${SUPABASE_URL}/rest/v1/${path}`;
+  const res = await fetch(url, {
+    ...options,
+    headers: {
+      "apikey": SUPABASE_KEY,
+      "Authorization": `Bearer ${SUPABASE_KEY}`,
+      "Content-Type": "application/json",
+      "Prefer": options.prefer || "",
+      ...(options.headers || {})
+    }
+  });
+  if (!res.ok) { const err = await res.text(); throw new Error(err); }
+  const text = await res.text();
+  return text ? JSON.parse(text) : null;
+}
+
+async function loadPuzzles() {
+  const data = await sbFetch("skill_puzzles?order=id.asc&limit=2000");
+  if (!data || !data.length) throw new Error("Žiadne úlohy v databáze");
+  return data;
+}
+
+// ─── Výber úlohy ─────────────────────────────────────────────────────────────
+
+function pickPuzzle() {
+  if (!puzzles.length) return null;
+  // Vyber náhodnú úlohu ktorá ešte nebola riešená v tejto session
+  const pool = puzzles.filter(p => p.id !== (current ? current.id : -1));
+  return pool[Math.floor(Math.random() * pool.length)] || puzzles[0];
+}
+
+// ─── Načítanie úlohy ─────────────────────────────────────────────────────────
+
+function loadPuzzle(puzzle) {
+  current = puzzle;
+  solutions = Array.isArray(puzzle.solutions) ? puzzle.solutions : [];
+  foundMoves = [];
+  puzzleDone = false;
+  puzzleFailed = false;
+  resultLogged = false;
+  puzzleCounted = false;
+  puzzleSolvedCounted = false;
+  selected = null;
+
+  const parsed = parseFen(puzzle.fen);
+  board = parsed.board;
+  meta = parsed.meta;
+
+  flipped = meta.activeColor === 'b';
+
+  // UI
+  document.getElementById('promptText').textContent = puzzle.prompt || 'Nájdi všetky šachy';
+  document.getElementById('puzzleId').textContent = puzzle.id ?? '-';
+  document.getElementById('puzzleElo').textContent = puzzle.elo ?? '-';
+  document.getElementById('puzzleTime').textContent = formatTime(puzzle.time || 120);
+
+  const ti = document.getElementById('turnIndicator');
+  ti.className = 'turn-indicator ' + (meta.activeColor === 'b' ? 'black' : 'white');
+
+  updateRemainingUI();
+  updateFoundMovesUI();
+  render();
+  startTimer(puzzle.time || 120);
+  setStatus('Pripravené', 'info');
+}
+
+function nextPuzzle() {
+  const puzzle = pickPuzzle();
+  if (!puzzle) return setStatus('Žiadne ďalšie úlohy', 'warning');
+  loadPuzzle(puzzle);
+}
+
+function restart() {
+  if (!current) return;
+  loadPuzzle(current);
+}
+
+// ─── Inicializácia ────────────────────────────────────────────────────────────
+
+async function init() {
+  currentPlayer = await getCurrentPlayer();
+  if (!currentPlayer) {
+    alert("Najprv vyber hráča.");
+    location.href = "index.html";
+    return;
+  }
+
+  updatePlayerUI();
+
+  try {
+    setStatus('Načítavam úlohy...', 'info');
+    puzzles = await loadPuzzles();
+    setStatus(`Načítaných ${puzzles.length} úloh`, 'success');
+  } catch(e) {
+    setStatus('Chyba pri načítaní: ' + e.message, 'error');
+    return;
+  }
+
+  const puzzle = pickPuzzle();
+  if (!puzzle) {
+    setStatus('Žiadne úlohy v databáze', 'error');
+    return;
+  }
+  loadPuzzle(puzzle);
+}
+
+init();
+</script>
+</body>
+</html>
