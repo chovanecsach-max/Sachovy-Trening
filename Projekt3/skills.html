@@ -1,7 +1,7 @@
 <!DOCTYPE html>
-<!-- saved from url=(0048)file:///C:/Users/mchovanec/Downloads/skills.html -->
-<html lang="sk"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-
+<html lang="sk">
+<head>
+<meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Šachové zručnosti</title>
 
@@ -786,9 +786,24 @@ async function recordResult(result) {
 
 // sbFetch je dostupný z player.js
 
+function getSkillsType() {
+  const params = new URLSearchParams(window.location.search);
+  return params.get("type") || "checks_captures";
+}
+
 async function loadPuzzles() {
-  const data = await sbFetch("skill_puzzles?order=id.asc&limit=2000");
-  if (!data || !data.length) throw new Error("Žiadne úlohy v databáze");
+  const type = getSkillsType();
+  let filter = "";
+  if (type === "checks_captures") {
+    filter = "skill_type=in.(checks,captures)";
+  } else if (type === "direct_attack") {
+    filter = "skill_type=eq.direct_attack";
+  }
+  const query = filter
+    ? `skill_puzzles?${filter}&order=id.asc&limit=2000`
+    : "skill_puzzles?order=id.asc&limit=2000";
+  const data = await sbFetch(query);
+  if (!data || !data.length) throw new Error("Žiadne úlohy v databáze pre tento typ");
   return data;
 }
 
@@ -859,6 +874,15 @@ async function init() {
 
   updatePlayerUI();
 
+  // Nastav názov podľa typu
+  const type = getSkillsType();
+  if (type === "direct_attack") {
+    document.title = "Priame napadnutia";
+    document.getElementById("promptText").textContent = "Nájdi všetky priame napadnutia";
+  } else {
+    document.title = "Šachy a brania";
+  }
+
   try {
     setStatus('Načítavam úlohy...', 'info');
     puzzles = await loadPuzzles();
@@ -878,6 +902,5 @@ async function init() {
 
 init();
 </script>
-
-
-</body></html>
+</body>
+</html>
