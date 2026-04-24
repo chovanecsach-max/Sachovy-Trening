@@ -904,4 +904,93 @@ function loadPuzzle(puzzle) {
   document.getElementById('puzzleElo').textContent = puzzle.elo ?? '-';
   document.getElementById('puzzleTime').textContent = formatTime(puzzle.time || 120);
 
-  const ti = document.getElementById('turnIndica
+  const ti = document.getElementById('turnIndicator');
+  ti.className = 'turn-indicator ' + (meta.activeColor === 'b' ? 'black' : 'white');
+
+  updateRemainingUI();
+  updateFoundMovesUI();
+  render();
+  startTimer(puzzle.time || 120);
+  setStatus('Pripravené', 'info');
+}
+
+function nextPuzzle() {
+  const puzzle = pickPuzzle();
+  if (!puzzle) return setStatus('Žiadne ďalšie úlohy', 'warning');
+  loadPuzzle(puzzle);
+}
+
+function restart() {
+  if (!current) return;
+  loadPuzzle(current);
+}
+
+// ─── Inicializácia ────────────────────────────────────────────────────────────
+
+function isWhitePiecePromo(p) { return p && p === p.toUpperCase(); }
+
+function showPromotionPanel(fromIdx, toIdx) {
+  pendingPromotion = { fromIdx, toIdx };
+  const piece = board[fromIdx];
+  const isWhite = piece === 'P';
+  const overlay = document.getElementById('promotionOverlay');
+  const options = document.getElementById('promotionOptions');
+  options.innerHTML = '';
+  ['q', 'r', 'b', 'n'].forEach(code => {
+    const div = document.createElement('div');
+    div.className = 'promotion-option';
+    const color = isWhite ? 'w' : 'b';
+    div.innerHTML = `<img src="img/Pieces/${color}${code.toUpperCase()}.svg" alt="${code}">`;
+    div.onclick = () => {
+      overlay.classList.remove('active');
+      const attempted = name(fromIdx) + name(toIdx) + code;
+      pendingPromotion = null;
+      selected = null;
+      handleMoveAttempt(attempted);
+    };
+    options.appendChild(div);
+  });
+  overlay.classList.add('active');
+  setStatus('Vyber figúru na premenu', 'info');
+}
+
+async function init() {
+  currentPlayer = await getCurrentPlayer();
+  if (!currentPlayer) {
+    alert("Najprv vyber hráča.");
+    location.href = "index.html";
+    return;
+  }
+
+  updatePlayerUI();
+
+  // Nastav názov podľa typu
+  const type = getSkillsType();
+  if (type === "direct_attack") {
+    document.title = "Priame napadnutia";
+    document.getElementById("promptText").textContent = "Nájdi všetky priame napadnutia";
+  } else {
+    document.title = "Šachy a brania";
+  }
+
+  try {
+    setStatus('Načítavam úlohy...', 'info');
+    puzzles = await loadPuzzles();
+    setStatus(`Načítaných ${puzzles.length} úloh`, 'success');
+  } catch(e) {
+    setStatus('Chyba pri načítaní: ' + e.message, 'error');
+    return;
+  }
+
+  const puzzle = pickPuzzle();
+  if (!puzzle) {
+    setStatus('Žiadne úlohy v databáze', 'error');
+    return;
+  }
+  loadPuzzle(puzzle);
+}
+
+init();
+</script>
+</body>
+</html>
