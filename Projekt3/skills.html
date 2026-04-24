@@ -334,6 +334,51 @@ button:disabled { opacity: 0.6; cursor: not-allowed; }
   .stats-grid { grid-template-columns: 1fr; }
   .buttons { grid-template-columns: 1fr; }
 }
+
+/* Promócia */
+.promotion-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 100;
+  align-items: center;
+  justify-content: center;
+}
+.promotion-overlay.active { display: flex; }
+.promotion-modal {
+  background: white;
+  border-radius: 14px;
+  padding: 20px;
+  text-align: center;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+}
+.promotion-modal-title {
+  font-size: 16px;
+  font-weight: bold;
+  margin-bottom: 14px;
+}
+.promotion-modal-options {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+.promotion-option {
+  width: 70px;
+  height: 70px;
+  border: 2px solid #d1d5db;
+  border-radius: 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f8fafc;
+}
+.promotion-option:hover {
+  background: #dbeafe;
+  border-color: #3b82f6;
+}
+.promotion-option img { width: 80%; height: 80%; object-fit: contain; }
 </style>
 </head>
 
@@ -423,6 +468,14 @@ button:disabled { opacity: 0.6; cursor: not-allowed; }
   </div>
 </div>
 
+<!-- Promócia -->
+<div id="promotionOverlay" class="promotion-overlay">
+  <div class="promotion-modal">
+    <div class="promotion-modal-title">Vyber figúru na premenu</div>
+    <div id="promotionOptions" class="promotion-modal-options"></div>
+  </div>
+</div>
+
 <script src="js/player.js"></script>
 <script>
 const files = ['a','b','c','d','e','f','g','h'];
@@ -435,6 +488,7 @@ let current = null;
 let selected = null;
 let flipped = false;
 
+let pendingPromotion = null;
 let solutions = [];       // všetky správne ťahy
 let foundMoves = [];      // už nájdené ťahy
 let puzzleDone = false;
@@ -642,6 +696,15 @@ function click(i) {
   }
 
   // Pokus o ťah
+  const piece = board[selected];
+  const toRow = Math.floor(i / 8);
+
+  // Promócia pešiaka
+  if ((piece === 'P' && toRow === 0) || (piece === 'p' && toRow === 7)) {
+    showPromotionPanel(selected, i);
+    return;
+  }
+
   const attempted = name(selected) + name(i);
   handleMoveAttempt(attempted);
 }
@@ -841,66 +904,4 @@ function loadPuzzle(puzzle) {
   document.getElementById('puzzleElo').textContent = puzzle.elo ?? '-';
   document.getElementById('puzzleTime').textContent = formatTime(puzzle.time || 120);
 
-  const ti = document.getElementById('turnIndicator');
-  ti.className = 'turn-indicator ' + (meta.activeColor === 'b' ? 'black' : 'white');
-
-  updateRemainingUI();
-  updateFoundMovesUI();
-  render();
-  startTimer(puzzle.time || 120);
-  setStatus('Pripravené', 'info');
-}
-
-function nextPuzzle() {
-  const puzzle = pickPuzzle();
-  if (!puzzle) return setStatus('Žiadne ďalšie úlohy', 'warning');
-  loadPuzzle(puzzle);
-}
-
-function restart() {
-  if (!current) return;
-  loadPuzzle(current);
-}
-
-// ─── Inicializácia ────────────────────────────────────────────────────────────
-
-async function init() {
-  currentPlayer = await getCurrentPlayer();
-  if (!currentPlayer) {
-    alert("Najprv vyber hráča.");
-    location.href = "index.html";
-    return;
-  }
-
-  updatePlayerUI();
-
-  // Nastav názov podľa typu
-  const type = getSkillsType();
-  if (type === "direct_attack") {
-    document.title = "Priame napadnutia";
-    document.getElementById("promptText").textContent = "Nájdi všetky priame napadnutia";
-  } else {
-    document.title = "Šachy a brania";
-  }
-
-  try {
-    setStatus('Načítavam úlohy...', 'info');
-    puzzles = await loadPuzzles();
-    setStatus(`Načítaných ${puzzles.length} úloh`, 'success');
-  } catch(e) {
-    setStatus('Chyba pri načítaní: ' + e.message, 'error');
-    return;
-  }
-
-  const puzzle = pickPuzzle();
-  if (!puzzle) {
-    setStatus('Žiadne úlohy v databáze', 'error');
-    return;
-  }
-  loadPuzzle(puzzle);
-}
-
-init();
-</script>
-</body>
-</html>
+  const ti = document.getElementById('turnIndica
