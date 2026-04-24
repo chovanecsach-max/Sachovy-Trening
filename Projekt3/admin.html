@@ -1,7 +1,7 @@
 <!DOCTYPE html>
-<!-- saved from url=(0049)file:///C:/Users/mchovanec/Downloads/admin_3.html -->
-<html lang="sk"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-
+<html lang="sk">
+<head>
+<meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Administrácia úloh</title>
 
@@ -222,7 +222,12 @@ button {
 <body>
 <div class="app">
   <h1>Administrácia úloh</h1>
-  <p class="subtitle">Vyhľadanie, testovanie a editácia puzzle.</p>
+
+  <!-- Záložky -->
+  <div style="display:flex; gap:8px; margin-bottom:16px; justify-content:center;">
+    <button id="tabPuzzles" class="primary" onclick="switchTab('puzzles')" style="padding:8px 18px;font-size:14px;">Taktické puzzle</button>
+    <button id="tabSkills" class="secondary" onclick="switchTab('skills')" style="padding:8px 18px;font-size:14px;">Šachové zručnosti</button>
+  </div>
 
   <div class="layout">
     <div class="card">
@@ -316,7 +321,7 @@ button {
         </div>
         <div class="edit-field" style="grid-column: span 2;">
           <label>Riešenie (JSON — solutionTree)</label>
-          <textarea id="editSolutionTree" placeholder="napr. [{&quot;move&quot;:&quot;e2e4&quot;,&quot;next&quot;:[]}]"></textarea>
+          <textarea id="editSolutionTree" placeholder='napr. [{"move":"e2e4","next":[]}]'></textarea>
         </div>
       </div>
 
@@ -327,11 +332,80 @@ button {
     </div>
   </div>
 
-  <div id="status" class="status success">Stav: Načítaných 1000 puzzle — môžeš vyhľadávať</div>
+  <div id="status" class="status">Stav: pripravené</div>
 
   <div class="actions" style="margin-top: 12px;">
-    <button class="primary" onclick="reloadPuzzles()">🔄 Obnoviť zoznam</button>
+    <button class="primary" onclick="reloadActive()">🔄 Obnoviť zoznam</button>
     <button class="secondary" onclick="goHome()">Späť do menu</button>
+  </div>
+
+  <!-- Sekcia skill_puzzles -->
+  <div id="skillSection" style="display:none; margin-top:16px;">
+    <div class="layout">
+      <div class="card">
+        <h2>Vyhľadanie podľa ID</h2>
+        <div class="row">
+          <input id="skillIdInput" type="number" placeholder="Zadaj ID úlohy">
+          <button class="primary" onclick="findSkillById()">Nájsť</button>
+        </div>
+      </div>
+      <div class="card">
+        <h2>Filter podľa typu</h2>
+        <select id="skillTypeFilter" style="margin-bottom:8px;">
+          <option value="">Všetky typy</option>
+          <option value="checks">Šachy</option>
+          <option value="captures">Brania</option>
+          <option value="direct_attack">Priame napadnutia</option>
+        </select>
+        <button class="primary" onclick="loadSkillsByType()">Načítať</button>
+      </div>
+    </div>
+
+    <div id="skillResultBox" class="result hidden" style="margin-top:12px;">
+      <h3>Nájdená úloha (zručnosti)</h3>
+      <div class="result-grid">
+        <div class="result-box">
+          <div class="label">ID</div>
+          <div id="sResId" class="value">-</div>
+        </div>
+        <div class="result-box">
+          <div class="label">Typ</div>
+          <div id="sResType" class="value">-</div>
+        </div>
+        <div class="result-box" style="grid-column:span 2;">
+          <div class="label">FEN</div>
+          <div id="sResFen" class="value">-</div>
+        </div>
+        <div class="result-box" style="grid-column:span 2;">
+          <div class="label">Aktuálne riešenia</div>
+          <div id="sResSolutions" class="value" style="font-family:monospace;font-size:13px;">-</div>
+        </div>
+      </div>
+
+      <div class="edit-section">
+        <h4>✏️ Editácia riešení</h4>
+        <div class="edit-field" style="margin-bottom:10px;">
+          <label>Riešenia (JSON zoznam ťahov)</label>
+          <textarea id="sEditSolutions" style="font-family:monospace;font-size:13px;" placeholder='["e2e4","d2d4"]'></textarea>
+        </div>
+        <div class="edit-field" style="margin-bottom:10px;">
+          <label>ELO</label>
+          <input id="sEditElo" type="number" placeholder="napr. 1300">
+        </div>
+        <div class="edit-field" style="margin-bottom:10px;">
+          <label>Čas (sek)</label>
+          <input id="sEditTime" type="number" placeholder="napr. 120">
+        </div>
+        <div class="actions">
+          <button class="success" onclick="saveSkillPuzzle()">💾 Uložiť zmeny</button>
+          <button class="danger" onclick="deleteSkillPuzzle()">🗑️ Vymazať úlohu</button>
+          <button class="secondary" onclick="clearSkillResult()">Zavrieť</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Zoznam úloh -->
+    <div id="skillList" style="margin-top:12px;"></div>
   </div>
 </div>
 
@@ -528,7 +602,164 @@ async function init() {
 }
 
 init();
+
+// ─── Záložky ─────────────────────────────────────────────────────────────────
+
+let activeTab = 'puzzles';
+
+function switchTab(tab) {
+  activeTab = tab;
+  const puzzleSection = document.getElementById('resultBox').parentElement;
+
+  if (tab === 'puzzles') {
+    document.getElementById('tabPuzzles').className = 'primary';
+    document.getElementById('tabSkills').className = 'secondary';
+    document.getElementById('skillSection').style.display = 'none';
+    document.querySelectorAll('.layout, .result, #status').forEach(el => el.style.display = '');
+  } else {
+    document.getElementById('tabPuzzles').className = 'secondary';
+    document.getElementById('tabSkills').className = 'primary';
+    document.getElementById('skillSection').style.display = 'block';
+    document.querySelectorAll('.layout').forEach(el => el.style.display = 'none');
+    clearResult();
+  }
+}
+
+async function reloadActive() {
+  if (activeTab === 'puzzles') {
+    await reloadPuzzles();
+  } else {
+    await loadSkillsByType();
+  }
+}
+
+// ─── Skill puzzles ────────────────────────────────────────────────────────────
+
+let skillPuzzles = [];
+let selectedSkill = null;
+
+async function loadSkillsByType() {
+  const type = document.getElementById('skillTypeFilter').value;
+  try {
+    const query = type
+      ? `skill_puzzles?skill_type=eq.${type}&order=id.asc&limit=500`
+      : 'skill_puzzles?order=id.asc&limit=500';
+    const data = await sbFetch(query);
+    skillPuzzles = data || [];
+    renderSkillList();
+    setStatus(`Načítaných ${skillPuzzles.length} úloh zručností`, 'success');
+  } catch(e) {
+    setStatus('Chyba: ' + e.message, 'error');
+  }
+}
+
+function renderSkillList() {
+  const el = document.getElementById('skillList');
+  if (!skillPuzzles.length) {
+    el.innerHTML = '<div style="color:#64748b;font-style:italic;padding:10px;">Žiadne úlohy</div>';
+    return;
+  }
+  el.innerHTML = skillPuzzles.map(p => `
+    <div style="display:flex;align-items:center;gap:10px;padding:8px;border:1px solid #e2e8f0;border-radius:8px;margin-bottom:6px;background:white;cursor:pointer;"
+         onclick="showSkillPuzzle(${p.id})">
+      <span style="font-weight:bold;color:#1d4ed8;min-width:40px;">ID ${p.id}</span>
+      <span style="font-size:12px;background:#f0f9ff;border:1px solid #bae6fd;border-radius:6px;padding:2px 8px;color:#0369a1;">${p.skill_type}</span>
+      <span style="font-size:13px;color:#475569;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${p.fen}</span>
+      <span style="font-size:12px;color:#64748b;">${Array.isArray(p.solutions) ? p.solutions.length : 0} riešení</span>
+    </div>
+  `).join('');
+}
+
+function showSkillPuzzle(id) {
+  const puzzle = skillPuzzles.find(p => p.id === id);
+  if (!puzzle) return;
+  selectedSkill = puzzle;
+
+  document.getElementById('skillResultBox').classList.remove('hidden');
+  document.getElementById('sResId').textContent = puzzle.id;
+  document.getElementById('sResType').textContent = puzzle.skill_type;
+  document.getElementById('sResFen').textContent = puzzle.fen;
+  document.getElementById('sResSolutions').textContent =
+    JSON.stringify(puzzle.solutions, null, 2);
+
+  document.getElementById('sEditSolutions').value =
+    JSON.stringify(puzzle.solutions || [], null, 2);
+  document.getElementById('sEditElo').value = puzzle.elo || 1300;
+  document.getElementById('sEditTime').value = puzzle.time || 120;
+
+  document.getElementById('skillResultBox').scrollIntoView({ behavior: 'smooth' });
+}
+
+async function findSkillById() {
+  const id = Number(document.getElementById('skillIdInput').value);
+  if (!id) return setStatus('Zadaj platné ID', 'error');
+
+  try {
+    const data = await sbFetch(`skill_puzzles?id=eq.${id}&limit=1`);
+    if (!data || !data.length) return setStatus('Úloha nenájdená', 'error');
+    skillPuzzles = data;
+    renderSkillList();
+    showSkillPuzzle(id);
+    setStatus('Úloha nájdená', 'success');
+  } catch(e) {
+    setStatus('Chyba: ' + e.message, 'error');
+  }
+}
+
+async function saveSkillPuzzle() {
+  if (!selectedSkill) return setStatus('Najprv nájdi úlohu', 'error');
+
+  let solutions;
+  try {
+    solutions = JSON.parse(document.getElementById('sEditSolutions').value);
+  } catch(e) {
+    return setStatus('Riešenia nie sú platný JSON', 'error');
+  }
+
+  const elo = Number(document.getElementById('sEditElo').value);
+  const time = Number(document.getElementById('sEditTime').value);
+
+  try {
+    setStatus('Ukladám...');
+    await sbFetch(`skill_puzzles?id=eq.${selectedSkill.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ solutions, elo, time })
+    });
+
+    // Aktualizuj lokálne
+    const idx = skillPuzzles.findIndex(p => p.id === selectedSkill.id);
+    if (idx !== -1) {
+      skillPuzzles[idx] = { ...skillPuzzles[idx], solutions, elo, time };
+      selectedSkill = skillPuzzles[idx];
+    }
+
+    document.getElementById('sResSolutions').textContent =
+      JSON.stringify(solutions, null, 2);
+    setStatus(`Úloha ID ${selectedSkill.id} uložená`, 'success');
+  } catch(e) {
+    setStatus('Chyba: ' + e.message, 'error');
+  }
+}
+
+async function deleteSkillPuzzle() {
+  if (!selectedSkill) return setStatus('Najprv nájdi úlohu', 'error');
+  if (!confirm(`Vymazať úlohu ID ${selectedSkill.id}?`)) return;
+
+  try {
+    await sbFetch(`skill_puzzles?id=eq.${selectedSkill.id}`, { method: 'DELETE' });
+    skillPuzzles = skillPuzzles.filter(p => p.id !== selectedSkill.id);
+    renderSkillList();
+    clearSkillResult();
+    setStatus('Úloha vymazaná', 'success');
+  } catch(e) {
+    setStatus('Chyba: ' + e.message, 'error');
+  }
+}
+
+function clearSkillResult() {
+  selectedSkill = null;
+  document.getElementById('skillResultBox').classList.add('hidden');
+}
 </script>
-
-
-</body></html>
+</body>
+</html>
