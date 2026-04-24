@@ -25,20 +25,10 @@ body {
   text-align: center;
 }
 
-h1 {
-  margin: 0 0 10px 0;
-  font-size: 30px;
-}
+h1 { margin: 0 0 10px 0; font-size: 30px; }
+p { margin: 0 0 22px 0; color: #475569; }
 
-p {
-  margin: 0 0 22px 0;
-  color: #475569;
-}
-
-.menu {
-  display: grid;
-  gap: 12px;
-}
+.menu { display: grid; gap: 12px; }
 
 button {
   padding: 14px 16px;
@@ -46,22 +36,69 @@ button {
   border: none;
   border-radius: 12px;
   cursor: pointer;
+  width: 100%;
 }
 
-.primary {
-  background: #111827;
-  color: white;
-}
+.primary { background: #111827; color: white; }
+.secondary { background: #e5e7eb; color: #111827; }
 
-.secondary {
-  background: #e5e7eb;
-  color: #111827;
+.skills-btn {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #93c5fd;
 }
 
 .admin {
   background: #fff7ed;
   color: #c2410c;
   border: 1px solid #fdba74;
+}
+
+.submenu {
+  display: none;
+  grid-template-columns: 1fr;
+  gap: 8px;
+  padding: 12px;
+  background: #f0f7ff;
+  border: 1px solid #93c5fd;
+  border-radius: 12px;
+  animation: fadeIn 0.15s ease;
+  margin-top: -4px;
+}
+
+.submenu.open { display: grid; }
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.submenu-title {
+  font-size: 12px;
+  color: #1d4ed8;
+  text-transform: uppercase;
+  font-weight: bold;
+  margin-bottom: 2px;
+}
+
+.submenu button {
+  background: white;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+  padding: 10px 14px;
+  font-size: 15px;
+  border-radius: 10px;
+}
+
+.submenu button:hover { background: #dbeafe; }
+
+.submenu .back-btn {
+  background: #e5e7eb;
+  color: #374151;
+  border: none;
+  font-size: 13px;
+  padding: 8px;
+  margin-top: 2px;
 }
 </style>
 </head>
@@ -77,8 +114,18 @@ button {
     <button class="primary" onclick="goTraining('koncovka')">Tréning koncovka</button>
     <button class="primary" onclick="goTraining('mix')">Mix</button>
 
+    <button class="skills-btn" onclick="toggleSkillsMenu()">
+      ♟ Šachové zručnosti <span id="skillsArrow">▼</span>
+    </button>
+
+    <div id="skillsSubmenu" class="submenu">
+      <div class="submenu-title">Vyber typ zručnosti</div>
+      <button onclick="goSkills('checks_captures')">Šachy a brania</button>
+      <button onclick="goSkills('direct_attack')">Priame napadnutia</button>
+      <button class="back-btn" onclick="toggleSkillsMenu()">✕ Zavrieť</button>
+    </div>
+
     <button class="secondary" onclick="goRegister()">Registrácia hráča</button>
-    <button class="secondary" onclick="goSkills()">Šachové zručnosti</button>
     <button class="admin" onclick="goAdmin()">Administrácia</button>
   </div>
 </div>
@@ -96,8 +143,16 @@ function goAdmin() {
   location.href = "admin.html";
 }
 
-function goSkills() {
-  location.href = "skills.html";
+function goSkills(type) {
+  location.href = "skills.html?type=" + type;
+}
+
+function toggleSkillsMenu() {
+  const menu = document.getElementById('skillsSubmenu');
+  const arrow = document.getElementById('skillsArrow');
+  const isOpen = menu.classList.contains('open');
+  menu.classList.toggle('open');
+  arrow.textContent = isOpen ? '▼' : '▲';
 }
 </script>
 </body>
