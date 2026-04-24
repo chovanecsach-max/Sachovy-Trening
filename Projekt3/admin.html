@@ -229,6 +229,7 @@ button {
     <button id="tabSkills" class="secondary" onclick="switchTab('skills')" style="padding:8px 18px;font-size:14px;">Šachové zručnosti</button>
   </div>
 
+  <div id="puzzleSection">
   <div class="layout">
     <div class="card">
       <h2>Vyhľadanie podľa ID</h2>
@@ -338,6 +339,8 @@ button {
     <button class="primary" onclick="reloadActive()">🔄 Obnoviť zoznam</button>
     <button class="secondary" onclick="goHome()">Späť do menu</button>
   </div>
+
+  </div><!-- koniec puzzleSection -->
 
   <!-- Sekcia skill_puzzles -->
   <div id="skillSection" style="display:none; margin-top:16px;">
@@ -609,18 +612,17 @@ let activeTab = 'puzzles';
 
 function switchTab(tab) {
   activeTab = tab;
-  const puzzleSection = document.getElementById('resultBox').parentElement;
 
   if (tab === 'puzzles') {
     document.getElementById('tabPuzzles').className = 'primary';
     document.getElementById('tabSkills').className = 'secondary';
     document.getElementById('skillSection').style.display = 'none';
-    document.querySelectorAll('.layout, .result, #status').forEach(el => el.style.display = '');
+    document.getElementById('puzzleSection').style.display = 'block';
   } else {
     document.getElementById('tabPuzzles').className = 'secondary';
     document.getElementById('tabSkills').className = 'primary';
     document.getElementById('skillSection').style.display = 'block';
-    document.querySelectorAll('.layout').forEach(el => el.style.display = 'none');
+    document.getElementById('puzzleSection').style.display = 'none';
     clearResult();
   }
 }
