@@ -58,6 +58,7 @@ async function createPlayer(name, surname = '', email = '', elo = 1500) {
     elo_taktika: elo,
     elo_strategia: elo,
     elo_koncovka: elo,
+    elo_zrucnosti: elo,
     played: 0,
     solved: 0,
     total_time: 0
