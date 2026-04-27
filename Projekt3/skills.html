@@ -987,4 +987,30 @@ async function init() {
     document.title = "Pešiakové prielomy";
     document.getElementById("promptText").textContent = "Nájdi všetky pešiakové prielomy";
   } else if (type === "underdefended") {
-    document.title = "Sla
+    document.title = "Slabo pokryté figúrky";
+    document.getElementById("promptText").textContent = "Nájdi všetky slabo pokryté figúrky súpera";
+  } else {
+    document.title = "Šachy a brania";
+  }
+
+  try {
+    setStatus('Načítavam úlohy...', 'info');
+    puzzles = await loadPuzzles();
+    setStatus(`Načítaných ${puzzles.length} úloh`, 'success');
+  } catch(e) {
+    setStatus('Chyba pri načítaní: ' + e.message, 'error');
+    return;
+  }
+
+  const puzzle = pickPuzzle();
+  if (!puzzle) {
+    setStatus('Žiadne úlohy v databáze', 'error');
+    return;
+  }
+  loadPuzzle(puzzle);
+}
+
+init();
+</script>
+</body>
+</html>
