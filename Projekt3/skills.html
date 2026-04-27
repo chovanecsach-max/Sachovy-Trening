@@ -883,6 +883,8 @@ async function recordResult(result) {
         body: JSON.stringify({ elo_zrucnosti: newElo })
       });
       currentPlayer.elo_zrucnosti = newElo;
+      // Obnov zobrazenie ELO v UI
+      document.getElementById('playerElo').textContent = newElo + ' (Z)';
     }
   } catch(e) {
     console.error("Chyba pri aktualizácii ELO zručností:", e);
