@@ -674,6 +674,16 @@ function render() {
 function click(i) {
   if (puzzleDone) return;
 
+  // Pre underdefended - hráč kliká priamo na figúrku súpera
+  const skillType = getSkillsType();
+  if (skillType === 'underdefended') {
+    if (!board[i]) return setStatus('Klikni na figúrku súpera', 'info');
+    const opponent = meta.activeColor === 'w' ? 'b' : 'w';
+    if (pieceColor(board[i]) !== opponent) return setStatus('Klikni na figúrku súpera', 'warning');
+    handleMoveAttempt(name(i));
+    return;
+  }
+
   if (selected === null) {
     if (!board[i]) return setStatus('Vyber figúrku', 'info');
     if (pieceColor(board[i]) !== meta.activeColor) return setStatus('Vyber správnu stranu', 'warning');
