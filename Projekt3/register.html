@@ -239,6 +239,10 @@ async function render() {
           <span class="stat-label">ELO Koncovka</span>
           <div class="stat-value">${p.elo_koncovka || p.elo}</div>
         </div>
+        <div class="stat-box">
+          <span class="stat-label">ELO Zručnosti</span>
+          <div class="stat-value">${p.elo_zrucnosti || 1500}</div>
+        </div>
       </div>
       <div class="player-time">
         <strong>Celkový čas tréningu:</strong> ${totalTime}
