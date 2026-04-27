@@ -861,6 +861,10 @@ async function loadPuzzles() {
     filter = "skill_type=in.(checks,captures)";
   } else if (type === "direct_attack") {
     filter = "skill_type=eq.direct_attack";
+  } else if (type === "pawn_breakthrough") {
+    filter = "skill_type=eq.pawn_breakthrough";
+  } else if (type === "underdefended") {
+    filter = "skill_type=eq.underdefended";
   }
   const query = filter
     ? `skill_puzzles?${filter}&order=id.asc&limit=2000`
@@ -969,6 +973,12 @@ async function init() {
   if (type === "direct_attack") {
     document.title = "Priame napadnutia";
     document.getElementById("promptText").textContent = "Nájdi všetky priame napadnutia";
+  } else if (type === "pawn_breakthrough") {
+    document.title = "Pešiakové prielomy";
+    document.getElementById("promptText").textContent = "Nájdi všetky pešiakové prielomy";
+  } else if (type === "underdefended") {
+    document.title = "Slabo pokryté figúrky";
+    document.getElementById("promptText").textContent = "Nájdi všetky slabo pokryté figúrky súpera";
   } else {
     document.title = "Šachy a brania";
   }
