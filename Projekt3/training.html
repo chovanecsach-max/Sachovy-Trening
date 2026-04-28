@@ -900,7 +900,7 @@ function recordResultOnce(result) {
   const usedTime = Math.max(0, normalizeTimeValue(current.time) - timerRemaining);
 
   if (!currentPuzzleIsAdmin) {
-    addTrainingResult(currentPlayer.id, current.id, result);
+    addTrainingResult(currentPlayer.id, current.id, result, usedTime);
     registerPlayerResult(currentPlayer.id, result, usedTime);
     updatePlayerElo(currentPlayer.id, current.elo, result, getTrainingMode());
     updateSessionStats(result, usedTime);
