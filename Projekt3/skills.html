@@ -853,6 +853,10 @@ async function recordResult(result) {
   if (resultLogged || !currentPlayer || !current) return;
   resultLogged = true;
 
+  // Vypočítaj čas strávený na úlohe
+  const puzzleTime = Math.max(0, Math.round(current.time || 120));
+  const usedTime = Math.max(0, puzzleTime - Math.max(0, timerRemaining));
+
   // Zaznamenaj do training_log
   try {
     await sbFetch("training_log", {
@@ -861,7 +865,8 @@ async function recordResult(result) {
       body: JSON.stringify({
         player_id: currentPlayer.id,
         puzzle_id: current.id,
-        result: result
+        result: result,
+        time_spent: usedTime
       })
     });
   } catch(e) {
