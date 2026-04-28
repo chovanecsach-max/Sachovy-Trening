@@ -873,7 +873,7 @@ async function recordResult(result) {
     console.error("Chyba pri zápise logu:", e);
   }
 
-  // Aktualizuj ELO zručností
+  // Aktualizuj ELO zručností, total_time a štatistiky
   try {
     const players = await sbFetch(`players?id=eq.${currentPlayer.id}&limit=1`);
     if (players && players.length) {
@@ -883,9 +883,19 @@ async function recordResult(result) {
       const diff = puzzleElo - currentElo;
       let change = result === 'win' ? 10 + diff / 50 : -(10 - diff / 50);
       const newElo = Math.max(100, Math.round(currentElo + change));
+
+      const updates = {
+        elo_zrucnosti: newElo,
+        played: Number(player.played || 0) + 1,
+        total_time: Number(player.total_time || 0) + usedTime
+      };
+      if (result === 'win') {
+        updates.solved = Number(player.solved || 0) + 1;
+      }
+
       await sbFetch(`players?id=eq.${currentPlayer.id}`, {
         method: 'PATCH',
-        body: JSON.stringify({ elo_zrucnosti: newElo })
+        body: JSON.stringify(updates)
       });
       currentPlayer.elo_zrucnosti = newElo;
       // Obnov zobrazenie ELO v UI
