@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Štatistika hráčov</title>
+<style>
+body {
+  font-family: Arial, sans-serif;
+  background: #f4f4f6;
+  margin: 0;
+  padding: 12px;
+  color: #111827;
+}
+
+.app {
+  max-width: 1100px;
+  margin: 0 auto;
+  background: white;
+  border-radius: 14px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+  padding: 20px;
+}
+
+h1 {
+  margin: 0 0 6px 0;
+  text-align: center;
+  font-size: 26px;
+}
+
+.subtitle {
+  text-align: center;
+  color: #475569;
+  margin: 0 0 20px 0;
+}
+
+.filter-card {
+  border: 1px solid #d1d5db;
+  border-radius: 12px;
+  padding: 14px;
+  margin-bottom: 16px;
+  background: #f8fafc;
+}
+
+.filter-row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+.filter-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.filter-field label {
+  font-size: 12px;
+  color: #64748b;
+  text-transform: uppercase;
+  font-weight: bold;
+}
+
+input[type="date"] {
+  padding: 8px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 14px;
+  background: white;
+}
+
+button {
+  padding: 10px 16px;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.primary { background: #111827; color: white; }
+.secondary { background: #e5e7eb; color: #111827; }
+.success { background: #dcfce7; color: #166534; border: 1px solid #86efac; }
+
+.status {
+  margin: 12px 0;
+  padding: 10px;
+  border-radius: 10px;
+  border: 1px solid #d1d5db;
+  background: #f8fafc;
+  color: #334155;
+  font-size: 14px;
+}
+
+.status.error { background: #fef2f2; border-color: #fca5a5; color: #b91c1c; }
+.status.success { background: #f0fdf4; border-color: #86efac; color: #166534; }
+
+/* Tabuľka */
+.table-wrapper {
+  overflow-x: auto;
+  margin-top: 16px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+th {
+  background: #1e3a5f;
+  color: white;
+  padding: 10px 8px;
+  text-align: left;
+  font-size: 12px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+td {
+  padding: 9px 8px;
+  border-bottom: 1px solid #e2e8f0;
+  white-space: nowrap;
+}
+
+tr:nth-child(even) td { background: #f8fafc; }
+tr:hover td { background: #eff6ff; }
+
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+.badge-blue { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
+.badge-green { background: #f0fdf4; color: #166534; border: 1px solid #86efac; }
+
+.actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 16px;
+  flex-wrap: wrap;
+}
+
+.empty {
+  text-align: center;
+  color: #64748b;
+  font-style: italic;
+  padding: 30px;
+}
+</style>
+</head>
+
+<body>
+<div class="app">
+  <h1>Štatistika hráčov</h1>
+  <p class="subtitle">Prehľad výsledkov tréningow za zvolené obdobie.</p>
+
+  <div class="filter-card">
+    <div class="filter-row">
+      <div class="filter-field">
+        <label>Štatistika od</label>
+        <input type="date" id="dateFrom">
+      </div>
+      <div class="filter-field">
+        <label>Štatistika po</label>
+        <input type="date" id="dateTo">
+      </div>
+      <button class="primary" onclick="loadStats()">📊 Načítať štatistiku</button>
+      <button class="success" id="exportBtn" onclick="exportXlsx()" style="display:none;">⬇️ Exportovať do XLSX</button>
+      <button class="secondary" onclick="goHome()">Späť do menu</button>
+    </div>
+  </div>
+
+  <div id="status" class="status">Vyber obdobie a klikni na Načítať štatistiku.</div>
+
+  <div class="table-wrapper">
+    <table id="statsTable" style="display:none;">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Meno</th>
+          <th>Priezvisko</th>
+          <th>Riešené (obdobie)</th>
+          <th>Vyriešené (obdobie)</th>
+          <th>Úspešnosť</th>
+          <th>Hodnotené obdobie</th>
+          <th>Čas celkom</th>
+          <th>Čas za obdobie</th>
+          <th>ELO Taktika</th>
+          <th>ELO Stratégia</th>
+          <th>ELO Koncovka</th>
+          <th>ELO Zručnosti</th>
+        </tr>
+      </thead>
+      <tbody id="statsBody"></tbody>
+    </table>
+    <div id="emptyMsg" class="empty" style="display:none;">Žiadne dáta pre zvolené obdobie.</div>
+  </div>
+</div>
+
+<script src="js/player.js"></script>
+<script>
+let statsData = [];
+
+function goHome() { location.href = "index.html"; }
+
+function formatTime(totalSeconds) {
+  const s = Math.max(0, Math.floor(Number(totalSeconds) || 0));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
+}
+
+function formatDate(dateStr) {
+  if (!dateStr) return '-';
+  const d = new Date(dateStr);
+  return d.toLocaleDateString('sk-SK');
+}
+
+function setStatus(text, type = '') {
+  const el = document.getElementById('status');
+  el.textContent = text;
+  el.className = 'status' + (type ? ' ' + type : '');
+}
+
+async function loadStats() {
+  const dateFrom = document.getElementById('dateFrom').value;
+  const dateTo = document.getElementById('dateTo').value;
+
+  if (!dateFrom || !dateTo) {
+    setStatus('Zadaj obe dátumy.', 'error');
+    return;
+  }
+
+  if (dateFrom > dateTo) {
+    setStatus('Dátum "od" musí byť pred dátumom "po".', 'error');
+    return;
+  }
+
+  setStatus('Načítavam dáta...');
+
+  try {
+    // Načítaj všetkých hráčov
+    const players = await sbFetch('players?order=name.asc');
+    if (!players || !players.length) {
+      setStatus('Žiadni hráči v databáze.', 'error');
+      return;
+    }
+
+    // Načítaj training_log za obdobie
+    const dateFromFull = dateFrom + 'T00:00:00';
+    const dateToFull = dateTo + 'T23:59:59';
+    const logs = await sbFetch(
+      `training_log?created_at=gte.${dateFromFull}&created_at=lte.${dateToFull}&select=player_id,result,time_spent`
+    );
+
+    // Zosumarizuj logy podľa hráča
+    const logMap = {};
+    (logs || []).forEach(log => {
+      const pid = log.player_id;
+      if (!logMap[pid]) logMap[pid] = { played: 0, solved: 0, timeSpent: 0 };
+      logMap[pid].played += 1;
+      if (log.result === 'win') logMap[pid].solved += 1;
+      logMap[pid].timeSpent += Number(log.time_spent || 0);
+    });
+
+    // Zostav štatistiku
+    statsData = players.map(p => {
+      const log = logMap[p.id] || { played: 0, solved: 0, timeSpent: 0 };
+      const acc = log.played > 0 ? Math.round((log.solved / log.played) * 100) : 0;
+      return {
+        id: p.id,
+        name: p.name || '',
+        surname: p.surname || '',
+        played: log.played,
+        solved: log.solved,
+        accuracy: acc,
+        dateFrom: dateFrom,
+        dateTo: dateTo,
+        totalTime: Number(p.total_time || 0),
+        periodTime: log.timeSpent,
+        eloTaktika: p.elo_taktika || 1500,
+        eloStrategia: p.elo_strategia || 1500,
+        eloKoncovka: p.elo_koncovka || 1500,
+        eloZrucnosti: p.elo_zrucnosti || 1500
+      };
+    });
+
+    renderTable();
+    setStatus(`Načítaných ${players.length} hráčov. Obdobie: ${formatDate(dateFrom)} — ${formatDate(dateTo)}`, 'success');
+    document.getElementById('exportBtn').style.display = '';
+
+  } catch(e) {
+    setStatus('Chyba pri načítaní: ' + e.message, 'error');
+  }
+}
+
+function renderTable() {
+  const tbody = document.getElementById('statsBody');
+  const table = document.getElementById('statsTable');
+  const empty = document.getElementById('emptyMsg');
+
+  tbody.innerHTML = '';
+
+  if (!statsData.length) {
+    table.style.display = 'none';
+    empty.style.display = '';
+    return;
+  }
+
+  table.style.display = '';
+  empty.style.display = 'none';
+
+  statsData.forEach(r => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${r.id}</td>
+      <td>${r.name}</td>
+      <td>${r.surname}</td>
+      <td><span class="badge badge-blue">${r.played}</span></td>
+      <td><span class="badge badge-green">${r.solved}</span></td>
+      <td>${r.accuracy}%</td>
+      <td>${formatDate(r.dateFrom)} — ${formatDate(r.dateTo)}</td>
+      <td>${formatTime(r.totalTime)}</td>
+      <td>${formatTime(r.periodTime)}</td>
+      <td>${r.eloTaktika}</td>
+      <td>${r.eloStrategia}</td>
+      <td>${r.eloKoncovka}</td>
+      <td>${r.eloZrucnosti}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function exportXlsx() {
+  if (!statsData.length) return;
+
+  // Vytvor CSV ktorý Excel otvorí správne
+  const headers = [
+    'ID', 'Meno', 'Priezvisko',
+    'Riešené (obdobie)', 'Vyriešené (obdobie)', 'Úspešnosť (%)',
+    'Obdobie od', 'Obdobie po',
+    'Čas celkom', 'Čas za obdobie',
+    'ELO Taktika', 'ELO Stratégia', 'ELO Koncovka', 'ELO Zručnosti'
+  ];
+
+  const rows = statsData.map(r => [
+    r.id, r.name, r.surname,
+    r.played, r.solved, r.accuracy,
+    r.dateFrom, r.dateTo,
+    formatTime(r.totalTime), formatTime(r.periodTime),
+    r.eloTaktika, r.eloStrategia, r.eloKoncovka, r.eloZrucnosti
+  ]);
+
+  // Použi SheetJS ak je dostupný, inak CSV
+  if (typeof XLSX !== 'undefined') {
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+    ws['!cols'] = headers.map((h, i) => ({ wch: Math.max(h.length, 12) }));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Štatistika');
+    const dateFrom = document.getElementById('dateFrom').value;
+    const dateTo = document.getElementById('dateTo').value;
+    XLSX.writeFile(wb, `Statistika_${dateFrom}_${dateTo}.xlsx`);
+  } else {
+    // Fallback - CSV
+    const bom = '\uFEFF';
+    const csv = bom + [headers, ...rows].map(r => r.join(';')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    const dateFrom = document.getElementById('dateFrom').value;
+    const dateTo = document.getElementById('dateTo').value;
+    a.download = `Statistika_${dateFrom}_${dateTo}.csv`;
+    a.click();
+  }
+}
+
+// Nastav predvolené dátumy (aktuálny mesiac)
+function initDates() {
+  const now = new Date();
+  const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+  const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  document.getElementById('dateFrom').value = firstDay.toISOString().split('T')[0];
+  document.getElementById('dateTo').value = lastDay.toISOString().split('T')[0];
+}
+
+initDates();
+</script>
+
+<!-- SheetJS pre XLSX export -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</body>
+</html>
