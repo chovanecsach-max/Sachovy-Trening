@@ -1,6 +1,6 @@
 const TRAINING_KEY = "trainingLog";
 
-async function addTrainingResult(playerId, puzzleId, result) {
+async function addTrainingResult(playerId, puzzleId, result, timeSpent = 0) {
   try {
     await sbFetch("training_log", {
       method: "POST",
@@ -8,7 +8,8 @@ async function addTrainingResult(playerId, puzzleId, result) {
       body: JSON.stringify({
         player_id: playerId,
         puzzle_id: puzzleId,
-        result: result
+        result: result,
+        time_spent: Math.max(0, Math.round(timeSpent))
       })
     });
   } catch (e) {
