@@ -105,6 +105,7 @@ button {
 
 <body>
 <div class="container">
+  <div id="userPanel" style="text-align:right;margin-bottom:12px;font-size:13px;color:#64748b;"></div>
   <h1>Šachový tréning</h1>
   <p>Vyber si, čo chceš robiť.</p>
 
@@ -128,12 +129,39 @@ button {
     </div>
 
     <button class="secondary" onclick="goRegister()">Registrácia hráča</button>
-    <button class="secondary" onclick="goStats()">Štatistika</button>
+    <button class="secondary" id="statsBtn" onclick="goStats()">Štatistika</button>
     <button class="admin" onclick="goAdmin()">Administrácia</button>
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/auth.js"></script>
 <script>
+async function initPage() {
+  const ok = await refreshSession();
+  if (!ok) { location.href = 'login.html'; return; }
+
+  const user = getCurrentUser();
+  const nick = user.nick || user.name || user.email;
+  const role = user.role;
+  const roleLabel = role === 'admin' ? '👑 Admin' : role === 'trener' ? '🏫 Tréner' : '♟ Hráč';
+
+  document.getElementById('userPanel').innerHTML =
+    `${roleLabel}: <strong>${nick}</strong> &nbsp;
+     <button onclick="logout()" style="padding:4px 10px;font-size:12px;border:1px solid #d1d5db;border-radius:6px;cursor:pointer;background:#f8fafc;">Odhlásiť</button>`;
+
+  // Skryj admin tlačidlo pre hráčov
+  if (role === 'hrac') {
+    document.querySelectorAll('.admin').forEach(el => el.style.display = 'none');
+  }
+  // Štatistika len pre admin a tréner
+  if (role === 'hrac') {
+    document.getElementById('statsBtn') && (document.getElementById('statsBtn').style.display = 'none');
+  }
+}
+
+initPage();
+
 function goTraining(mode) {
   location.href = "training.html?mode=" + mode;
 }
