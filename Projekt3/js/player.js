@@ -80,6 +80,20 @@ function setCurrentPlayer(id) {
 }
 
 async function getCurrentPlayer() {
+  // Najprv skús načítať hráča podľa user_id z Auth session
+  const userId = sessionStorage.getItem('user_id');
+  if (userId) {
+    try {
+      const data = await sbFetch(`players?user_id=eq.${userId}&limit=1`);
+      if (data && data.length) {
+        localStorage.setItem(CURRENT_KEY, data[0].id);
+        return data[0];
+      }
+    } catch (e) {
+      console.error("Chyba pri načítaní hráča podľa user_id:", e);
+    }
+  }
+  // Fallback - načítaj podľa localStorage
   const id = localStorage.getItem(CURRENT_KEY);
   if (!id) return null;
   try {
