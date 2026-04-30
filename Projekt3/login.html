@@ -38,7 +38,6 @@ h1 {
   font-size: 14px;
 }
 
-/* Záložky */
 .tabs {
   display: flex;
   border-bottom: 2px solid #e5e7eb;
@@ -126,14 +125,6 @@ button {
 .status.success { background: #f0fdf4; border: 1px solid #86efac; color: #166534; display: block; }
 .status.info { background: #eff6ff; border: 1px solid #bfdbfe; color: #1d4ed8; display: block; }
 
-.divider {
-  text-align: center;
-  color: #94a3b8;
-  font-size: 12px;
-  margin: 16px 0;
-}
-
-/* Skrytý element */
 .hidden { display: none !important; }
 </style>
 </head>
@@ -198,7 +189,6 @@ button {
       <label>Tréner</label>
       <select id="regTrener">
         <option value="">— bez trénera —</option>
-        <!-- načíta sa dynamicky -->
       </select>
     </div>
     <button class="btn-primary" onclick="register()">Zaregistrovať sa</button>
@@ -221,11 +211,7 @@ function switchTab(tab) {
   });
   document.getElementById('loginForm').classList.toggle('active', tab === 'login');
   document.getElementById('registerForm').classList.toggle('active', tab === 'register');
-
-  // Načítaj trénerov keď sa otvorí záložka registrácie
-  if (tab === 'register') {
-    loadTrainerDropdown();
-  }
+  if (tab === 'register') loadTrainerDropdown();
 }
 
 function setStatus(id, text, type) {
@@ -234,7 +220,6 @@ function setStatus(id, text, type) {
   el.className = 'status ' + type;
 }
 
-// Zobraziť/skryť výber trénera podľa zvolenej roly
 function onRoleChange() {
   const role = document.getElementById('regRole').value;
   const trenerField = document.getElementById('trenerField');
@@ -246,29 +231,20 @@ function onRoleChange() {
   }
 }
 
-// Načítanie trénerov do dropdown
 async function loadTrainerDropdown() {
   const sel = document.getElementById('regTrener');
-  // Ak sú options už načítané (okrem prvého "bez trénera"), nekresliť znova
   if (sel.options.length > 1) return;
-
   try {
     const res = await fetch(
       `${SUPABASE_URL}/rest/v1/profiles?role=eq.trener&select=id,name,surname,nick_name&order=surname.asc`,
-      {
-        headers: {
-          'apikey': SUPABASE_KEY,
-          'Authorization': `Bearer ${SUPABASE_KEY}`
-        }
-      }
+      { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }
     );
     if (!res.ok) return;
     const trainers = await res.json();
     trainers.forEach(t => {
       const opt = document.createElement('option');
       opt.value = t.id;
-      const displayName = t.nick_name || `${t.name || ''} ${t.surname || ''}`.trim();
-      opt.textContent = displayName;
+      opt.textContent = t.nick_name || `${t.name || ''} ${t.surname || ''}`.trim();
       sel.appendChild(opt);
     });
   } catch (e) {
@@ -294,7 +270,6 @@ async function login() {
     return;
   }
 
-  // Načítaj profil
   const { data: profile } = await sb.from('profiles').select('*').eq('id', data.user.id).single();
 
   if (!profile) {
@@ -302,7 +277,11 @@ async function login() {
     return;
   }
 
-  // Ulož do sessionStorage
+  // *** OPRAVA: Vymazať starého hráča z localStorage ***
+  // getCurrentPlayer() ho načíta čerstvo podľa user_id prihláseného používateľa
+  localStorage.removeItem('currentPlayer');
+
+  // Ulož session do sessionStorage
   sessionStorage.setItem('user_id', data.user.id);
   sessionStorage.setItem('user_email', data.user.email);
   sessionStorage.setItem('user_role', profile.role);
@@ -311,10 +290,7 @@ async function login() {
   sessionStorage.setItem('user_surname', profile.surname || '');
 
   setStatus('loginStatus', 'Prihlásenie úspešné! Presmerovanie...', 'success');
-
-  setTimeout(() => {
-    location.href = 'index.html';
-  }, 800);
+  setTimeout(() => { location.href = 'index.html'; }, 800);
 }
 
 async function register() {
@@ -331,7 +307,6 @@ async function register() {
     setStatus('registerStatus', 'Vyplň všetky povinné polia.', 'error');
     return;
   }
-
   if (password.length < 6) {
     setStatus('registerStatus', 'Heslo musí mať aspoň 6 znakov.', 'error');
     return;
@@ -340,11 +315,8 @@ async function register() {
   setStatus('registerStatus', 'Registrácia...', 'info');
 
   const { data, error } = await sb.auth.signUp({
-    email,
-    password,
-    options: {
-      data: { name, surname, nick_name: nick, role }
-    }
+    email, password,
+    options: { data: { name, surname, nick_name: nick, role } }
   });
 
   if (error) {
@@ -352,28 +324,17 @@ async function register() {
     return;
   }
 
-  // Zostav telo hráča
+  // Zostav telo hráča — vytvorí sa pre KAŽDÚ rolu (hráč aj tréner trénujú)
   const playerBody = {
-    name: name,
-    surname: surname,
-    email: email,
-    elo: 1500,
-    elo_taktika: 1500,
-    elo_strategia: 1500,
-    elo_koncovka: 1500,
-    elo_zrucnosti: 1500,
-    played: 0,
-    solved: 0,
-    total_time: 0,
+    name, surname, email,
+    elo: 1500, elo_taktika: 1500, elo_strategia: 1500,
+    elo_koncovka: 1500, elo_zrucnosti: 1500,
+    played: 0, solved: 0, total_time: 0,
     user_id: data.user.id
   };
+  // Prirad trénera len pre hráčov
+  if (trenerId) playerBody.trener_id = trenerId;
 
-  // Prirad trénera ak bol vybraný
-  if (trenerId) {
-    playerBody.trener_id = trenerId;
-  }
-
-  // Vytvor záznam v players cez REST API
   try {
     await fetch(`${SUPABASE_URL}/rest/v1/players`, {
       method: 'POST',
@@ -385,11 +346,8 @@ async function register() {
       },
       body: JSON.stringify(playerBody)
     });
-  } catch(e) {
-    console.error('Chyba pri vytváraní hráča:', e);
-  }
+  } catch(e) { console.error('Chyba pri vytváraní hráča:', e); }
 
-  // Vytvor profil cez REST API
   try {
     await fetch(`${SUPABASE_URL}/rest/v1/profiles`, {
       method: 'POST',
@@ -400,34 +358,21 @@ async function register() {
         'Prefer': 'return=minimal'
       },
       body: JSON.stringify({
-        id: data.user.id,
-        email: email,
-        role: role,
-        nick_name: nick,
-        name: name,
-        surname: surname
+        id: data.user.id, email, role, nick_name: nick, name, surname
       })
     });
-  } catch(e) {
-    console.error('Chyba pri vytváraní profilu:', e);
-  }
+  } catch(e) { console.error('Chyba pri vytváraní profilu:', e); }
 
   setStatus('registerStatus', '✅ Registrácia úspešná! Môžeš sa prihlásiť.', 'success');
-
-  // Prepni na prihlásenie
   setTimeout(() => switchTab('login'), 2000);
 }
 
-// Ak prídeš z menu na registráciu, nekontrolujem session
 if (window.location.hash === '#register') {
   switchTab('register');
 } else {
-  // Skontroluj či je už prihlásený
   (async () => {
     const { data } = await sb.auth.getSession();
-    if (data.session) {
-      location.href = 'index.html';
-    }
+    if (data.session) location.href = 'index.html';
   })();
 }
 </script>
