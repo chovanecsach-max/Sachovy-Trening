@@ -306,6 +306,11 @@ async function checkSession() {
 }
 
 checkSession();
+
+// Ak prídeš z menu, otvor záložku Registrácia
+if (window.location.hash === '#register') {
+  switchTab('register');
+}
 </script>
 </body>
 </html>
