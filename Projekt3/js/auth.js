@@ -71,24 +71,36 @@ function requireRole(role) {
 async function refreshSession() {
   if (isLoggedIn()) return true;
 
-  const { data } = await sbClient.auth.getSession();
-  if (!data.session) return false;
+  try {
+    const { data } = await sbClient.auth.getSession();
+    if (!data.session) return false;
 
-  const userId = data.session.user.id;
-  const { data: profile } = await sbClient
-    .from('profiles')
-    .select('*')
-    .eq('id', userId)
-    .single();
+    const userId = data.session.user.id;
 
-  if (!profile) return false;
+    // Načítaj profil cez REST API
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/profiles?id=eq.${userId}&limit=1`,
+      {
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${data.session.access_token}`
+        }
+      }
+    );
+    const profiles = await res.json();
+    if (!profiles || !profiles.length) return false;
+    const profile = profiles[0];
 
-  sessionStorage.setItem('user_id', userId);
-  sessionStorage.setItem('user_email', data.session.user.email);
-  sessionStorage.setItem('user_role', profile.role);
-  sessionStorage.setItem('user_nick', profile.nick_name || '');
-  sessionStorage.setItem('user_name', profile.name || '');
-  sessionStorage.setItem('user_surname', profile.surname || '');
+    sessionStorage.setItem('user_id', userId);
+    sessionStorage.setItem('user_email', data.session.user.email);
+    sessionStorage.setItem('user_role', profile.role);
+    sessionStorage.setItem('user_nick', profile.nick_name || '');
+    sessionStorage.setItem('user_name', profile.name || '');
+    sessionStorage.setItem('user_surname', profile.surname || '');
 
-  return true;
+    return true;
+  } catch(e) {
+    console.error('refreshSession error:', e);
+    return false;
+  }
 }
