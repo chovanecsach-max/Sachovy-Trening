@@ -297,19 +297,17 @@ async function register() {
   setTimeout(() => switchTab('login'), 2000);
 }
 
-// Skontroluj či je už prihlásený
-async function checkSession() {
-  const { data } = await sb.auth.getSession();
-  if (data.session) {
-    location.href = 'index.html';
-  }
-}
-
-checkSession();
-
-// Ak prídeš z menu, otvor záložku Registrácia
+// Ak prídeš z menu na registráciu, nekontrolujem session
 if (window.location.hash === '#register') {
   switchTab('register');
+} else {
+  // Skontroluj či je už prihlásený
+  (async () => {
+    const { data } = await sb.auth.getSession();
+    if (data.session) {
+      location.href = 'index.html';
+    }
+  })();
 }
 </script>
 </body>
