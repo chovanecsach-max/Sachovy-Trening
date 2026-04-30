@@ -1,13 +1,12 @@
 // auth.js — centrálna autentifikačná knižnica
-// Načítava sa na každej stránke pred player.js
-// POZOR: SUPABASE_URL a SUPABASE_KEY sú definované v player.js
+// Načítava sa na každej stránke PRED player.js
+
+const SUPABASE_URL = "https://wdjsilryllqksdtmaehy.supabase.co";
+const SUPABASE_KEY = "sb_publishable_45gFQhgPScrDjDCVC0B4Iw_q6uZKf9m";
 
 // Inicializácia Supabase klienta pre Auth
 const { createClient } = supabase;
-const sbClient = createClient(
-  "https://wdjsilryllqksdtmaehy.supabase.co",
-  "sb_publishable_45gFQhgPScrDjDCVC0B4Iw_q6uZKf9m"
-);
+const sbClient = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // ─── Pomocné funkcie ──────────────────────────────────────────────────────────
 
