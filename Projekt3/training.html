@@ -685,6 +685,8 @@ button:disabled {
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/auth.js"></script>
 <script src="js/player.js"></script>
 <script src="js/training.js"></script>
 
@@ -1921,7 +1923,14 @@ async function init() {
   loadPuzzleForPlayer();
 }
 
-init();
+
+// Kontrola prihlásenia
+async function checkAuthAndInit() {
+  const ok = await refreshSession();
+  if (!ok) { location.href = 'login.html'; return; }
+  init();
+}
+checkAuthAndInit();
 </script>
 </body>
 </html>
