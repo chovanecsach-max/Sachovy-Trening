@@ -102,8 +102,10 @@ function setCurrentPlayer(id) {
 }
 
 async function getCurrentPlayer() {
-  // Najprv skús načítať hráča podľa user_id z Auth session
   const userId = sessionStorage.getItem('user_id');
+  const userEmail = sessionStorage.getItem('user_email');
+
+  // 1. Hľadaj podľa user_id (správna cesta)
   if (userId) {
     try {
       const data = await sbFetch(`players?user_id=eq.${userId}&limit=1`);
@@ -114,8 +116,34 @@ async function getCurrentPlayer() {
     } catch (e) {
       console.error("Chyba pri načítaní hráča podľa user_id:", e);
     }
+
+    // 2. Fallback: hľadaj podľa emailu (pre existujúcich používateľov bez user_id)
+    if (userEmail) {
+      try {
+        const data = await sbFetch(`players?email=eq.${encodeURIComponent(userEmail)}&limit=1`);
+        if (data && data.length) {
+          const player = data[0];
+          localStorage.setItem(CURRENT_KEY, player.id);
+
+          // Automaticky oprav chýbajúci user_id v DB pre budúce prihlásenia
+          try {
+            await sbFetch(`players?id=eq.${player.id}`, {
+              method: "PATCH",
+              body: JSON.stringify({ user_id: userId })
+            });
+          } catch (e) {
+            console.warn("Nepodarilo sa aktualizovať user_id:", e);
+          }
+
+          return player;
+        }
+      } catch (e) {
+        console.error("Chyba pri načítaní hráča podľa emailu:", e);
+      }
+    }
   }
-  // Fallback - načítaj podľa localStorage
+
+  // 3. Posledný fallback: localStorage (manuálne vybraný hráč)
   const id = localStorage.getItem(CURRENT_KEY);
   if (!id) return null;
   try {
