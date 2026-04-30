@@ -35,11 +35,30 @@ function getPlayerEloByMode(player, mode) {
   return Number(player[getEloField(mode)] || 1500);
 }
 
+// ─── Tréneri ────────────────────────────────────────────────────────────────
+
+async function getTrainers() {
+  try {
+    const data = await sbFetch(
+      "profiles?role=eq.trener&select=id,name,surname,nick_name&order=surname.asc"
+    );
+    return data || [];
+  } catch (e) {
+    console.error("Chyba pri načítaní trénerov:", e);
+    return [];
+  }
+}
+
 // ─── Hráči ──────────────────────────────────────────────────────────────────
 
-async function loadPlayers() {
+// trenerFilter: UUID trénera — ak zadané, načíta len jeho hráčov
+async function loadPlayers(trenerFilter = null) {
   try {
-    const data = await sbFetch("players?order=created_at.asc");
+    let query = "players?order=surname.asc,name.asc";
+    if (trenerFilter) {
+      query += `&trener_id=eq.${trenerFilter}`;
+    }
+    const data = await sbFetch(query);
     return data || [];
   } catch (e) {
     console.error("Chyba pri načítaní hráčov:", e);
@@ -47,9 +66,9 @@ async function loadPlayers() {
   }
 }
 
-async function createPlayer(name, surname = '', email = '', elo = 1500) {
+// trenerId: UUID trénera, ktorý hráča vytvára (alebo null)
+async function createPlayer(name, surname = '', email = '', elo = 1500, trenerId = null) {
   const newPlayer = {
-    id: Date.now(),
     name: name,
     surname: surname,
     email: email,
@@ -62,6 +81,9 @@ async function createPlayer(name, surname = '', email = '', elo = 1500) {
     solved: 0,
     total_time: 0
   };
+  if (trenerId) {
+    newPlayer.trener_id = trenerId;
+  }
   try {
     await sbFetch("players", {
       method: "POST",
