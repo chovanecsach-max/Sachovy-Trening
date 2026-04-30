@@ -243,7 +243,19 @@ async function register() {
     'Prefer': 'return=minimal'
   };
 
-  // 2. Vytvor player záznam (pre všetky roly — hráč aj tréner trénujú)
+  // 2. Najprv vytvor profil (player.user_id je FK na profiles — musí existovať skôr)
+  const profileRes = await fetch(`${SUPABASE_URL}/rest/v1/profiles`, {
+    method: 'POST', headers,
+    body: JSON.stringify({ id: data.user.id, email, role, nick_name: nick, name, surname })
+  });
+  if (!profileRes.ok) {
+    const err = await profileRes.text();
+    console.error('Chyba pri vytváraní profilu:', err);
+    setStatus('registerStatus', '⚠️ Účet vytvorený, ale zlyhalo vytvorenie profilu: ' + err, 'error');
+    return;
+  }
+
+  // 3. Potom vytvor player záznam (pre všetky roly — hráč aj tréner trénujú)
   const playerBody = {
     name, surname, email,
     elo: 1500, elo_taktika: 1500, elo_strategia: 1500,
@@ -259,19 +271,7 @@ async function register() {
   if (!playerRes.ok) {
     const err = await playerRes.text();
     console.error('Chyba pri vytváraní hráča:', err);
-    setStatus('registerStatus', '⚠️ Účet vytvorený, ale zlyhalo vytvorenie hráčskeho záznamu: ' + err, 'error');
-    return;
-  }
-
-  // 3. Vytvor profil
-  const profileRes = await fetch(`${SUPABASE_URL}/rest/v1/profiles`, {
-    method: 'POST', headers,
-    body: JSON.stringify({ id: data.user.id, email, role, nick_name: nick, name, surname })
-  });
-  if (!profileRes.ok) {
-    const err = await profileRes.text();
-    console.error('Chyba pri vytváraní profilu:', err);
-    setStatus('registerStatus', '⚠️ Hráč vytvorený, ale zlyhalo vytvorenie profilu: ' + err, 'error');
+    setStatus('registerStatus', '⚠️ Profil vytvorený, ale zlyhalo vytvorenie hráčskeho záznamu: ' + err, 'error');
     return;
   }
 
