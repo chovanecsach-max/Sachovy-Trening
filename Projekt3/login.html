@@ -291,7 +291,26 @@ async function register() {
     return;
   }
 
-  // Ak admin registruje trénera, vytvor aj záznam v players
+  // Vytvor záznam v players
+  try {
+    await sb.from('players').insert({
+      name: name,
+      surname: surname,
+      email: email,
+      elo: 1500,
+      elo_taktika: 1500,
+      elo_strategia: 1500,
+      elo_koncovka: 1500,
+      elo_zrucnosti: 1500,
+      played: 0,
+      solved: 0,
+      total_time: 0,
+      user_id: data.user.id
+    });
+  } catch(e) {
+    console.error('Chyba pri vytváraní hráča:', e);
+  }
+
   setStatus('registerStatus', '✅ Registrácia úspešná! Môžeš sa prihlásiť.', 'success');
 
   // Prepni na prihlásenie
