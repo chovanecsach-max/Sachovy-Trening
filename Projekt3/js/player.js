@@ -1,5 +1,4 @@
-const SUPABASE_URL = "https://wdjsilryllqksdtmaehy.supabase.co";
-const SUPABASE_KEY = "sb_publishable_45gFQhgPScrDjDCVC0B4Iw_q6uZKf9m";
+// SUPABASE_URL a SUPABASE_KEY sú definované v auth.js
 
 const CURRENT_KEY = "currentPlayer";
 
