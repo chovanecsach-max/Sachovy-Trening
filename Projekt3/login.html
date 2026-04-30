@@ -202,6 +202,7 @@ const SUPABASE_ANON_KEY = "sb_publishable_45gFQhgPScrDjDCVC0B4Iw_q6uZKf9m";
 
 const { createClient } = supabase;
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const SUPABASE_KEY = SUPABASE_ANON_KEY;
 
 function switchTab(tab) {
   document.querySelectorAll('.tab').forEach((t, i) => {
@@ -291,24 +292,56 @@ async function register() {
     return;
   }
 
-  // Vytvor záznam v players
+  // Vytvor záznam v players cez REST API
   try {
-    await sb.from('players').insert({
-      name: name,
-      surname: surname,
-      email: email,
-      elo: 1500,
-      elo_taktika: 1500,
-      elo_strategia: 1500,
-      elo_koncovka: 1500,
-      elo_zrucnosti: 1500,
-      played: 0,
-      solved: 0,
-      total_time: 0,
-      user_id: data.user.id
+    await fetch(`${SUPABASE_URL}/rest/v1/players`, {
+      method: 'POST',
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${data.session.access_token}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=minimal'
+      },
+      body: JSON.stringify({
+        name: name,
+        surname: surname,
+        email: email,
+        elo: 1500,
+        elo_taktika: 1500,
+        elo_strategia: 1500,
+        elo_koncovka: 1500,
+        elo_zrucnosti: 1500,
+        played: 0,
+        solved: 0,
+        total_time: 0,
+        user_id: data.user.id
+      })
     });
   } catch(e) {
     console.error('Chyba pri vytváraní hráča:', e);
+  }
+
+  // Vytvor profil cez REST API
+  try {
+    await fetch(`${SUPABASE_URL}/rest/v1/profiles`, {
+      method: 'POST',
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${data.session.access_token}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=minimal'
+      },
+      body: JSON.stringify({
+        id: data.user.id,
+        email: email,
+        role: role,
+        nick_name: nick,
+        name: name,
+        surname: surname
+      })
+    });
+  } catch(e) {
+    console.error('Chyba pri vytváraní profilu:', e);
   }
 
   setStatus('registerStatus', '✅ Registrácia úspešná! Môžeš sa prihlásiť.', 'success');
