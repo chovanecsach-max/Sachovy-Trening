@@ -34,6 +34,30 @@ h1 {
   margin: 0 0 20px 0;
 }
 
+/* Role banner */
+.role-banner {
+  padding: 10px 14px;
+  border-radius: 10px;
+  margin-bottom: 16px;
+  font-size: 14px;
+  text-align: center;
+}
+.role-banner.hrac {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1d4ed8;
+}
+.role-banner.trener {
+  background: #f0fdf4;
+  border: 1px solid #86efac;
+  color: #166534;
+}
+.role-banner.admin {
+  background: #faf5ff;
+  border: 1px solid #d8b4fe;
+  color: #6b21a8;
+}
+
 .filter-card {
   border: 1px solid #d1d5db;
   border-radius: 12px;
@@ -95,7 +119,6 @@ button {
 .status.error { background: #fef2f2; border-color: #fca5a5; color: #b91c1c; }
 .status.success { background: #f0fdf4; border-color: #86efac; color: #166534; }
 
-/* Tabuľka */
 .table-wrapper {
   overflow-x: auto;
   margin-top: 16px;
@@ -156,7 +179,10 @@ tr:hover td { background: #eff6ff; }
 <body>
 <div class="app">
   <h1>Štatistika hráčov</h1>
-  <p class="subtitle">Prehľad výsledkov tréningow za zvolené obdobie.</p>
+  <p class="subtitle">Prehľad výsledkov tréningov za zvolené obdobie.</p>
+
+  <!-- Role banner — zobrazí sa po načítaní -->
+  <div id="roleBanner" class="role-banner" style="display:none;"></div>
 
   <div class="filter-card">
     <div class="filter-row">
@@ -178,23 +204,7 @@ tr:hover td { background: #eff6ff; }
 
   <div class="table-wrapper">
     <table id="statsTable" style="display:none;">
-      <thead>
-        <tr>
-          <th>ID</th>
-          <th>Meno</th>
-          <th>Priezvisko</th>
-          <th>Riešené (obdobie)</th>
-          <th>Vyriešené (obdobie)</th>
-          <th>Úspešnosť</th>
-          <th>Hodnotené obdobie</th>
-          <th>Čas celkom</th>
-          <th>Čas za obdobie</th>
-          <th>ELO Taktika</th>
-          <th>ELO Stratégia</th>
-          <th>ELO Koncovka</th>
-          <th>ELO Zručnosti</th>
-        </tr>
-      </thead>
+      <thead id="statsHead"></thead>
       <tbody id="statsBody"></tbody>
     </table>
     <div id="emptyMsg" class="empty" style="display:none;">Žiadne dáta pre zvolené obdobie.</div>
@@ -205,8 +215,64 @@ tr:hover td { background: #eff6ff; }
 <script src="js/auth.js"></script>
 <script src="js/player.js"></script>
 <script>
+// ─── Kontext prihláseného používateľa ───────────────────────────────────────
+const USER_ROLE    = sessionStorage.getItem('user_role') || '';
+const USER_ID      = sessionStorage.getItem('user_id') || '';
+const USER_NICK    = sessionStorage.getItem('user_nick') || sessionStorage.getItem('user_name') || '';
+const IS_ADMIN     = USER_ROLE === 'admin';
+const IS_TRENER    = USER_ROLE === 'trener';
+const IS_HRAC      = USER_ROLE === 'hrac';
+
 let statsData = [];
 
+// ─── Inicializácia ───────────────────────────────────────────────────────────
+function init() {
+  // Role banner
+  const banner = document.getElementById('roleBanner');
+  if (IS_HRAC) {
+    banner.textContent = `👤 Zobrazujem štatistiku pre: ${USER_NICK}`;
+    banner.className = 'role-banner hrac';
+    banner.style.display = '';
+  } else if (IS_TRENER) {
+    banner.textContent = `🧑‍🏫 Tréner ${USER_NICK} — zobrazujem svojich hráčov`;
+    banner.className = 'role-banner trener';
+    banner.style.display = '';
+  } else if (IS_ADMIN) {
+    banner.textContent = '🔧 Admin — zobrazujem všetkých hráčov';
+    banner.className = 'role-banner admin';
+    banner.style.display = '';
+  }
+
+  // Hlavička tabuľky podľa roly
+  renderTableHead();
+  initDates();
+}
+
+// ─── Hlavička tabuľky ────────────────────────────────────────────────────────
+function renderTableHead() {
+  const head = document.getElementById('statsHead');
+  // Stĺpec "Meno trénera" len pre admina
+  const trenerCol = IS_ADMIN ? '<th>Tréner</th>' : '';
+  head.innerHTML = `
+    <tr>
+      <th>Meno</th>
+      <th>Priezvisko</th>
+      ${trenerCol}
+      <th>Riešené (obdobie)</th>
+      <th>Vyriešené (obdobie)</th>
+      <th>Úspešnosť</th>
+      <th>Hodnotené obdobie</th>
+      <th>Čas celkom</th>
+      <th>Čas za obdobie</th>
+      <th>ELO Taktika</th>
+      <th>ELO Stratégia</th>
+      <th>ELO Koncovka</th>
+      <th>ELO Zručnosti</th>
+    </tr>
+  `;
+}
+
+// ─── Pomocné funkcie ─────────────────────────────────────────────────────────
 function goHome() { location.href = "index.html"; }
 
 function formatTime(totalSeconds) {
@@ -219,8 +285,7 @@ function formatTime(totalSeconds) {
 
 function formatDate(dateStr) {
   if (!dateStr) return '-';
-  const d = new Date(dateStr);
-  return d.toLocaleDateString('sk-SK');
+  return new Date(dateStr).toLocaleDateString('sk-SK');
 }
 
 function setStatus(text, type = '') {
@@ -229,35 +294,65 @@ function setStatus(text, type = '') {
   el.className = 'status' + (type ? ' ' + type : '');
 }
 
+// ─── Načítanie hráčov podľa roly ─────────────────────────────────────────────
+async function fetchPlayers() {
+  if (IS_HRAC) {
+    // Hráč vidí len seba — načítaj podľa user_id
+    return await sbFetch(`players?user_id=eq.${USER_ID}&limit=1`);
+  } else if (IS_TRENER) {
+    // Tréner vidí len svojich hráčov
+    return await sbFetch(`players?trener_id=eq.${USER_ID}&order=surname.asc,name.asc`);
+  } else {
+    // Admin vidí všetkých
+    return await sbFetch('players?order=surname.asc,name.asc');
+  }
+}
+
+// ─── Načítanie trénerov (pre admin view) ─────────────────────────────────────
+async function fetchTrenerMap() {
+  if (!IS_ADMIN) return {};
+  try {
+    const trainers = await sbFetch('profiles?role=eq.trener&select=id,name,surname,nick_name');
+    const map = {};
+    (trainers || []).forEach(t => {
+      map[t.id] = t.nick_name || `${t.name || ''} ${t.surname || ''}`.trim();
+    });
+    return map;
+  } catch(e) {
+    return {};
+  }
+}
+
+// ─── Hlavná funkcia načítania štatistiky ─────────────────────────────────────
 async function loadStats() {
   const dateFrom = document.getElementById('dateFrom').value;
-  const dateTo = document.getElementById('dateTo').value;
+  const dateTo   = document.getElementById('dateTo').value;
 
-  if (!dateFrom || !dateTo) {
-    setStatus('Zadaj obe dátumy.', 'error');
-    return;
-  }
-
-  if (dateFrom > dateTo) {
-    setStatus('Dátum "od" musí byť pred dátumom "po".', 'error');
-    return;
-  }
+  if (!dateFrom || !dateTo) { setStatus('Zadaj obe dátumy.', 'error'); return; }
+  if (dateFrom > dateTo)    { setStatus('Dátum "od" musí byť pred dátumom "po".', 'error'); return; }
 
   setStatus('Načítavam dáta...');
 
   try {
-    // Načítaj všetkých hráčov
-    const players = await sbFetch('players?order=name.asc');
+    // Načítaj hráčov podľa roly
+    const players = await fetchPlayers();
     if (!players || !players.length) {
-      setStatus('Žiadni hráči v databáze.', 'error');
+      setStatus(IS_HRAC ? 'Tvoj hráčsky záznam nebol nájdený.' : 'Žiadni hráči.', 'error');
       return;
     }
 
-    // Načítaj training_log za obdobie
+    // Načítaj trénerov pre admin view
+    const trenerMap = await fetchTrenerMap();
+
+    // Načítaj training_log za obdobie — len pre relevantných hráčov
+    const playerIds = players.map(p => p.id);
     const dateFromFull = dateFrom + 'T00:00:00';
-    const dateToFull = dateTo + 'T23:59:59';
+    const dateToFull   = dateTo   + 'T23:59:59';
+
+    // Supabase IN filter: player_id=in.(id1,id2,...)
+    const idsParam = `(${playerIds.join(',')})`;
     const logs = await sbFetch(
-      `training_log?created_at=gte.${dateFromFull}&created_at=lte.${dateToFull}&select=player_id,result,time_spent`
+      `training_log?player_id=in.${idsParam}&created_at=gte.${dateFromFull}&created_at=lte.${dateToFull}&select=player_id,result,time_spent`
     );
 
     // Zosumarizuj logy podľa hráča
@@ -265,7 +360,7 @@ async function loadStats() {
     (logs || []).forEach(log => {
       const pid = log.player_id;
       if (!logMap[pid]) logMap[pid] = { played: 0, solved: 0, timeSpent: 0 };
-      logMap[pid].played += 1;
+      logMap[pid].played   += 1;
       if (log.result === 'win') logMap[pid].solved += 1;
       logMap[pid].timeSpent += Number(log.time_spent || 0);
     });
@@ -275,32 +370,36 @@ async function loadStats() {
       const log = logMap[p.id] || { played: 0, solved: 0, timeSpent: 0 };
       const acc = log.played > 0 ? Math.round((log.solved / log.played) * 100) : 0;
       return {
-        id: p.id,
-        name: p.name || '',
-        surname: p.surname || '',
-        played: log.played,
-        solved: log.solved,
-        accuracy: acc,
-        dateFrom: dateFrom,
-        dateTo: dateTo,
-        totalTime: Number(p.total_time || 0),
-        periodTime: log.timeSpent,
-        eloTaktika: p.elo_taktika || 1500,
+        name:         p.name || '',
+        surname:      p.surname || '',
+        trenerName:   trenerMap[p.trener_id] || '—',
+        played:       log.played,
+        solved:       log.solved,
+        accuracy:     acc,
+        dateFrom,
+        dateTo,
+        totalTime:    Number(p.total_time || 0),
+        periodTime:   log.timeSpent,
+        eloTaktika:   p.elo_taktika   || 1500,
         eloStrategia: p.elo_strategia || 1500,
-        eloKoncovka: p.elo_koncovka || 1500,
+        eloKoncovka:  p.elo_koncovka  || 1500,
         eloZrucnosti: p.elo_zrucnosti || 1500
       };
     });
 
     renderTable();
-    setStatus(`Načítaných ${players.length} hráčov. Obdobie: ${formatDate(dateFrom)} — ${formatDate(dateTo)}`, 'success');
+
+    const label = IS_HRAC ? 'Tvoja štatistika' : `Načítaných ${players.length} hráčov`;
+    setStatus(`${label}. Obdobie: ${formatDate(dateFrom)} — ${formatDate(dateTo)}`, 'success');
     document.getElementById('exportBtn').style.display = '';
 
   } catch(e) {
     setStatus('Chyba pri načítaní: ' + e.message, 'error');
+    console.error(e);
   }
 }
 
+// ─── Render tabuľky ───────────────────────────────────────────────────────────
 function renderTable() {
   const tbody = document.getElementById('statsBody');
   const table = document.getElementById('statsTable');
@@ -318,11 +417,12 @@ function renderTable() {
   empty.style.display = 'none';
 
   statsData.forEach(r => {
+    const trenerCol = IS_ADMIN ? `<td>${r.trenerName}</td>` : '';
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td>${r.id}</td>
       <td>${r.name}</td>
       <td>${r.surname}</td>
+      ${trenerCol}
       <td><span class="badge badge-blue">${r.played}</span></td>
       <td><span class="badge badge-green">${r.solved}</span></td>
       <td>${r.accuracy}%</td>
@@ -338,59 +438,62 @@ function renderTable() {
   });
 }
 
+// ─── XLSX export ──────────────────────────────────────────────────────────────
 function exportXlsx() {
   if (!statsData.length) return;
 
-  // Vytvor CSV ktorý Excel otvorí správne
+  const trenerHeader = IS_ADMIN ? ['Tréner'] : [];
   const headers = [
-    'ID', 'Meno', 'Priezvisko',
+    'Meno', 'Priezvisko',
+    ...trenerHeader,
     'Riešené (obdobie)', 'Vyriešené (obdobie)', 'Úspešnosť (%)',
     'Obdobie od', 'Obdobie po',
     'Čas celkom', 'Čas za obdobie',
     'ELO Taktika', 'ELO Stratégia', 'ELO Koncovka', 'ELO Zručnosti'
   ];
 
-  const rows = statsData.map(r => [
-    r.id, r.name, r.surname,
-    r.played, r.solved, r.accuracy,
-    r.dateFrom, r.dateTo,
-    formatTime(r.totalTime), formatTime(r.periodTime),
-    r.eloTaktika, r.eloStrategia, r.eloKoncovka, r.eloZrucnosti
-  ]);
+  const rows = statsData.map(r => {
+    const trenerCol = IS_ADMIN ? [r.trenerName] : [];
+    return [
+      r.name, r.surname,
+      ...trenerCol,
+      r.played, r.solved, r.accuracy,
+      r.dateFrom, r.dateTo,
+      formatTime(r.totalTime), formatTime(r.periodTime),
+      r.eloTaktika, r.eloStrategia, r.eloKoncovka, r.eloZrucnosti
+    ];
+  });
 
-  // Použi SheetJS ak je dostupný, inak CSV
+  const dateFrom = document.getElementById('dateFrom').value;
+  const dateTo   = document.getElementById('dateTo').value;
+
   if (typeof XLSX !== 'undefined') {
     const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
-    ws['!cols'] = headers.map((h, i) => ({ wch: Math.max(h.length, 12) }));
+    ws['!cols'] = headers.map(h => ({ wch: Math.max(h.length, 12) }));
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Štatistika');
-    const dateFrom = document.getElementById('dateFrom').value;
-    const dateTo = document.getElementById('dateTo').value;
     XLSX.writeFile(wb, `Statistika_${dateFrom}_${dateTo}.xlsx`);
   } else {
-    // Fallback - CSV
     const bom = '\uFEFF';
     const csv = bom + [headers, ...rows].map(r => r.join(';')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    const dateFrom = document.getElementById('dateFrom').value;
-    const dateTo = document.getElementById('dateTo').value;
     a.download = `Statistika_${dateFrom}_${dateTo}.csv`;
     a.click();
   }
 }
 
-// Nastav predvolené dátumy (aktuálny mesiac)
+// ─── Predvolené dátumy (aktuálny mesiac) ─────────────────────────────────────
 function initDates() {
-  const now = new Date();
+  const now      = new Date();
   const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
-  const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  const lastDay  = new Date(now.getFullYear(), now.getMonth() + 1, 0);
   document.getElementById('dateFrom').value = firstDay.toISOString().split('T')[0];
-  document.getElementById('dateTo').value = lastDay.toISOString().split('T')[0];
+  document.getElementById('dateTo').value   = lastDay.toISOString().split('T')[0];
 }
 
-initDates();
+init();
 </script>
 
 <!-- SheetJS pre XLSX export -->
