@@ -224,9 +224,10 @@ button {
   <h1>Administrácia úloh</h1>
 
   <!-- Záložky -->
-  <div style="display:flex; gap:8px; margin-bottom:16px; justify-content:center;">
+  <div style="display:flex; gap:8px; margin-bottom:16px; justify-content:center; flex-wrap:wrap;">
     <button id="tabPuzzles" class="primary" onclick="switchTab('puzzles')" style="padding:8px 18px;font-size:14px;">Taktické puzzle</button>
     <button id="tabSkills" class="secondary" onclick="switchTab('skills')" style="padding:8px 18px;font-size:14px;">Šachové zručnosti</button>
+    <button id="tabUsers" class="secondary" onclick="switchTab('users')" style="padding:8px 18px;font-size:14px;">👥 Používatelia</button>
   </div>
 
   <div id="puzzleSection">
@@ -413,6 +414,51 @@ button {
     <div id="skillList" style="margin-top:12px;"></div>
   </div>
 </div>
+
+<!-- ═══ SEKCIA POUŽÍVATELIA ═══════════════════════════════════════════════ -->
+<div id="userSection" style="display:none;">
+  <div style="display:flex; gap:8px; margin-bottom:12px; align-items:center; flex-wrap:wrap;">
+    <button class="primary" onclick="loadUsers()">🔄 Načítať používateľov</button>
+    <button class="secondary" style="margin-left:auto;" onclick="goHome()">← Menu</button>
+  </div>
+
+  <div id="userStatus" class="status">Klikni na Načítať používateľov.</div>
+
+  <div id="userList" style="margin-top:12px; display:grid; gap:8px;"></div>
+
+  <div id="userEditBox" class="result hidden" style="margin-top:16px;">
+    <h3>✏️ Upraviť používateľa</h3>
+    <div class="result-grid">
+      <div class="result-box"><div class="label">Email</div><div id="uEmail" class="value">-</div></div>
+      <div class="result-box"><div class="label">Nick</div><div id="uNick" class="value">-</div></div>
+      <div class="result-box"><div class="label">Meno</div><div id="uName" class="value">-</div></div>
+      <div class="result-box"><div class="label">Priezvisko</div><div id="uSurname" class="value">-</div></div>
+    </div>
+    <div class="edit-section">
+      <div class="edit-grid">
+        <div class="edit-field">
+          <label>Rola</label>
+          <select id="uEditRole" onchange="onUserRoleChange()">
+            <option value="hrac">Hráč</option>
+            <option value="trener">Tréner</option>
+            <option value="admin">Admin</option>
+          </select>
+        </div>
+        <div class="edit-field" id="uTrenerWrap">
+          <label>Tréner (len pre hráča)</label>
+          <select id="uEditTrener">
+            <option value="">— bez trénera —</option>
+          </select>
+        </div>
+      </div>
+      <div class="actions">
+        <button class="success" onclick="saveUser()">💾 Uložiť zmeny</button>
+        <button class="secondary" onclick="closeUserEdit()">Zavrieť</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 
 <script>
 const SUPABASE_URL = "https://wdjsilryllqksdtmaehy.supabase.co";
@@ -614,19 +660,15 @@ let activeTab = 'puzzles';
 
 function switchTab(tab) {
   activeTab = tab;
-
-  if (tab === 'puzzles') {
-    document.getElementById('tabPuzzles').className = 'primary';
-    document.getElementById('tabSkills').className = 'secondary';
-    document.getElementById('skillSection').style.display = 'none';
-    document.getElementById('puzzleSection').style.display = 'block';
-  } else {
-    document.getElementById('tabPuzzles').className = 'secondary';
-    document.getElementById('tabSkills').className = 'primary';
-    document.getElementById('skillSection').style.display = 'block';
-    document.getElementById('puzzleSection').style.display = 'none';
-    clearResult();
-  }
+  const tabs = ['puzzles', 'skills', 'users'];
+  tabs.forEach(t => {
+    document.getElementById('tab' + t.charAt(0).toUpperCase() + t.slice(1)).className =
+      t === tab ? 'primary' : 'secondary';
+  });
+  document.getElementById('puzzleSection').style.display = tab === 'puzzles' ? 'block' : 'none';
+  document.getElementById('skillSection').style.display  = tab === 'skills'  ? 'block' : 'none';
+  document.getElementById('userSection').style.display   = tab === 'users'   ? 'block' : 'none';
+  if (tab === 'users') loadUsers();
 }
 
 async function reloadActive() {
@@ -763,6 +805,156 @@ async function deleteSkillPuzzle() {
 function clearSkillResult() {
   selectedSkill = null;
   document.getElementById('skillResultBox').classList.add('hidden');
+}
+
+// ─── Správa používateľov ─────────────────────────────────────────────────────
+
+let allUsers = [];
+let allTreners = [];
+let selectedUser = null;
+
+function setUserStatus(text, type = '') {
+  const el = document.getElementById('userStatus');
+  el.textContent = text;
+  el.className = 'status' + (type ? ' ' + type : '');
+}
+
+async function loadUsers() {
+  setUserStatus('Načítavam používateľov...');
+  try {
+    // Načítaj všetky profily
+    const profiles = await sbFetch('profiles?order=surname.asc,name.asc&select=id,email,role,nick_name,name,surname');
+    allUsers = profiles || [];
+
+    // Načítaj trénerov pre dropdown
+    allTreners = allUsers.filter(u => u.role === 'trener');
+
+    // Načítaj player záznamy pre trener_id info
+    const players = await sbFetch('players?select=user_id,trener_id');
+    const playerMap = {};
+    (players || []).forEach(p => { if (p.user_id) playerMap[p.user_id] = p.trener_id; });
+
+    renderUserList(playerMap);
+    setUserStatus(`Načítaných ${allUsers.length} používateľov`, 'success');
+  } catch(e) {
+    setUserStatus('Chyba: ' + e.message, 'error');
+  }
+}
+
+function renderUserList(playerMap) {
+  const el = document.getElementById('userList');
+  if (!allUsers.length) {
+    el.innerHTML = '<div style="color:#64748b;font-style:italic;padding:10px;">Žiadni používatelia</div>';
+    return;
+  }
+
+  const roleColors = {
+    admin:  'background:#fff7ed;color:#c2410c;border:1px solid #fdba74;',
+    trener: 'background:#f0fdf4;color:#166534;border:1px solid #86efac;',
+    hrac:   'background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;'
+  };
+  const roleLabels = { admin: '👑 Admin', trener: '🧑‍🏫 Tréner', hrac: '♟ Hráč' };
+
+  // Mapa trénerov id → meno
+  const trenerNameMap = {};
+  allTreners.forEach(t => {
+    trenerNameMap[t.id] = t.nick_name || `${t.name || ''} ${t.surname || ''}`.trim();
+  });
+
+  el.innerHTML = allUsers.map(u => {
+    const roleStyle = roleColors[u.role] || '';
+    const roleLabel = roleLabels[u.role] || u.role;
+    const trenerName = (u.role === 'hrac' && playerMap[u.id])
+      ? `<span style="font-size:12px;color:#64748b;"> · 🧑‍🏫 ${trenerNameMap[playerMap[u.id]] || '?'}</span>`
+      : '';
+    const displayName = u.nick_name || `${u.name || ''} ${u.surname || ''}`.trim() || u.email;
+    return `
+      <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border:1px solid #e2e8f0;border-radius:10px;background:white;">
+        <div style="flex:1;">
+          <span style="font-weight:bold;">${displayName}</span>
+          ${trenerName}
+          <div style="font-size:12px;color:#94a3b8;">${u.email}</div>
+        </div>
+        <span style="padding:3px 10px;border-radius:999px;font-size:12px;font-weight:bold;${roleStyle}">${roleLabel}</span>
+        <button class="secondary" style="padding:6px 12px;font-size:13px;" onclick="openUserEdit('${u.id}')">Upraviť</button>
+      </div>
+    `;
+  }).join('');
+}
+
+async function openUserEdit(userId) {
+  selectedUser = allUsers.find(u => u.id === userId);
+  if (!selectedUser) return;
+
+  // Naplň detail
+  document.getElementById('uEmail').textContent   = selectedUser.email || '-';
+  document.getElementById('uNick').textContent    = selectedUser.nick_name || '-';
+  document.getElementById('uName').textContent    = selectedUser.name || '-';
+  document.getElementById('uSurname').textContent = selectedUser.surname || '-';
+  document.getElementById('uEditRole').value      = selectedUser.role || 'hrac';
+
+  // Naplň dropdown trénerov
+  const sel = document.getElementById('uEditTrener');
+  sel.innerHTML = '<option value="">— bez trénera —</option>';
+  allTreners.forEach(t => {
+    if (t.id === userId) return; // tréner nemôže byť priradený sám sebe
+    const opt = document.createElement('option');
+    opt.value = t.id;
+    opt.textContent = t.nick_name || `${t.name || ''} ${t.surname || ''}`.trim();
+    sel.appendChild(opt);
+  });
+
+  // Načítaj aktuálneho trénera hráča
+  try {
+    const playerData = await sbFetch(`players?user_id=eq.${userId}&select=trener_id&limit=1`);
+    if (playerData && playerData.length && playerData[0].trener_id) {
+      sel.value = playerData[0].trener_id;
+    }
+  } catch(e) {}
+
+  onUserRoleChange();
+  document.getElementById('userEditBox').classList.remove('hidden');
+  document.getElementById('userEditBox').scrollIntoView({ behavior: 'smooth' });
+}
+
+function onUserRoleChange() {
+  const role = document.getElementById('uEditRole').value;
+  document.getElementById('uTrenerWrap').style.display = role === 'hrac' ? 'block' : 'none';
+}
+
+async function saveUser() {
+  if (!selectedUser) return;
+  const newRole   = document.getElementById('uEditRole').value;
+  const trenerId  = document.getElementById('uEditTrener').value || null;
+
+  try {
+    setUserStatus('Ukladám...');
+
+    // 1. Zmeň rolu v profiles
+    await sbFetch(`profiles?id=eq.${selectedUser.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ role: newRole })
+    });
+
+    // 2. Ak je hráč, zmeň trener_id v players
+    if (newRole === 'hrac') {
+      await sbFetch(`players?user_id=eq.${selectedUser.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ trener_id: trenerId })
+      });
+    }
+
+    setUserStatus(`✅ Používateľ ${selectedUser.email} — rola zmenená na "${newRole}"`, 'success');
+    closeUserEdit();
+    await loadUsers();
+  } catch(e) {
+    setUserStatus('Chyba pri ukladaní: ' + e.message, 'error');
+  }
+}
+
+function closeUserEdit() {
+  selectedUser = null;
+  document.getElementById('userEditBox').classList.add('hidden');
 }
 </script>
 </body>
