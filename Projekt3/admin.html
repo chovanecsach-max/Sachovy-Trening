@@ -877,6 +877,7 @@ function renderUserList(playerMap) {
         </div>
         <span style="padding:3px 10px;border-radius:999px;font-size:12px;font-weight:bold;${roleStyle}">${roleLabel}</span>
         <button class="secondary" style="padding:6px 12px;font-size:13px;" onclick="openUserEdit('${u.id}')">Upraviť</button>
+        <button class="danger" style="padding:6px 12px;font-size:13px;" onclick="deleteUser('${u.id}', '${displayName.replace(/'/g, '')}')">🗑️</button>
       </div>
     `;
   }).join('');
@@ -955,6 +956,30 @@ async function saveUser() {
 function closeUserEdit() {
   selectedUser = null;
   document.getElementById('userEditBox').classList.add('hidden');
+}
+
+async function deleteUser(userId, displayName) {
+  if (!confirm(`Naozaj chceš ÚPLNE vymazať používateľa "${displayName}"?\n\nVymažú sa:\n• Záznamy o tréningu\n• Hráčsky záznam\n• Profil\n\nTáto akcia je NEVRATNÁ.`)) return;
+
+  setUserStatus('Mažem používateľa...');
+  try {
+    // 1. Vymaž training_log záznamy (cez player_id)
+    const playerData = await sbFetch(`players?user_id=eq.${userId}&select=id&limit=1`);
+    if (playerData && playerData.length) {
+      const playerId = playerData[0].id;
+      await sbFetch(`training_log?player_id=eq.${playerId}`, { method: 'DELETE' });
+      // 2. Vymaž player záznam
+      await sbFetch(`players?id=eq.${playerId}`, { method: 'DELETE' });
+    }
+
+    // 3. Vymaž profil
+    await sbFetch(`profiles?id=eq.${userId}`, { method: 'DELETE' });
+
+    setUserStatus(`✅ Používateľ "${displayName}" bol úplne vymazaný.`, 'success');
+    await loadUsers();
+  } catch(e) {
+    setUserStatus('Chyba pri mazaní: ' + e.message, 'error');
+  }
 }
 </script>
 </body>
