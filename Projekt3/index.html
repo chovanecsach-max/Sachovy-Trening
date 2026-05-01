@@ -150,14 +150,11 @@ async function initPage() {
     `${roleLabel}: <strong>${nick}</strong> &nbsp;
      <button onclick="logout()" style="padding:4px 10px;font-size:12px;border:1px solid #d1d5db;border-radius:6px;cursor:pointer;background:#f8fafc;">Odhlásiť</button>`;
 
-  // Skryj admin tlačidlo pre hráčov
-  if (role === 'hrac') {
+  // Skryj admin tlačidlo pre hráčov a trénerov
+  if (role !== 'admin') {
     document.querySelectorAll('.admin').forEach(el => el.style.display = 'none');
   }
-  // Štatistika len pre admin a tréner
-  if (role === 'hrac') {
-    document.getElementById('statsBtn') && (document.getElementById('statsBtn').style.display = 'none');
-  }
+  // Štatistika je dostupná pre všetky roly (každý vidí len svoje dáta)
 }
 
 initPage();
