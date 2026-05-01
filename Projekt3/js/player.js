@@ -120,7 +120,7 @@ async function getCurrentPlayer() {
     // 2. Fallback: hľadaj podľa emailu (pre existujúcich používateľov bez user_id)
     if (userEmail) {
       try {
-        const data = await sbFetch(`players?email=eq.${encodeURIComponent(userEmail)}&limit=1`);
+        const data = await sbFetch(`players?email=eq.${userEmail}&limit=1`);
         if (data && data.length) {
           const player = data[0];
           localStorage.setItem(CURRENT_KEY, player.id);
