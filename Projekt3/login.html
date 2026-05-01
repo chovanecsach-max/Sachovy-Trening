@@ -6,6 +6,7 @@
 <title>Šachový tréning — Prihlásenie</title>
 <style>
 * { box-sizing: border-box; }
+
 body {
   font-family: Arial, sans-serif;
   background: #f4f4f6;
@@ -15,6 +16,7 @@ body {
   align-items: center;
   justify-content: center;
 }
+
 .container {
   width: min(460px, 92vw);
   background: white;
@@ -22,40 +24,116 @@ body {
   padding: 32px;
   box-shadow: 0 10px 30px rgba(0,0,0,0.08);
 }
-h1 { margin: 0 0 6px 0; font-size: 28px; text-align: center; }
-.subtitle { text-align: center; color: #475569; margin: 0 0 24px 0; font-size: 14px; }
-.tabs { display: flex; border-bottom: 2px solid #e5e7eb; margin-bottom: 24px; }
-.tab {
-  flex: 1; padding: 10px; text-align: center; cursor: pointer;
-  font-size: 15px; color: #64748b;
-  border-bottom: 2px solid transparent; margin-bottom: -2px; transition: all 0.15s;
+
+h1 {
+  margin: 0 0 6px 0;
+  font-size: 28px;
+  text-align: center;
 }
-.tab.active { color: #111827; font-weight: bold; border-bottom-color: #111827; }
+
+.subtitle {
+  text-align: center;
+  color: #475569;
+  margin: 0 0 24px 0;
+  font-size: 14px;
+}
+
+/* Záložky */
+.tabs {
+  display: flex;
+  border-bottom: 2px solid #e5e7eb;
+  margin-bottom: 24px;
+}
+
+.tab {
+  flex: 1;
+  padding: 10px;
+  text-align: center;
+  cursor: pointer;
+  font-size: 15px;
+  color: #64748b;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  transition: all 0.15s;
+}
+
+.tab.active {
+  color: #111827;
+  font-weight: bold;
+  border-bottom-color: #111827;
+}
+
 .form { display: none; }
 .form.active { display: block; }
-.field { margin-bottom: 14px; }
+
+.field {
+  margin-bottom: 14px;
+}
+
 .field label {
-  display: block; font-size: 12px; color: #64748b;
-  text-transform: uppercase; margin-bottom: 5px; font-weight: bold;
+  display: block;
+  font-size: 12px;
+  color: #64748b;
+  text-transform: uppercase;
+  margin-bottom: 5px;
+  font-weight: bold;
 }
+
 .field input, .field select {
-  width: 100%; padding: 10px 12px;
-  border: 1px solid #d1d5db; border-radius: 10px; font-size: 14px; background: white;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  font-size: 14px;
+  background: white;
 }
+
 .field input:focus, .field select:focus {
-  outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,0.1);
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37,99,235,0.1);
 }
-.row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+.row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
 button {
-  width: 100%; padding: 12px; border: none; border-radius: 10px;
-  cursor: pointer; font-size: 15px; font-weight: bold; margin-top: 6px;
+  width: 100%;
+  padding: 12px;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: bold;
+  margin-top: 6px;
 }
+
 .btn-primary { background: #111827; color: white; }
 .btn-primary:hover { background: #1f2937; }
-.status { margin-top: 14px; padding: 10px 12px; border-radius: 10px; font-size: 13px; display: none; }
+
+.status {
+  margin-top: 14px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 13px;
+  display: none;
+}
+
 .status.error { background: #fef2f2; border: 1px solid #fca5a5; color: #b91c1c; display: block; }
 .status.success { background: #f0fdf4; border: 1px solid #86efac; color: #166534; display: block; }
 .status.info { background: #eff6ff; border: 1px solid #bfdbfe; color: #1d4ed8; display: block; }
+
+.divider {
+  text-align: center;
+  color: #94a3b8;
+  font-size: 12px;
+  margin: 16px 0;
+}
+
+/* Skrytý element */
 .hidden { display: none !important; }
 </style>
 </head>
@@ -108,14 +186,8 @@ button {
       <label>Heslo * (min. 6 znakov)</label>
       <input id="regPassword" type="password" placeholder="Vaše heslo">
     </div>
+    <!-- Rola je vždy hráč — tréner/admin sa nastaví cez admin panel -->
     <div class="field">
-      <label>Rola</label>
-      <select id="regRole" onchange="onRoleChange()">
-        <option value="hrac">Hráč</option>
-        <option value="trener">Tréner</option>
-      </select>
-    </div>
-    <div class="field" id="trenerField">
       <label>Tréner</label>
       <select id="regTrener">
         <option value="">— bez trénera —</option>
@@ -130,6 +202,7 @@ button {
 <script>
 const SUPABASE_URL = "https://wdjsilryllqksdtmaehy.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_45gFQhgPScrDjDCVC0B4Iw_q6uZKf9m";
+
 const { createClient } = supabase;
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const SUPABASE_KEY = SUPABASE_ANON_KEY;
@@ -140,7 +213,11 @@ function switchTab(tab) {
   });
   document.getElementById('loginForm').classList.toggle('active', tab === 'login');
   document.getElementById('registerForm').classList.toggle('active', tab === 'register');
-  if (tab === 'register') loadTrainerDropdown();
+
+  // Načítaj trénerov keď sa otvorí záložka registrácie
+  if (tab === 'register') {
+    loadTrainerDropdown();
+  }
 }
 
 function setStatus(id, text, type) {
@@ -149,31 +226,29 @@ function setStatus(id, text, type) {
   el.className = 'status ' + type;
 }
 
-function onRoleChange() {
-  const role = document.getElementById('regRole').value;
-  const trenerField = document.getElementById('trenerField');
-  if (role === 'hrac') {
-    trenerField.classList.remove('hidden');
-  } else {
-    trenerField.classList.add('hidden');
-    document.getElementById('regTrener').value = '';
-  }
-}
-
+// Načítanie trénerov do dropdown
 async function loadTrainerDropdown() {
   const sel = document.getElementById('regTrener');
+  // Ak sú options už načítané (okrem prvého "bez trénera"), nekresliť znova
   if (sel.options.length > 1) return;
+
   try {
     const res = await fetch(
       `${SUPABASE_URL}/rest/v1/profiles?role=eq.trener&select=id,name,surname,nick_name&order=surname.asc`,
-      { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }
+      {
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`
+        }
+      }
     );
     if (!res.ok) return;
     const trainers = await res.json();
     trainers.forEach(t => {
       const opt = document.createElement('option');
       opt.value = t.id;
-      opt.textContent = t.nick_name || `${t.name || ''} ${t.surname || ''}`.trim();
+      const displayName = t.nick_name || `${t.name || ''} ${t.surname || ''}`.trim();
+      opt.textContent = displayName;
       sel.appendChild(opt);
     });
   } catch (e) {
@@ -184,18 +259,30 @@ async function loadTrainerDropdown() {
 async function login() {
   const email = document.getElementById('loginEmail').value.trim();
   const password = document.getElementById('loginPassword').value;
-  if (!email || !password) { setStatus('loginStatus', 'Vyplň email a heslo.', 'error'); return; }
+
+  if (!email || !password) {
+    setStatus('loginStatus', 'Vyplň email a heslo.', 'error');
+    return;
+  }
 
   setStatus('loginStatus', 'Prihlasovanie...', 'info');
+
   const { data, error } = await sb.auth.signInWithPassword({ email, password });
-  if (error) { setStatus('loginStatus', 'Chyba: ' + error.message, 'error'); return; }
 
+  if (error) {
+    setStatus('loginStatus', 'Chyba: ' + error.message, 'error');
+    return;
+  }
+
+  // Načítaj profil
   const { data: profile } = await sb.from('profiles').select('*').eq('id', data.user.id).single();
-  if (!profile) { setStatus('loginStatus', 'Profil nenájdený.', 'error'); return; }
 
-  // Vymazať starého hráča — getCurrentPlayer načíta čerstvo podľa user_id
-  localStorage.removeItem('currentPlayer');
+  if (!profile) {
+    setStatus('loginStatus', 'Profil nenájdený.', 'error');
+    return;
+  }
 
+  // Ulož do sessionStorage
   sessionStorage.setItem('user_id', data.user.id);
   sessionStorage.setItem('user_email', data.user.email);
   sessionStorage.setItem('user_role', profile.role);
@@ -204,7 +291,10 @@ async function login() {
   sessionStorage.setItem('user_surname', profile.surname || '');
 
   setStatus('loginStatus', 'Prihlásenie úspešné! Presmerovanie...', 'success');
-  setTimeout(() => { location.href = 'index.html'; }, 800);
+
+  setTimeout(() => {
+    location.href = 'index.html';
+  }, 800);
 }
 
 async function register() {
@@ -213,78 +303,111 @@ async function register() {
   const nick = document.getElementById('regNick').value.trim();
   const email = document.getElementById('regEmail').value.trim();
   const password = document.getElementById('regPassword').value;
-  const role = document.getElementById('regRole').value;
+  const role = 'hrac'; // Rola je vždy hráč — tréner/admin sa nastaví cez admin panel
   const trenerIdRaw = document.getElementById('regTrener').value;
-  const trenerId = (role === 'hrac' && trenerIdRaw) ? trenerIdRaw : null;
+  const trenerId = trenerIdRaw || null;
 
   if (!name || !surname || !nick || !email || !password) {
-    setStatus('registerStatus', 'Vyplň všetky povinné polia.', 'error'); return;
+    setStatus('registerStatus', 'Vyplň všetky povinné polia.', 'error');
+    return;
   }
+
   if (password.length < 6) {
-    setStatus('registerStatus', 'Heslo musí mať aspoň 6 znakov.', 'error'); return;
+    setStatus('registerStatus', 'Heslo musí mať aspoň 6 znakov.', 'error');
+    return;
   }
 
   setStatus('registerStatus', 'Registrácia...', 'info');
 
-  // 1. Vytvor Auth účet
   const { data, error } = await sb.auth.signUp({
-    email, password,
-    options: { data: { name, surname, nick_name: nick, role } }
+    email,
+    password,
+    options: {
+      data: { name, surname, nick_name: nick, role }
+    }
   });
-  if (error) { setStatus('registerStatus', 'Chyba: ' + error.message, 'error'); return; }
 
-  // Použiť token zo session ak existuje, inak anon key
-  // (session môže byť null ak Supabase vyžaduje potvrdenie emailu)
-  const authToken = data.session?.access_token || SUPABASE_KEY;
-  const headers = {
-    'apikey': SUPABASE_KEY,
-    'Authorization': `Bearer ${authToken}`,
-    'Content-Type': 'application/json',
-    'Prefer': 'return=minimal'
-  };
-
-  // 2. Najprv vytvor profil (player.user_id je FK na profiles — musí existovať skôr)
-  const profileRes = await fetch(`${SUPABASE_URL}/rest/v1/profiles`, {
-    method: 'POST', headers,
-    body: JSON.stringify({ id: data.user.id, email, role, nick_name: nick, name, surname })
-  });
-  if (!profileRes.ok) {
-    const err = await profileRes.text();
-    console.error('Chyba pri vytváraní profilu:', err);
-    setStatus('registerStatus', '⚠️ Účet vytvorený, ale zlyhalo vytvorenie profilu: ' + err, 'error');
+  if (error) {
+    setStatus('registerStatus', 'Chyba: ' + error.message, 'error');
     return;
   }
 
-  // 3. Potom vytvor player záznam (pre všetky roly — hráč aj tréner trénujú)
+  // Zostav telo hráča
   const playerBody = {
-    name, surname, email,
-    elo: 1500, elo_taktika: 1500, elo_strategia: 1500,
-    elo_koncovka: 1500, elo_zrucnosti: 1500,
-    played: 0, solved: 0, total_time: 0,
+    name: name,
+    surname: surname,
+    email: email,
+    elo: 1500,
+    elo_taktika: 1500,
+    elo_strategia: 1500,
+    elo_koncovka: 1500,
+    elo_zrucnosti: 1500,
+    played: 0,
+    solved: 0,
+    total_time: 0,
     user_id: data.user.id
   };
-  if (trenerId) playerBody.trener_id = trenerId;
 
-  const playerRes = await fetch(`${SUPABASE_URL}/rest/v1/players`, {
-    method: 'POST', headers, body: JSON.stringify(playerBody)
-  });
-  if (!playerRes.ok) {
-    const err = await playerRes.text();
-    console.error('Chyba pri vytváraní hráča:', err);
-    setStatus('registerStatus', '⚠️ Profil vytvorený, ale zlyhalo vytvorenie hráčskeho záznamu: ' + err, 'error');
-    return;
+  // Prirad trénera ak bol vybraný
+  if (trenerId) {
+    playerBody.trener_id = trenerId;
+  }
+
+  // Vytvor záznam v players cez REST API
+  try {
+    await fetch(`${SUPABASE_URL}/rest/v1/players`, {
+      method: 'POST',
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${data.session.access_token}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=minimal'
+      },
+      body: JSON.stringify(playerBody)
+    });
+  } catch(e) {
+    console.error('Chyba pri vytváraní hráča:', e);
+  }
+
+  // Vytvor profil cez REST API
+  try {
+    await fetch(`${SUPABASE_URL}/rest/v1/profiles`, {
+      method: 'POST',
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${data.session.access_token}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=minimal'
+      },
+      body: JSON.stringify({
+        id: data.user.id,
+        email: email,
+        role: role,
+        nick_name: nick,
+        name: name,
+        surname: surname
+      })
+    });
+  } catch(e) {
+    console.error('Chyba pri vytváraní profilu:', e);
   }
 
   setStatus('registerStatus', '✅ Registrácia úspešná! Môžeš sa prihlásiť.', 'success');
+
+  // Prepni na prihlásenie
   setTimeout(() => switchTab('login'), 2000);
 }
 
+// Ak prídeš z menu na registráciu, nekontrolujem session
 if (window.location.hash === '#register') {
   switchTab('register');
 } else {
+  // Skontroluj či je už prihlásený
   (async () => {
     const { data } = await sb.auth.getSession();
-    if (data.session) location.href = 'index.html';
+    if (data.session) {
+      location.href = 'index.html';
+    }
   })();
 }
 </script>
