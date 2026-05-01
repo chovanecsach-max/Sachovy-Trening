@@ -4,183 +4,281 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Šachový tréning</title>
-
 <style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
 body {
-  font-family: Arial, sans-serif;
-  background: #f4f4f6;
-  margin: 0;
+  font-family: 'Segoe UI', Arial, sans-serif;
+  background: #e8eaf0;
   min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 16px;
 }
 
 .container {
-  width: min(520px, 92vw);
-  background: white;
-  border-radius: 16px;
-  padding: 28px;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.08);
-  text-align: center;
+  width: min(480px, 100%);
+  border-radius: 18px;
+  overflow: hidden;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.18);
 }
 
-h1 { margin: 0 0 10px 0; font-size: 30px; }
-p { margin: 0 0 22px 0; color: #475569; }
-
-.menu { display: grid; gap: 12px; }
-
-button {
-  padding: 14px 16px;
-  font-size: 16px;
-  border: none;
-  border-radius: 12px;
-  cursor: pointer;
-  width: 100%;
+/* ── Header ── */
+.header {
+  background: #0f1117;
+  padding: 18px 22px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
-.primary { background: #111827; color: white; }
-.secondary { background: #e5e7eb; color: #111827; }
+.logo { display: flex; align-items: center; gap: 10px; }
+.logo-icon { font-size: 28px; line-height: 1; }
+.logo-text { font-size: 18px; font-weight: 600; color: #d4a843; letter-spacing: 0.4px; }
 
-.skills-btn {
-  background: #eff6ff;
-  color: #1d4ed8;
-  border: 1px solid #93c5fd;
+.user-chip {
+  display: flex; align-items: center; gap: 7px;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.14);
+  border-radius: 20px;
+  padding: 5px 12px 5px 7px;
 }
 
-.admin {
-  background: #fff7ed;
-  color: #c2410c;
-  border: 1px solid #fdba74;
+.avatar {
+  width: 24px; height: 24px; border-radius: 50%;
+  background: #d4a843;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 700; color: #1a1209;
+  flex-shrink: 0;
 }
 
+.chip-name {
+  font-size: 12px; color: rgba(255,255,255,0.75);
+  max-width: 120px; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis;
+}
+
+.logout-btn {
+  background: none; border: none;
+  color: rgba(255,255,255,0.4);
+  font-size: 14px; cursor: pointer;
+  padding: 0 0 0 4px; line-height: 1;
+  transition: color 0.15s;
+}
+.logout-btn:hover { color: #d4a843; }
+
+/* ── Stats bar ── */
+.stats-bar {
+  background: #1a1d27;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.stat-item {
+  padding: 13px 10px; text-align: center;
+  border-right: 1px solid rgba(255,255,255,0.06);
+}
+.stat-item:last-child { border-right: none; }
+.stat-val { font-size: 20px; font-weight: 600; color: #d4a843; line-height: 1; }
+.stat-lbl { font-size: 10px; color: rgba(255,255,255,0.38); text-transform: uppercase; letter-spacing: 0.9px; margin-top: 4px; }
+
+/* ── Body ── */
+.body { background: #ffffff; padding: 20px 18px 22px; }
+
+.section-label {
+  font-size: 10px; text-transform: uppercase; letter-spacing: 1.6px;
+  color: #9ca3af; font-weight: 600; margin-bottom: 9px;
+}
+
+.menu { display: grid; gap: 8px; margin-bottom: 18px; }
+
+.menu-btn {
+  width: 100%; padding: 12px 16px; border-radius: 10px;
+  font-size: 15px; font-weight: 500; cursor: pointer;
+  text-align: left; display: flex; align-items: center; gap: 11px;
+  background: #f8f9fc; color: #1a1d2e; border: 1px solid #e2e5ef;
+  transition: border-color 0.15s, background 0.15s;
+}
+.menu-btn:hover { background: #f1f3f9; border-color: #c8cde0; }
+
+.btn-icon {
+  width: 30px; height: 30px; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 15px; flex-shrink: 0;
+}
+
+.i-taktika   { background: #eff6ff; color: #2563eb; }
+.i-strategia { background: #f5f3ff; color: #7c3aed; }
+.i-koncovka  { background: #fefce8; color: #a16207; }
+.i-mix       { background: #f0fdf4; color: #16a34a; }
+.i-skills    { background: #fff1f2; color: #e11d48; }
+.i-stat      { background: #eff6ff; color: #2563eb; }
+.i-admin     { background: rgba(212,168,67,0.15); color: #a07828; }
+
+.divider { height: 1px; background: #e8eaf0; margin: 14px 0; }
+
+/* Submenu */
 .submenu {
-  display: none;
-  grid-template-columns: 1fr;
-  gap: 8px;
-  padding: 12px;
-  background: #f0f7ff;
-  border: 1px solid #93c5fd;
-  border-radius: 12px;
-  animation: fadeIn 0.15s ease;
-  margin-top: -4px;
+  display: none; grid-template-columns: 1fr; gap: 6px;
+  padding: 10px; background: #f8f9fc;
+  border: 1px solid #e2e5ef; border-radius: 10px;
+  margin-top: -4px; animation: fadeIn 0.15s ease;
 }
-
 .submenu.open { display: grid; }
 
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(-6px); }
+  from { opacity: 0; transform: translateY(-5px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 
-.submenu-title {
-  font-size: 12px;
-  color: #1d4ed8;
-  text-transform: uppercase;
-  font-weight: bold;
-  margin-bottom: 2px;
+.submenu-label {
+  font-size: 10px; text-transform: uppercase; letter-spacing: 1.4px;
+  color: #9ca3af; font-weight: 600; margin-bottom: 4px; padding: 0 4px;
 }
 
-.submenu button {
-  background: white;
-  color: #1d4ed8;
-  border: 1px solid #bfdbfe;
-  padding: 10px 14px;
-  font-size: 15px;
-  border-radius: 10px;
-}
+.submenu .menu-btn { background: #ffffff; font-size: 14px; padding: 10px 14px; }
 
-.submenu button:hover { background: #dbeafe; }
+.btn-secondary { background: #f8f9fc; color: #4b5563; border: 1px solid #e2e5ef; }
 
-.submenu .back-btn {
-  background: #e5e7eb;
-  color: #374151;
-  border: none;
-  font-size: 13px;
-  padding: 8px;
-  margin-top: 2px;
-}
+.btn-admin { background: #0f1117; color: #d4a843; border: none; }
+.btn-admin:hover { background: #1a1d27; }
 </style>
 </head>
-
 <body>
+
 <div class="container">
-  <div id="userPanel" style="text-align:right;margin-bottom:12px;font-size:13px;color:#64748b;"></div>
-  <h1>Šachový tréning</h1>
-  <p>Vyber si, čo chceš robiť.</p>
 
-  <div class="menu">
-    <button class="primary" onclick="goTraining('taktika')">Tréning taktika</button>
-    <button class="primary" onclick="goTraining('strategia')">Tréning stratégia</button>
-    <button class="primary" onclick="goTraining('koncovka')">Tréning koncovka</button>
-    <button class="primary" onclick="goTraining('mix')">Mix</button>
+  <!-- Header -->
+  <div class="header">
+    <div class="logo">
+      <div class="logo-icon">♟</div>
+      <div class="logo-text">Šachový tréning</div>
+    </div>
+    <div class="user-chip">
+      <div class="avatar" id="userAvatar">?</div>
+      <span class="chip-name" id="userName">...</span>
+      <button class="logout-btn" onclick="logout()" title="Odhlásiť">✕</button>
+    </div>
+  </div>
 
-    <button class="skills-btn" onclick="toggleSkillsMenu()">
-      ♟ Šachové zručnosti <span id="skillsArrow">▼</span>
-    </button>
+  <!-- Stats bar -->
+  <div class="stats-bar">
+    <div class="stat-item">
+      <div class="stat-val" id="statElo">—</div>
+      <div class="stat-lbl">ELO</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-val" id="statAcc">—</div>
+      <div class="stat-lbl">Úspešnosť</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-val" id="statPlayed">—</div>
+      <div class="stat-lbl">Riešené</div>
+    </div>
+  </div>
 
-    <div id="skillsSubmenu" class="submenu">
-      <div class="submenu-title">Vyber typ zručnosti</div>
-      <button onclick="goSkills('checks_captures')">Šachy a brania</button>
-      <button onclick="goSkills('direct_attack')">Priame napadnutia</button>
-      <button onclick="goSkills('pawn_breakthrough')">Pešiakové prielomy</button>
-      <button onclick="goSkills('underdefended')">Slabo pokryté figúrky</button>
-      <button class="back-btn" onclick="toggleSkillsMenu()">✕ Zavrieť</button>
+  <!-- Body -->
+  <div class="body">
+
+    <div class="section-label">Tréning</div>
+    <div class="menu">
+      <button class="menu-btn" onclick="goTraining('taktika')">
+        <div class="btn-icon i-taktika">⚔</div>Tréning taktika
+      </button>
+      <button class="menu-btn" onclick="goTraining('strategia')">
+        <div class="btn-icon i-strategia">♜</div>Tréning stratégia
+      </button>
+      <button class="menu-btn" onclick="goTraining('koncovka')">
+        <div class="btn-icon i-koncovka">♚</div>Tréning koncovka
+      </button>
+      <button class="menu-btn" onclick="goTraining('mix')">
+        <div class="btn-icon i-mix">⚡</div>Mix
+      </button>
     </div>
 
-    <button class="secondary" onclick="goRegister()">Registrácia používateľa</button>
-    <button class="secondary" id="statsBtn" onclick="goStats()">Štatistika</button>
-    <button class="admin" onclick="goAdmin()">Administrácia</button>
+    <div class="section-label">Zručnosti</div>
+    <div class="menu">
+      <button class="menu-btn" onclick="toggleSkillsMenu()">
+        <div class="btn-icon i-skills">♞</div>
+        Šachové zručnosti
+        <span id="skillsArrow" style="margin-left:auto;color:#9ca3af;font-size:12px;">▼</span>
+      </button>
+      <div id="skillsSubmenu" class="submenu">
+        <div class="submenu-label">Vyber typ zručnosti</div>
+        <button class="menu-btn" onclick="goSkills('checks_captures')">
+          <div class="btn-icon i-skills">♞</div>Šachy a brania
+        </button>
+        <button class="menu-btn" onclick="goSkills('direct_attack')">
+          <div class="btn-icon i-taktika">⚔</div>Priame napadnutia
+        </button>
+        <button class="menu-btn" onclick="goSkills('pawn_breakthrough')">
+          <div class="btn-icon i-mix">♙</div>Pešiakové prielomy
+        </button>
+        <button class="menu-btn" onclick="goSkills('underdefended')">
+          <div class="btn-icon i-strategia">♜</div>Slabo pokryté figúrky
+        </button>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="menu">
+      <button class="menu-btn btn-secondary" onclick="goStats()">
+        <div class="btn-icon i-stat">📊</div>Štatistika
+      </button>
+      <button class="menu-btn btn-admin" id="adminBtn" onclick="goAdmin()" style="display:none;">
+        <div class="btn-icon i-admin">⚙</div>Administrácia
+      </button>
+    </div>
+
   </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/auth.js"></script>
+<script src="js/player.js"></script>
 <script>
 async function initPage() {
   const ok = await refreshSession();
   if (!ok) { location.href = 'login.html'; return; }
 
   const user = getCurrentUser();
-  const nick = user.nick || user.name || user.email;
+  const nick = user.nick || user.name || user.email || '?';
   const role = user.role;
-  const roleLabel = role === 'admin' ? '👑 Admin' : role === 'trener' ? '🏫 Tréner' : '♟ Hráč';
 
-  document.getElementById('userPanel').innerHTML =
-    `${roleLabel}: <strong>${nick}</strong> &nbsp;
-     <button onclick="logout()" style="padding:4px 10px;font-size:12px;border:1px solid #d1d5db;border-radius:6px;cursor:pointer;background:#f8fafc;">Odhlásiť</button>`;
+  document.getElementById('userAvatar').textContent = nick.charAt(0).toUpperCase();
+  document.getElementById('userName').textContent = nick;
 
-  // Skryj admin tlačidlo pre hráčov a trénerov
-  if (role !== 'admin') {
-    document.querySelectorAll('.admin').forEach(el => el.style.display = 'none');
+  if (role === 'admin') {
+    document.getElementById('adminBtn').style.display = 'flex';
   }
-  // Štatistika je dostupná pre všetky roly (každý vidí len svoje dáta)
+
+  // Načítaj štatistiky
+  try {
+    const player = await getCurrentPlayer();
+    if (player) {
+      const played = Number(player.played || 0);
+      const solved = Number(player.solved || 0);
+      const acc = played > 0 ? Math.round((solved / played) * 100) : 0;
+      document.getElementById('statElo').textContent    = player.elo || 1500;
+      document.getElementById('statAcc').textContent    = acc + '%';
+      document.getElementById('statPlayed').textContent = played;
+    }
+  } catch(e) {
+    console.error('Chyba načítania štatistík:', e);
+  }
 }
 
 initPage();
 
-function goTraining(mode) {
-  location.href = "training.html?mode=" + mode;
-}
-
-function goRegister() {
-  location.href = "login.html#register";
-}
-
-function goAdmin() {
-  location.href = "admin.html";
-}
-
-function goStats() {
-  location.href = "statistika.html";
-}
-
-function goSkills(type) {
-  location.href = "skills.html?type=" + type;
-}
+function goTraining(mode) { location.href = "training.html?mode=" + mode; }
+function goAdmin()         { location.href = "admin.html"; }
+function goStats()         { location.href = "statistika.html"; }
+function goSkills(type)    { location.href = "skills.html?type=" + type; }
 
 function toggleSkillsMenu() {
-  const menu = document.getElementById('skillsSubmenu');
+  const menu  = document.getElementById('skillsSubmenu');
   const arrow = document.getElementById('skillsArrow');
   const isOpen = menu.classList.contains('open');
   menu.classList.toggle('open');
