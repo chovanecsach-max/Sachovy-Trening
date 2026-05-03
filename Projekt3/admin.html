@@ -430,12 +430,21 @@ button {
     <h3>✏️ Upraviť používateľa</h3>
     <div class="result-grid">
       <div class="result-box"><div class="label">Email</div><div id="uEmail" class="value">-</div></div>
-      <div class="result-box"><div class="label">Nick</div><div id="uNick" class="value">-</div></div>
-      <div class="result-box"><div class="label">Meno</div><div id="uName" class="value">-</div></div>
-      <div class="result-box"><div class="label">Priezvisko</div><div id="uSurname" class="value">-</div></div>
     </div>
     <div class="edit-section">
       <div class="edit-grid">
+        <div class="edit-field">
+          <label>Meno</label>
+          <input type="text" id="uEditName" placeholder="Meno">
+        </div>
+        <div class="edit-field">
+          <label>Priezvisko</label>
+          <input type="text" id="uEditSurname" placeholder="Priezvisko">
+        </div>
+        <div class="edit-field">
+          <label>Nick</label>
+          <input type="text" id="uEditNick" placeholder="Prezývka">
+        </div>
         <div class="edit-field">
           <label>Rola</label>
           <select id="uEditRole" onchange="onUserRoleChange()">
@@ -888,11 +897,11 @@ async function openUserEdit(userId) {
   if (!selectedUser) return;
 
   // Naplň detail
-  document.getElementById('uEmail').textContent   = selectedUser.email || '-';
-  document.getElementById('uNick').textContent    = selectedUser.nick_name || '-';
-  document.getElementById('uName').textContent    = selectedUser.name || '-';
-  document.getElementById('uSurname').textContent = selectedUser.surname || '-';
-  document.getElementById('uEditRole').value      = selectedUser.role || 'hrac';
+  document.getElementById('uEmail').textContent        = selectedUser.email || '-';
+  document.getElementById('uEditName').value           = selectedUser.name || '';
+  document.getElementById('uEditSurname').value        = selectedUser.surname || '';
+  document.getElementById('uEditNick').value           = selectedUser.nick_name || '';
+  document.getElementById('uEditRole').value           = selectedUser.role || 'hrac';
 
   // Naplň dropdown trénerov
   const sel = document.getElementById('uEditTrener');
@@ -925,19 +934,33 @@ function onUserRoleChange() {
 
 async function saveUser() {
   if (!selectedUser) return;
-  const newRole   = document.getElementById('uEditRole').value;
-  const trenerId  = document.getElementById('uEditTrener').value || null;
+  const newRole    = document.getElementById('uEditRole').value;
+  const trenerId   = document.getElementById('uEditTrener').value || null;
+  const newName    = document.getElementById('uEditName').value.trim();
+  const newSurname = document.getElementById('uEditSurname').value.trim();
+  const newNick    = document.getElementById('uEditNick').value.trim();
+
+  if (!newNick) {
+    setUserStatus('Nick nemôže byť prázdny.', 'error');
+    return;
+  }
 
   try {
     setUserStatus('Ukladám...');
 
-    // 1. Zmeň rolu v profiles
+    // 1. Zmeň profil (rola + meno + priezvisko + nick)
     await sbFetch(`profiles?id=eq.${selectedUser.id}`, {
       method: 'PATCH',
-      body: JSON.stringify({ role: newRole })
+      body: JSON.stringify({ role: newRole, name: newName, surname: newSurname, nick_name: newNick })
     });
 
-    // 2. Ak je hráč, zmeň trener_id v players
+    // 2. Zmeň meno aj v players zázname
+    await sbFetch(`players?user_id=eq.${selectedUser.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ name: newName, surname: newSurname })
+    });
+
+    // 3. Ak je hráč, zmeň aj trener_id
     if (newRole === 'hrac') {
       await sbFetch(`players?user_id=eq.${selectedUser.id}`, {
         method: 'PATCH',
@@ -945,7 +968,7 @@ async function saveUser() {
       });
     }
 
-    setUserStatus(`✅ Používateľ ${selectedUser.email} — rola zmenená na "${newRole}"`, 'success');
+    setUserStatus(`✅ Používateľ ${selectedUser.email} bol aktualizovaný.`, 'success');
     closeUserEdit();
     await loadUsers();
   } catch(e) {
