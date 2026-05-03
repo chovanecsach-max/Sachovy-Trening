@@ -694,6 +694,7 @@ let legalTargets = [];
 let puzzleCounted = false;
 let puzzleSolvedCounted = false;
 let resultLogged = false;
+let everFailed = false; // true ak hráč raz chyboval — ELO sa nezapočíta ani po správnom riešení
 let lastMove = null;
 let isAnimatingSolution = false;
 
@@ -883,12 +884,19 @@ function recordResultOnce(result) {
 
   const usedTime = Math.max(0, normalizeTimeValue(current.time) - timerRemaining);
 
+  // Ak hráč raz chyboval (everFailed), ELO a log sa zapisujú len pre pôvodný neúspech
+  // Pri následnom správnom riešení po "Skús znova" sa ELO nezapočíta
   if (!currentPuzzleIsAdmin) {
     addTrainingResult(currentPlayer.id, current.id, result, usedTime);
     registerPlayerResult(currentPlayer.id, result, usedTime);
-    updatePlayerElo(currentPlayer.id, current.elo, result, getTrainingMode());
+    if (!everFailed || result === 'loss') {
+      updatePlayerElo(currentPlayer.id, current.elo, result, getTrainingMode());
+    }
     updateSessionStats(result, usedTime);
   }
+
+  // Nastav everFailed ak ide o prehru
+  if (result === 'loss') everFailed = true;
 
   resultLogged = true;
   updatePlayerUI();
@@ -1748,6 +1756,7 @@ function resetPuzzleState() {
   selected = null;
   solved = false;
   failed = false;
+  everFailed = false; // resetuje sa len pri novej úlohe
   pendingPromotion = null;
   legalTargets = [];
   puzzleCounted = false;
@@ -1822,7 +1831,10 @@ function restart() {
 
 function retryPuzzle() {
   if (!current || isAnimatingSolution || dragState.active || pendingPromotion) return;
+  // Zachovaj everFailed — hráč už raz chyboval, ELO sa nezapočíta
+  const wasEverFailed = everFailed;
   loadPuzzleObject(current, currentPuzzleIsAdmin);
+  everFailed = wasEverFailed; // obnov príznak po resete
   setStatus(currentPuzzleIsAdmin ? 'Admin úloha bola resetovaná' : 'Úloha bola resetovaná', 'info');
 }
 
