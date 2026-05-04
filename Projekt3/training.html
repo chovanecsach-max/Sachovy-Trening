@@ -951,12 +951,12 @@ function updatePuzzleMetaUI(puzzle) {
   const mode = new URLSearchParams(window.location.search).get('mode') || 'mix';
   const isMix = mode === 'mix';
 
-  // V MIX režime skryjeme skutočnú kategóriu — hráč ju musí sám identifikovať
+  // V MIX režime skryjeme skutočnú kategóriu aj názov — hráč ich musí sám identifikovať
   const category = isMix ? 'Mix' : inferCategory(puzzle);
   const elo = normalizeEloValue(puzzle.elo);
   const timeValue = normalizeTimeValue(puzzle.time);
 
-  document.getElementById('puzzleTitle').textContent = puzzle.title || '';
+  document.getElementById('puzzleTitle').textContent = isMix ? '' : (puzzle.title || '');
   document.getElementById('puzzleId').textContent = puzzle.id ?? '-';
   document.getElementById('puzzleCategory').textContent = category;
   document.getElementById('puzzleElo').textContent = String(elo);
