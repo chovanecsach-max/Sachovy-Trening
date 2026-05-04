@@ -948,7 +948,11 @@ function inferCategory(puzzle) {
 }
 
 function updatePuzzleMetaUI(puzzle) {
-  const category = inferCategory(puzzle);
+  const mode = new URLSearchParams(window.location.search).get('mode') || 'mix';
+  const isMix = mode === 'mix';
+
+  // V MIX režime skryjeme skutočnú kategóriu — hráč ju musí sám identifikovať
+  const category = isMix ? 'Mix' : inferCategory(puzzle);
   const elo = normalizeEloValue(puzzle.elo);
   const timeValue = normalizeTimeValue(puzzle.time);
 
@@ -1784,7 +1788,9 @@ function loadPuzzleObject(puzzle, isAdmin = false) {
 
   flipped = (current.turnText || '').includes('Čierny');
 
-  document.getElementById('promptText').innerText = current.prompt || 'Nájdi najlepší ťah';
+  const mode = new URLSearchParams(window.location.search).get('mode') || 'mix';
+  const isMix = mode === 'mix';
+  document.getElementById('promptText').innerText = isMix ? 'Nájdi najlepší ťah' : (current.prompt || 'Nájdi najlepší ťah');
   const turnIndicator = document.getElementById('turnIndicator');
   turnIndicator.className = 'turn-indicator ' + (((current.turnText || '').includes('Čierny')) ? 'black' : 'white');
   updatePuzzleMetaUI(current);
