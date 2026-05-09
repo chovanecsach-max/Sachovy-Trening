@@ -931,6 +931,10 @@ async function loadPuzzles() {
   let filter = "";
   if (type === "checks_captures") {
     filter = "skill_type=in.(checks,captures)";
+  } else if (type === "checks") {
+    filter = "skill_type=eq.checks";
+  } else if (type === "captures") {
+    filter = "skill_type=eq.captures";
   } else if (type === "direct_attack") {
     filter = "skill_type=eq.direct_attack";
   } else if (type === "pawn_breakthrough") {
@@ -1042,7 +1046,13 @@ async function init() {
 
   // Nastav názov podľa typu
   const type = getSkillsType();
-  if (type === "direct_attack") {
+  if (type === "checks") {
+    document.title = "Šachy";
+    document.getElementById("promptText").textContent = "Nájdi všetky šachy";
+  } else if (type === "captures") {
+    document.title = "Brania";
+    document.getElementById("promptText").textContent = "Nájdi všetky brania";
+  } else if (type === "direct_attack") {
     document.title = "Priame napadnutia";
     document.getElementById("promptText").textContent = "Nájdi všetky priame napadnutia";
   } else if (type === "pawn_breakthrough") {
@@ -1053,6 +1063,7 @@ async function init() {
     document.getElementById("promptText").textContent = "Nájdi všetky slabo pokryté figúrky súpera";
   } else {
     document.title = "Šachy a brania";
+    document.getElementById("promptText").textContent = "Nájdi všetky šachy a brania";
   }
 
   try {
