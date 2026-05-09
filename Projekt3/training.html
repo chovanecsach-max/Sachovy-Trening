@@ -898,6 +898,11 @@ function recordResultOnce(result) {
   // Nastav everFailed ak ide o prehru
   if (result === 'loss') everFailed = true;
 
+  // Ulož posledný typ tréningu pre zobrazenie ELO v menu
+  if (!currentPuzzleIsAdmin) {
+    localStorage.setItem('lastTrainingMode', getTrainingMode() || 'mix');
+  }
+
   resultLogged = true;
   updatePlayerUI();
 }
