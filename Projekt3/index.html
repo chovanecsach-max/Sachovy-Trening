@@ -166,7 +166,7 @@ body {
   <div class="stats-bar">
     <div class="stat-item">
       <div class="stat-val" id="statElo">—</div>
-      <div class="stat-lbl">ELO</div>
+      <div class="stat-lbl" id="statEloLbl">ELO</div>
     </div>
     <div class="stat-item">
       <div class="stat-val" id="statAcc">—</div>
@@ -261,7 +261,33 @@ async function initPage() {
       const played = Number(player.played || 0);
       const solved = Number(player.solved || 0);
       const acc = played > 0 ? Math.round((solved / played) * 100) : 0;
-      document.getElementById('statElo').textContent    = player.elo || 1500;
+
+      // Zisti posledný typ tréningu a zobraz správne ELO
+      const lastMode = localStorage.getItem('lastTrainingMode') || 'mix';
+      let eloVal, eloLabel;
+
+      if (lastMode === 'taktika') {
+        eloVal = player.elo_taktika || 1500; eloLabel = 'ELO Taktika';
+      } else if (lastMode === 'strategia') {
+        eloVal = player.elo_strategia || 1500; eloLabel = 'ELO Stratégia';
+      } else if (lastMode === 'koncovka') {
+        eloVal = player.elo_koncovka || 1500; eloLabel = 'ELO Koncovka';
+      } else if (lastMode.startsWith('skill_')) {
+        eloVal = player.elo_zrucnosti || 1500;
+        const skillNames = {
+          'skill_checks_captures':   'ELO Šachy/Brania',
+          'skill_direct_attack':     'ELO Priame nap.',
+          'skill_pawn_breakthrough': 'ELO Pešiak. priel.',
+          'skill_underdefended':     'ELO Slabo pokryté',
+          'skill_direct_threat':     'ELO Priama hrozba'
+        };
+        eloLabel = skillNames[lastMode] || 'ELO Zručnosti';
+      } else {
+        eloVal = player.elo || 1500; eloLabel = 'ELO Mix';
+      }
+
+      document.getElementById('statElo').textContent    = eloVal;
+      document.getElementById('statEloLbl').textContent = eloLabel;
       document.getElementById('statAcc').textContent    = acc + '%';
       document.getElementById('statPlayed').textContent = played;
     }
