@@ -862,6 +862,10 @@ async function recordResult(result) {
     return;
   }
 
+  // Ulož posledný typ zručnosti pre zobrazenie ELO v menu
+  const skillType = new URLSearchParams(window.location.search).get('type') || 'checks_captures';
+  localStorage.setItem('lastTrainingMode', 'skill_' + skillType);
+
   // Vypočítaj čas strávený na úlohe
   const puzzleTime = Math.max(0, Math.round(current.time || 120));
   const usedTime = Math.max(0, puzzleTime - Math.max(0, timerRemaining));
