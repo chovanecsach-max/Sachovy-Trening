@@ -404,6 +404,7 @@ button {
         </div>
         <div class="actions">
           <button class="success" onclick="saveSkillPuzzle()">💾 Uložiť zmeny</button>
+          <button class="admin" onclick="openInAdminSkills()">🧪 Otvoriť v testovacom režime</button>
           <button class="danger" onclick="deleteSkillPuzzle()">🗑️ Vymazať úlohu</button>
           <button class="secondary" onclick="clearSkillResult()">Zavrieť</button>
         </div>
@@ -638,6 +639,13 @@ function openInAdminTraining() {
   localStorage.setItem("adminPuzzleId", String(selectedPuzzle.id));
   localStorage.setItem("adminMode", "true");
   location.href = "training.html";
+}
+
+function openInAdminSkills() {
+  if (!selectedSkill) { setStatus("Najprv nájdi úlohu", "error"); return; }
+  localStorage.setItem("adminSkillId", String(selectedSkill.id));
+  localStorage.setItem("adminSkillType", selectedSkill.skill_type || "");
+  location.href = "skills.html?type=" + (selectedSkill.skill_type || "checks_captures");
 }
 
 async function reloadPuzzles() {
