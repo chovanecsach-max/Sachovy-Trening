@@ -206,8 +206,11 @@ body {
       </button>
       <div id="skillsSubmenu" class="submenu">
         <div class="submenu-label">Vyber typ zručnosti</div>
-        <button class="menu-btn" onclick="goSkills('checks_captures')">
-          <div class="btn-icon i-skills">♞</div>Šachy a brania
+        <button class="menu-btn" onclick="goSkills('checks')">
+          <div class="btn-icon i-skills">♞</div>Šachy
+        </button>
+        <button class="menu-btn" onclick="goSkills('captures')">
+          <div class="btn-icon i-skills">✂</div>Brania
         </button>
         <button class="menu-btn" onclick="goSkills('direct_attack')">
           <div class="btn-icon i-taktika">⚔</div>Priame napadnutia
@@ -275,6 +278,8 @@ async function initPage() {
       } else if (lastMode.startsWith('skill_')) {
         eloVal = player.elo_zrucnosti || 1500;
         const skillNames = {
+          'skill_checks':            'ELO Šachy',
+          'skill_captures':          'ELO Brania',
           'skill_checks_captures':   'ELO Šachy/Brania',
           'skill_direct_attack':     'ELO Priame nap.',
           'skill_pawn_breakthrough': 'ELO Pešiak. priel.',
