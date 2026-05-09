@@ -496,6 +496,7 @@ let foundMoves = [];      // už nájdené ťahy
 let puzzleDone = false;
 let puzzleFailed = false;
 let resultLogged = false;
+let isAdminMode = false; // testovací režim — bez zápisu do štatistiky
 let puzzleCounted = false;
 let puzzleSolvedCounted = false;
 
@@ -855,6 +856,12 @@ async function recordResult(result) {
   if (resultLogged || !currentPlayer || !current) return;
   resultLogged = true;
 
+  // V admin testovacom režime nezapisujeme štatistiky
+  if (isAdminMode) {
+    setStatus('Admin testovací režim — výsledok sa nezapisuje', 'info');
+    return;
+  }
+
   // Vypočítaj čas strávený na úlohe
   const puzzleTime = Math.max(0, Math.round(current.time || 120));
   const usedTime = Math.max(0, puzzleTime - Math.max(0, timerRemaining));
@@ -1047,6 +1054,21 @@ async function init() {
   try {
     setStatus('Načítavam úlohy...', 'info');
     puzzles = await loadPuzzles();
+
+    // Skontroluj či prišiel z admin panelu (testovací režim)
+    const adminSkillId = localStorage.getItem('adminSkillId');
+    if (adminSkillId) {
+      localStorage.removeItem('adminSkillId');
+      localStorage.removeItem('adminSkillType');
+      isAdminMode = true;
+      const adminPuzzle = puzzles.find(p => Number(p.id) === Number(adminSkillId));
+      if (adminPuzzle) {
+        setStatus(`Admin testovací režim — úloha ID ${adminSkillId} (bez zápisu do štatistiky)`, 'info');
+        loadPuzzle(adminPuzzle);
+        return;
+      }
+    }
+
     setStatus(`Načítaných ${puzzles.length} úloh`, 'success');
   } catch(e) {
     setStatus('Chyba pri načítaní: ' + e.message, 'error');
