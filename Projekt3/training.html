@@ -616,6 +616,14 @@ button:disabled {
           </div>
         </div>
       </div>
+
+      <!-- Rebríček Top 10 -->
+      <div class="stats-card" id="leaderboardCard">
+        <h3>🏆 Top 10</h3>
+        <div id="leaderboardList" style="margin-top:8px;">
+          <div style="color:#94a3b8;font-size:13px;font-style:italic;">Načítavam...</div>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -905,6 +913,67 @@ function recordResultOnce(result) {
 
   resultLogged = true;
   updatePlayerUI();
+}
+
+// ─── Rebríček Top 10 ─────────────────────────────────────────────────────────
+
+async function loadLeaderboard() {
+  const mode = getTrainingMode() || 'mix';
+  const eloField = {
+    taktika:   'elo_taktika',
+    strategia: 'elo_strategia',
+    koncovka:  'elo_koncovka',
+    mix:       'elo'
+  }[mode] || 'elo';
+
+  const modeLabel = {
+    taktika:   'Taktika',
+    strategia: 'Stratégia',
+    koncovka:  'Koncovka',
+    mix:       'Mix'
+  }[mode] || 'Mix';
+
+  document.querySelector('#leaderboardCard h3').textContent = `🏆 Top 10 — ${modeLabel}`;
+
+  try {
+    const data = await sbFetch(
+      `players?select=name,surname,nick_name,${eloField}&order=${eloField}.desc&limit=10`
+    );
+    renderLeaderboard(data || [], eloField);
+  } catch(e) {
+    document.getElementById('leaderboardList').innerHTML =
+      '<div style="color:#94a3b8;font-size:13px;">Chyba načítania</div>';
+  }
+}
+
+function renderLeaderboard(players, eloField) {
+  const el = document.getElementById('leaderboardList');
+  if (!players.length) {
+    el.innerHTML = '<div style="color:#94a3b8;font-size:13px;font-style:italic;">Žiadni hráči</div>';
+    return;
+  }
+  const medals = ['🥇','🥈','🥉'];
+  const myNick = currentPlayer
+    ? (currentPlayer.nick_name || `${currentPlayer.name || ''} ${currentPlayer.surname || ''}`.trim())
+    : null;
+
+  el.innerHTML = players.map((p, i) => {
+    const nick = p.nick_name || `${p.name || ''} ${p.surname || ''}`.trim() || '?';
+    const elo  = p[eloField] || 1500;
+    const isMe = myNick && nick === myNick;
+    const rank = medals[i] || `${i + 1}.`;
+    return `
+      <div style="display:flex;align-items:center;gap:8px;padding:5px 6px;border-radius:8px;
+        background:${isMe ? '#eff6ff' : 'transparent'};
+        border:${isMe ? '1px solid #bfdbfe' : '1px solid transparent'};
+        margin-bottom:3px;">
+        <span style="width:24px;text-align:center;font-size:13px;">${rank}</span>
+        <span style="flex:1;font-size:13px;font-weight:${isMe ? '600' : '400'};
+          color:${isMe ? '#1d4ed8' : '#334155'};
+          white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${nick}</span>
+        <span style="font-size:13px;font-weight:600;color:#1e3a5f;">${elo}</span>
+      </div>`;
+  }).join('');
 }
 
 function loseOnTime() {
@@ -1911,6 +1980,7 @@ async function init() {
   updateStatsUI();
   await updatePlayerUI();
   initSessionStats();
+  loadLeaderboard(); // načítaj rebríček
 
   const adminPuzzleId = localStorage.getItem("adminPuzzleId");
   const adminMode = localStorage.getItem("adminMode") === "true";
