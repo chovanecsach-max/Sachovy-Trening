@@ -439,7 +439,7 @@ button:disabled { opacity: 0.6; cursor: not-allowed; }
 
         <div class="buttons">
           <button class="primary" id="nextBtn" onclick="nextPuzzle()">Ďalšia úloha</button>
-          <button class="secondary" id="restartBtn" onclick="restart()">Od začiatku</button>
+          <button class="accent" id="retryBtn" onclick="retryPuzzle()">Skús znova</button>
           <button class="accent" id="showSolutionBtn" onclick="showSolution()">Ukáž riešenie</button>
           <button class="secondary" onclick="goHome()">Menu</button>
         </div>
@@ -504,7 +504,8 @@ let foundMoves = [];      // už nájdené ťahy
 let puzzleDone = false;
 let puzzleFailed = false;
 let resultLogged = false;
-let isAdminMode = false; // testovací režim — bez zápisu do štatistiky
+let everFailed = false; // true ak hráč raz chyboval/ukázal riešenie — ELO sa nezapočíta
+let isAdminMode = false;
 let puzzleCounted = false;
 let puzzleSolvedCounted = false;
 
@@ -833,6 +834,7 @@ function showSolution() {
   if (puzzleDone) return;
   stopTimer();
   markPlayed();
+  everFailed = true; // videl riešenie — ELO sa nezapočíta ani po "Skús znova"
   recordResult('loss');
   puzzleDone = true;
   puzzleFailed = true;
@@ -910,6 +912,8 @@ async function recordResult(result) {
       const puzzleElo = Number(current.elo || 1200);
       const diff = puzzleElo - currentElo;
       let change = result === 'win' ? 10 + diff / 50 : -(10 - diff / 50);
+      // Ak hráč chyboval alebo ukázal riešenie, ELO pri výhre sa nepočíta
+      if (everFailed && result === 'win') change = 0;
       const newElo = Math.max(100, Math.round(currentElo + change));
 
       const updates = {
@@ -1042,6 +1046,7 @@ function loadPuzzle(puzzle) {
   resultLogged = false;
   puzzleCounted = false;
   puzzleSolvedCounted = false;
+  everFailed = false; // reset pre novú úlohu (retryPuzzle ho obnovi)
   selected = null;
 
   const parsed = parseFen(puzzle.fen);
@@ -1072,9 +1077,12 @@ function nextPuzzle() {
   loadPuzzle(puzzle);
 }
 
-function restart() {
+function retryPuzzle() {
   if (!current) return;
+  const wasEverFailed = everFailed; // zachovaj príznak pred resetom
   loadPuzzle(current);
+  everFailed = wasEverFailed; // obnov po resete
+  setStatus('Úloha bola resetovaná — ELO sa nezapočíta.', 'info');
 }
 
 // ─── Inicializácia ────────────────────────────────────────────────────────────
