@@ -589,7 +589,6 @@ button:disabled {
 
         <div class="buttons">
           <button class="primary" id="nextPuzzleBtn" onclick="nextPuzzle()">Ďalšia úloha</button>
-          <button class="secondary" id="restartBtn" onclick="restart()">Od začiatku</button>
           <button class="accent" id="retryBtn" onclick="retryPuzzle()">Skús znova</button>
           <button class="accent" id="showSolutionBtn" onclick="showSolution()">Ukáž riešenie</button>
           <button class="secondary" onclick="goHome()">Menu</button>
@@ -1040,7 +1039,6 @@ function updatePuzzleMetaUI(puzzle) {
 function updateUiLocks() {
   const disabled = isAnimatingSolution || pendingPromotion !== null || failed;
   document.getElementById('nextPuzzleBtn').disabled = isAnimatingSolution || pendingPromotion !== null;
-  document.getElementById('restartBtn').disabled = isAnimatingSolution || pendingPromotion !== null;
   document.getElementById('retryBtn').disabled = isAnimatingSolution || pendingPromotion !== null;
   document.getElementById('showSolutionBtn').disabled = disabled || solved;
   document.getElementById('endTrainingBtn').disabled = isAnimatingSolution || pendingPromotion !== null;
