@@ -937,7 +937,7 @@ async function loadLeaderboard() {
 
   try {
     const data = await sbFetch(
-      `players?select=name,surname,nick_name,${eloField}&order=${eloField}.desc&limit=10`
+      `players?select=name,surname,${eloField}&order=${eloField}.desc&limit=10`
     );
     renderLeaderboard(data || [], eloField);
   } catch(e) {
@@ -954,11 +954,11 @@ function renderLeaderboard(players, eloField) {
   }
   const medals = ['🥇','🥈','🥉'];
   const myNick = currentPlayer
-    ? (currentPlayer.nick_name || `${currentPlayer.name || ''} ${currentPlayer.surname || ''}`.trim())
+    ? `${currentPlayer.name || ''} ${currentPlayer.surname || ''}`.trim()
     : null;
 
   el.innerHTML = players.map((p, i) => {
-    const nick = p.nick_name || `${p.name || ''} ${p.surname || ''}`.trim() || '?';
+    const nick = `${p.name || ''} ${p.surname || ''}`.trim() || '?';
     const elo  = p[eloField] || 1500;
     const isMe = myNick && nick === myNick;
     const rank = medals[i] || `${i + 1}.`;
