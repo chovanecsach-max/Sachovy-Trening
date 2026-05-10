@@ -760,6 +760,7 @@ function handleMoveAttempt(attempted) {
       stopTimer();
       markSolved();
       recordResult('win');
+      if (current) solvedSkillIds.add(current.id); // označ ako vyriešenú
       playSound('win');
       setStatus('🎉 Výborne! Našiel si všetky ' + getSkillTypeName() + '!', 'success');
     } else {
@@ -776,7 +777,6 @@ function handleMoveAttempt(attempted) {
       stopTimer();
       recordResult('loss');
     }
-    playSound('loss');
     setStatus('Toto nie je ' + getSkillTypeSingular() + '. Skús znova alebo ukáž riešenie.', 'error');
   }
 }
@@ -832,46 +832,6 @@ function updateFoundMovesUI() {
 }
 
 // ─── Riešenie ────────────────────────────────────────────────────────────────
-
-// ─── Zvuky ───────────────────────────────────────────────────────────────────
-
-let _audioCtx = null;
-
-function getAudioContext() {
-  if (!_audioCtx) {
-    _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  }
-  if (_audioCtx.state === 'suspended') _audioCtx.resume();
-  return _audioCtx;
-}
-
-document.addEventListener('click', () => getAudioContext(), { once: true });
-
-function playSound(type) {
-  try {
-    const ctx = getAudioContext();
-    if (!ctx || ctx.state === 'suspended') return;
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    if (type === 'win') {
-      osc.frequency.setValueAtTime(520, ctx.currentTime);
-      osc.frequency.setValueAtTime(780, ctx.currentTime + 0.12);
-      gain.gain.setValueAtTime(0.25, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
-      osc.start(ctx.currentTime);
-      osc.stop(ctx.currentTime + 0.4);
-    } else {
-      osc.frequency.setValueAtTime(340, ctx.currentTime);
-      osc.frequency.setValueAtTime(200, ctx.currentTime + 0.15);
-      gain.gain.setValueAtTime(0.25, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
-      osc.start(ctx.currentTime);
-      osc.stop(ctx.currentTime + 0.35);
-    }
-  } catch(e) {}
-}
 
 function showSolution() {
   if (puzzleDone) return;
@@ -1071,11 +1031,48 @@ async function loadPuzzles() {
 
 // ─── Výber úlohy ─────────────────────────────────────────────────────────────
 
+// Zoznam ID už vyriešených úloh (načíta sa raz pri štarte)
+let solvedSkillIds = new Set();
+
+async function loadSolvedSkillIds() {
+  if (!currentPlayer) return;
+  try {
+    const data = await sbFetch(
+      `training_log?player_id=eq.${currentPlayer.id}&select=puzzle_id`
+    );
+    solvedSkillIds = new Set((data || []).map(x => x.puzzle_id));
+  } catch(e) {
+    console.error('Chyba načítania vyriešených úloh:', e);
+  }
+}
+
 function pickPuzzle() {
   if (!puzzles.length) return null;
-  // Vyber náhodnú úlohu ktorá ešte nebola riešená v tejto session
-  const pool = puzzles.filter(p => p.id !== (current ? current.id : -1));
-  return pool[Math.floor(Math.random() * pool.length)] || puzzles[0];
+
+  // Vyber ELO hráča
+  const playerElo = Number(currentPlayer?.elo_zrucnosti || 1500);
+
+  // Prednostne nevyriešené úlohy
+  let pool = puzzles.filter(p =>
+    p.id !== (current ? current.id : -1) &&
+    !solvedSkillIds.has(p.id)
+  );
+
+  // Ak sú všetky vyriešené, vyber zo všetkých (okrem aktuálnej)
+  if (!pool.length) {
+    pool = puzzles.filter(p => p.id !== (current ? current.id : -1));
+  }
+
+  // Vyber úlohu blízku ELO hráča
+  function filterByRange(arr, range) {
+    return arr.filter(p => Math.abs((p.elo || 1200) - playerElo) <= range);
+  }
+
+  let candidates = filterByRange(pool, 150);
+  if (!candidates.length) candidates = filterByRange(pool, 300);
+  if (!candidates.length) candidates = pool;
+
+  return candidates[Math.floor(Math.random() * candidates.length)] || null;
 }
 
 // ─── Načítanie úlohy ─────────────────────────────────────────────────────────
@@ -1193,6 +1190,9 @@ async function init() {
   try {
     setStatus('Načítavam úlohy...', 'info');
     puzzles = await loadPuzzles();
+
+    // Načítaj skôr vyriešené úlohy
+    await loadSolvedSkillIds();
 
     // Skontroluj či prišiel z admin panelu (testovací režim)
     const adminSkillId = localStorage.getItem('adminSkillId');
