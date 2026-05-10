@@ -464,6 +464,14 @@ button:disabled { opacity: 0.6; cursor: not-allowed; }
           </div>
         </div>
       </div>
+
+      <!-- Rebríček Top 10 -->
+      <div class="stats-card" id="leaderboardCard">
+        <h3>🏆 Top 10</h3>
+        <div id="leaderboardList" style="margin-top:8px;">
+          <div style="color:#94a3b8;font-size:13px;font-style:italic;">Načítavam...</div>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -926,6 +934,63 @@ function getSkillsType() {
   return params.get("type") || "checks_captures";
 }
 
+// ─── Rebríček Top 10 ─────────────────────────────────────────────────────────
+
+async function loadLeaderboard() {
+  const skillNames = {
+    'checks':            'Šachy',
+    'captures':          'Brania',
+    'checks_captures':   'Šachy a brania',
+    'direct_attack':     'Priame napadnutia',
+    'pawn_breakthrough': 'Pešiakové prielomy',
+    'underdefended':     'Slabo pokryté',
+    'direct_threat':     'Priama hrozba'
+  };
+  const type = getSkillsType();
+  const label = skillNames[type] || 'Zručnosti';
+  document.querySelector('#leaderboardCard h3').textContent = `🏆 Top 10 — ${label}`;
+
+  try {
+    const data = await sbFetch(
+      `players?select=name,surname,nick_name,elo_zrucnosti&order=elo_zrucnosti.desc&limit=10`
+    );
+    renderLeaderboard(data || []);
+  } catch(e) {
+    document.getElementById('leaderboardList').innerHTML =
+      '<div style="color:#94a3b8;font-size:13px;">Chyba načítania</div>';
+  }
+}
+
+function renderLeaderboard(players) {
+  const el = document.getElementById('leaderboardList');
+  if (!players.length) {
+    el.innerHTML = '<div style="color:#94a3b8;font-size:13px;font-style:italic;">Žiadni hráči</div>';
+    return;
+  }
+  const medals = ['🥇','🥈','🥉'];
+  const myNick = currentPlayer
+    ? (currentPlayer.nick_name || `${currentPlayer.name || ''} ${currentPlayer.surname || ''}`.trim())
+    : null;
+
+  el.innerHTML = players.map((p, i) => {
+    const nick = p.nick_name || `${p.name || ''} ${p.surname || ''}`.trim() || '?';
+    const elo  = p.elo_zrucnosti || 1500;
+    const isMe = myNick && nick === myNick;
+    const rank = medals[i] || `${i + 1}.`;
+    return `
+      <div style="display:flex;align-items:center;gap:8px;padding:5px 6px;border-radius:8px;
+        background:${isMe ? '#eff6ff' : 'transparent'};
+        border:${isMe ? '1px solid #bfdbfe' : '1px solid transparent'};
+        margin-bottom:3px;">
+        <span style="width:24px;text-align:center;font-size:13px;">${rank}</span>
+        <span style="flex:1;font-size:13px;font-weight:${isMe ? '600' : '400'};
+          color:${isMe ? '#1d4ed8' : '#334155'};
+          white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${nick}</span>
+        <span style="font-size:13px;font-weight:600;color:#1e3a5f;">${elo}</span>
+      </div>`;
+  }).join('');
+}
+
 async function loadPuzzles() {
   const type = getSkillsType();
   let filter = "";
@@ -1043,6 +1108,7 @@ async function init() {
   }
 
   updatePlayerUI();
+  loadLeaderboard(); // načítaj rebríček
 
   // Nastav názov podľa typu
   const type = getSkillsType();
