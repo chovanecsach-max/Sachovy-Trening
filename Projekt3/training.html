@@ -1245,6 +1245,26 @@ function render() {
   }
 }
 
+// Ľahká aktualizácia — len CSS triedy bez prekreslenia figúrok (bez flash)
+function renderClasses() {
+  const squares = document.querySelectorAll('#board .square');
+  squares.forEach(d => {
+    const bi = Number(d.dataset.boardIndex);
+    const r = Math.floor(d.style.gridRow || 0);
+    // Zachovaj základné farby, aktualizuj len dynamické triedy
+    const base = d.className.match(/square (light|dark)/);
+    const baseClass = base ? base[0] : d.className;
+    d.className = baseClass;
+
+    if (selected === bi) d.classList.add('selected');
+    if (lastMove && lastMove.from === bi) d.classList.add('last-from');
+    if (lastMove && lastMove.to === bi) d.classList.add('last-to');
+    if (dragState.active && dragState.fromIndex === bi) d.classList.add('drag-origin');
+    const legalInfo = legalTargets.find(x => x.index === bi);
+    if (legalInfo) d.classList.add(legalInfo.capture ? 'capture' : 'legal');
+  });
+}
+
 function updateDragPiece(x, y) {
   const dragPiece = document.getElementById('dragPiece');
   dragPiece.style.left = x + 'px';
@@ -1857,14 +1877,14 @@ function click(i) {
     if (pieceColor(board[i]) !== meta.activeColor) return setStatus('Vyber správnu stranu', 'warning');
     selected = i;
     legalTargets = getLegalTargets(i);
-    render();
+    renderClasses(); // len CSS triedy — bez flash
     return setStatus('Vybraná figúrka: ' + name(i), 'info');
   }
 
   if (selected === i) {
     selected = null;
     legalTargets = [];
-    render();
+    renderClasses(); // len CSS triedy — bez flash
     return setStatus('Výber zrušený', 'info');
   }
 
