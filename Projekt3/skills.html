@@ -952,7 +952,7 @@ async function loadLeaderboard() {
 
   try {
     const data = await sbFetch(
-      `players?select=name,surname,nick_name,elo_zrucnosti&order=elo_zrucnosti.desc&limit=10`
+      `players?select=name,surname,elo_zrucnosti&order=elo_zrucnosti.desc&limit=10`
     );
     renderLeaderboard(data || []);
   } catch(e) {
@@ -969,11 +969,11 @@ function renderLeaderboard(players) {
   }
   const medals = ['🥇','🥈','🥉'];
   const myNick = currentPlayer
-    ? (currentPlayer.nick_name || `${currentPlayer.name || ''} ${currentPlayer.surname || ''}`.trim())
+    ? `${currentPlayer.name || ''} ${currentPlayer.surname || ''}`.trim()
     : null;
 
   el.innerHTML = players.map((p, i) => {
-    const nick = p.nick_name || `${p.name || ''} ${p.surname || ''}`.trim() || '?';
+    const nick = `${p.name || ''} ${p.surname || ''}`.trim() || '?';
     const elo  = p.elo_zrucnosti || 1500;
     const isMe = myNick && nick === myNick;
     const rank = medals[i] || `${i + 1}.`;
