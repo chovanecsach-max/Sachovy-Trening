@@ -927,42 +927,38 @@ function getAudioContext() {
       _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     } catch(e) { return null; }
   }
-  if (_audioCtx.state === 'suspended') {
-    _audioCtx.resume();
-  }
   return _audioCtx;
 }
+
+// Prebuď AudioContext čo najskôr — pri prvom mousedown na stránke
+document.addEventListener('mousedown', () => {
+  const ctx = getAudioContext();
+  if (ctx && ctx.state === 'suspended') ctx.resume();
+}, { once: true });
 
 function playSound(type) {
   try {
     const ctx = getAudioContext();
     if (!ctx) return;
-    // Ak je context stále suspended po resume, počkaj
-    const play = () => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      if (type === 'win') {
-        osc.frequency.setValueAtTime(520, ctx.currentTime);
-        osc.frequency.setValueAtTime(780, ctx.currentTime + 0.12);
-        gain.gain.setValueAtTime(0.25, ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
-        osc.start(ctx.currentTime);
-        osc.stop(ctx.currentTime + 0.4);
-      } else {
-        osc.frequency.setValueAtTime(340, ctx.currentTime);
-        osc.frequency.setValueAtTime(200, ctx.currentTime + 0.15);
-        gain.gain.setValueAtTime(0.25, ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
-        osc.start(ctx.currentTime);
-        osc.stop(ctx.currentTime + 0.35);
-      }
-    };
-    if (ctx.state === 'suspended') {
-      ctx.resume().then(play);
+    if (ctx.state !== 'running') return; // ak stále nie je ready, preskočí
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    if (type === 'win') {
+      osc.frequency.setValueAtTime(520, ctx.currentTime);
+      osc.frequency.setValueAtTime(780, ctx.currentTime + 0.12);
+      gain.gain.setValueAtTime(0.25, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.4);
     } else {
-      play();
+      osc.frequency.setValueAtTime(340, ctx.currentTime);
+      osc.frequency.setValueAtTime(200, ctx.currentTime + 0.15);
+      gain.gain.setValueAtTime(0.25, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.35);
     }
   } catch(e) {}
 }
