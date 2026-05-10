@@ -760,8 +760,10 @@ function handleMoveAttempt(attempted) {
       stopTimer();
       markSolved();
       recordResult('win');
+      playSound('win');
       setStatus('🎉 Výborne! Našiel si všetky ' + getSkillTypeName() + '!', 'success');
     } else {
+      playSound('win');
       setStatus('Správne! Nájdi ďalší ' + getSkillTypeSingular() + '.', 'success');
     }
   } else {
@@ -774,6 +776,7 @@ function handleMoveAttempt(attempted) {
       stopTimer();
       recordResult('loss');
     }
+    playSound('loss');
     setStatus('Toto nie je ' + getSkillTypeSingular() + '. Skús znova alebo ukáž riešenie.', 'error');
   }
 }
@@ -829,6 +832,34 @@ function updateFoundMovesUI() {
 }
 
 // ─── Riešenie ────────────────────────────────────────────────────────────────
+
+// ─── Zvuky ───────────────────────────────────────────────────────────────────
+
+function playSound(type) {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    if (type === 'win') {
+      osc.frequency.setValueAtTime(520, ctx.currentTime);
+      osc.frequency.setValueAtTime(780, ctx.currentTime + 0.12);
+      gain.gain.setValueAtTime(0.25, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.4);
+    } else {
+      osc.frequency.setValueAtTime(340, ctx.currentTime);
+      osc.frequency.setValueAtTime(200, ctx.currentTime + 0.15);
+      gain.gain.setValueAtTime(0.25, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.35);
+    }
+  } catch(e) {}
+}
 
 function showSolution() {
   if (puzzleDone) return;
