@@ -542,20 +542,20 @@ async function findById() {
     return;
   }
 
-  // Najprv hľadaj v lokálnom poli
+  // Hľadaj v lokálnom poli
   let puzzle = puzzles.find(p => Number(p.id) === wantedId);
 
-  // Ak nenájdené lokálne — hľadaj priamo v Supabase
+  // Fallback — hľadaj priamo v Supabase
   if (!puzzle) {
     setStatus("Hľadám v databáze...", "info");
     try {
       const data = await sbFetch(`puzzles?id=eq.${wantedId}&limit=1`);
       if (data && data.length) {
         puzzle = data[0];
-        puzzles.push(puzzle); // pridaj do lokálneho poľa
+        puzzles.push(puzzle);
       }
     } catch(e) {
-      setStatus("Chyba pri hľadaní v databáze: " + e.message, "error");
+      setStatus("Chyba pri hľadaní: " + e.message, "error");
       return;
     }
   }
@@ -678,9 +678,24 @@ function goHome() {
 async function init() {
   try {
     setStatus("Načítavam puzzle zo Supabase...");
-    const data = await sbFetch("puzzles?order=id.asc&limit=5000");
-    if (!data || !data.length) throw new Error("Žiadne puzzle v databáze");
-    puzzles = data;
+
+    // Supabase má default limit 1000 — načítavame po dávkach
+    let allPuzzles = [];
+    let offset = 0;
+    const batchSize = 1000;
+
+    while (true) {
+      const batch = await sbFetch(
+        `puzzles?order=id.asc&limit=${batchSize}&offset=${offset}`
+      );
+      if (!batch || !batch.length) break;
+      allPuzzles = allPuzzles.concat(batch);
+      if (batch.length < batchSize) break; // posledná dávka
+      offset += batchSize;
+    }
+
+    if (!allPuzzles.length) throw new Error("Žiadne puzzle v databáze");
+    puzzles = allPuzzles;
     setStatus(`Načítaných ${puzzles.length} puzzle — môžeš vyhľadávať`, "success");
   } catch (e) {
     setStatus("Chyba pri načítaní: " + e.message, "error");
