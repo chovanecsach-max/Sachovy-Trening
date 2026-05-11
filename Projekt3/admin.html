@@ -535,13 +535,31 @@ function clearResult() {
   setStatus("Výsledok bol vymazaný");
 }
 
-function findById() {
+async function findById() {
   const wantedId = Number(document.getElementById("puzzleIdInput").value);
   if (!Number.isFinite(wantedId)) {
     setStatus("Zadaj platné ID úlohy", "error");
     return;
   }
-  const puzzle = puzzles.find(p => Number(p.id) === wantedId);
+
+  // Najprv hľadaj v lokálnom poli
+  let puzzle = puzzles.find(p => Number(p.id) === wantedId);
+
+  // Ak nenájdené lokálne — hľadaj priamo v Supabase
+  if (!puzzle) {
+    setStatus("Hľadám v databáze...", "info");
+    try {
+      const data = await sbFetch(`puzzles?id=eq.${wantedId}&limit=1`);
+      if (data && data.length) {
+        puzzle = data[0];
+        puzzles.push(puzzle); // pridaj do lokálneho poľa
+      }
+    } catch(e) {
+      setStatus("Chyba pri hľadaní v databáze: " + e.message, "error");
+      return;
+    }
+  }
+
   if (!puzzle) {
     setStatus("Úloha s týmto ID neexistuje", "error");
     return;
@@ -660,7 +678,7 @@ function goHome() {
 async function init() {
   try {
     setStatus("Načítavam puzzle zo Supabase...");
-    const data = await sbFetch("puzzles?order=id.asc&limit=2000");
+    const data = await sbFetch("puzzles?order=id.asc&limit=5000");
     if (!data || !data.length) throw new Error("Žiadne puzzle v databáze");
     puzzles = data;
     setStatus(`Načítaných ${puzzles.length} puzzle — môžeš vyhľadávať`, "success");
