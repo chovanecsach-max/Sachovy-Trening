@@ -478,7 +478,7 @@ async function loadLeaderboards(myName) {
       const rank = MEDALS[i] || `${i + 1}.`;
       return `<div class="lb-row${isMe ? ' me' : ''}">
         <span class="lb-rank">${rank}</span>
-        <span class="lb-name">${name}</span>
+        <span class="lb-name" title="${name}">${name}</span>
         <span class="lb-elo">${elo}</span>
       </div>`;
     }).join('');
