@@ -250,6 +250,27 @@ h1 {
   border-color: #fca5a5;
 }
 
+/* Veľké hodiny — štýl A */
+.timer-box {
+  border: 1px solid #e5e7eb;
+  background: #f8fafc;
+  border-radius: 10px;
+  padding: 8px 10px;
+  text-align: center;
+  min-width: 0;
+}
+.timer-big {
+  font-size: 26px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 1px;
+  line-height: 1.1;
+  color: #1e3a5f;
+}
+.timer-big.timer-ok      { color: #0F6E56; }
+.timer-big.timer-warning { color: #BA7517; }
+.timer-big.timer-expired { color: #A32D2D; }
+
 .buttons {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -573,13 +594,13 @@ button:disabled {
             <div class="meta-label">ELO úlohy</div>
             <div class="meta-value"><span id="puzzleElo" class="badge elo">-</span></div>
           </div>
-          <div class="meta-box">
+          <div class="meta-box timer-box">
             <div class="meta-label">Odporúčaný čas</div>
-            <div class="meta-value"><span id="puzzleTime" class="badge time">-</span></div>
+            <div class="timer-big" id="puzzleTime">-</div>
           </div>
-          <div class="meta-box">
+          <div class="meta-box timer-box">
             <div class="meta-label">Zostáva</div>
-            <div class="meta-value"><span id="puzzleTimer" class="badge timer-ok">-</span></div>
+            <div class="timer-big timer-ok" id="puzzleTimer">-</div>
           </div>
           <div class="meta-box">
             <div class="meta-label">Režim</div>
@@ -847,14 +868,14 @@ function updateTimerUI() {
   el.textContent = formatTime(timerRemaining);
 
   if (timerExpired) {
-    el.className = 'badge timer-expired';
+    el.className = 'timer-big timer-expired';
     return;
   }
 
   if (timerRemaining <= 30) {
-    el.className = 'badge timer-warning';
+    el.className = 'timer-big timer-warning';
   } else {
-    el.className = 'badge timer-ok';
+    el.className = 'timer-big timer-ok';
   }
 }
 
