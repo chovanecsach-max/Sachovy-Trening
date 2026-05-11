@@ -169,6 +169,68 @@ body {
   display: flex; align-items: center; justify-content: center;
   font-size: 17px;
 }
+
+/* ── Rebríčky ── */
+.leaderboards {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 14px;
+  margin-top: 20px;
+}
+
+.lb-card {
+  background: #ffffff;
+  border: 1px solid #e2e5ef;
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.lb-header {
+  padding: 10px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #ffffff;
+  text-align: center;
+  letter-spacing: 0.5px;
+}
+
+.lb-taktika   { background: #2563eb; }
+.lb-strategia { background: #7c3aed; }
+.lb-koncovka  { background: #a16207; }
+.lb-mix       { background: #16a34a; }
+.lb-zrucnosti { background: #e11d48; }
+
+.lb-body { padding: 8px 10px; }
+
+.lb-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 4px;
+  border-radius: 6px;
+  font-size: 12px;
+  color: #334155;
+  border-bottom: 1px solid #f1f3f9;
+}
+.lb-row:last-child { border-bottom: none; }
+.lb-row.me {
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-weight: 600;
+}
+
+.lb-rank { width: 20px; text-align: center; font-size: 13px; flex-shrink: 0; }
+.lb-name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lb-elo  { font-weight: 600; color: #1e3a5f; flex-shrink: 0; font-size: 12px; }
+.lb-row.me .lb-elo { color: #1d4ed8; }
+
+.lb-loading {
+  padding: 12px;
+  text-align: center;
+  color: #94a3b8;
+  font-size: 12px;
+  font-style: italic;
+}
 </style>
 </head>
 <body>
@@ -259,6 +321,30 @@ body {
     </button>
   </div>
 
+  <!-- 5 rebríčkov vedľa seba -->
+  <div class="leaderboards">
+    <div class="lb-card">
+      <div class="lb-header lb-taktika">⚔ Taktika</div>
+      <div class="lb-body" id="lb-taktika"><div class="lb-loading">Načítavam...</div></div>
+    </div>
+    <div class="lb-card">
+      <div class="lb-header lb-strategia">♜ Stratégia</div>
+      <div class="lb-body" id="lb-strategia"><div class="lb-loading">Načítavam...</div></div>
+    </div>
+    <div class="lb-card">
+      <div class="lb-header lb-koncovka">♚ Koncovka</div>
+      <div class="lb-body" id="lb-koncovka"><div class="lb-loading">Načítavam...</div></div>
+    </div>
+    <div class="lb-card">
+      <div class="lb-header lb-mix">⚡ Mix</div>
+      <div class="lb-body" id="lb-mix"><div class="lb-loading">Načítavam...</div></div>
+    </div>
+    <div class="lb-card">
+      <div class="lb-header lb-zrucnosti">♞ Zručnosti</div>
+      <div class="lb-body" id="lb-zrucnosti"><div class="lb-loading">Načítavam...</div></div>
+    </div>
+  </div>
+
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -316,9 +402,16 @@ async function initPage() {
       document.getElementById('statEloLbl').textContent = eloLabel;
       document.getElementById('statAcc').textContent    = acc + '%';
       document.getElementById('statPlayed').textContent = played;
+
+      // Načítaj rebríčky — pošli meno hráča pre zvýraznenie
+      const myName = `${player.name || ''} ${player.surname || ''}`.trim();
+      loadLeaderboards(myName);
+    } else {
+      loadLeaderboards(null);
     }
   } catch(e) {
     console.error('Chyba načítania štatistík:', e);
+    loadLeaderboards(null);
   }
 }
 
@@ -335,6 +428,60 @@ function toggleSkillsMenu() {
   const isOpen = menu.classList.contains('open');
   menu.classList.toggle('open');
   btn.classList.toggle('active', !isOpen);
+}
+
+// ─── Rebríčky ────────────────────────────────────────────────────────────────
+
+const LB_CATEGORIES = [
+  { id: 'taktika',   field: 'elo_taktika',   label: 'Taktika' },
+  { id: 'strategia', field: 'elo_strategia',  label: 'Stratégia' },
+  { id: 'koncovka',  field: 'elo_koncovka',   label: 'Koncovka' },
+  { id: 'mix',       field: 'elo',            label: 'Mix' },
+  { id: 'zrucnosti', field: 'elo_zrucnosti',  label: 'Zručnosti' }
+];
+
+const MEDALS = ['🥇','🥈','🥉'];
+
+async function loadLeaderboards(myName) {
+  // Načítaj všetkých hráčov raz — potom sortuj lokálne
+  let players = [];
+  try {
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/players?select=name,surname,elo,elo_taktika,elo_strategia,elo_koncovka,elo_zrucnosti`,
+      { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }
+    );
+    players = await res.json() || [];
+  } catch(e) {
+    LB_CATEGORIES.forEach(cat => {
+      document.getElementById('lb-' + cat.id).innerHTML =
+        '<div class="lb-loading">Chyba načítania</div>';
+    });
+    return;
+  }
+
+  LB_CATEGORIES.forEach(cat => {
+    const sorted = [...players]
+      .sort((a, b) => (b[cat.field] || 1500) - (a[cat.field] || 1500))
+      .slice(0, 10);
+
+    const el = document.getElementById('lb-' + cat.id);
+    if (!sorted.length) {
+      el.innerHTML = '<div class="lb-loading">Žiadni hráči</div>';
+      return;
+    }
+
+    el.innerHTML = sorted.map((p, i) => {
+      const name = `${p.name || ''} ${p.surname || ''}`.trim() || '?';
+      const elo  = p[cat.field] || 1500;
+      const isMe = myName && name === myName;
+      const rank = MEDALS[i] || `${i + 1}.`;
+      return `<div class="lb-row${isMe ? ' me' : ''}">
+        <span class="lb-rank">${rank}</span>
+        <span class="lb-name">${name}</span>
+        <span class="lb-elo">${elo}</span>
+      </div>`;
+    }).join('');
+  });
 }
 </script>
 </body>
