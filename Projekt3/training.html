@@ -1374,8 +1374,10 @@ function buildSolutionTreeFromLine(line) {
 }
 
 function getPuzzleSolutionRoot(puzzle) {
-  if (Array.isArray(puzzle.solutionTree) && puzzle.solutionTree.length) {
-    return puzzle.solutionTree.filter(isValidTreeNode).map(cloneTreeNode);
+  // Akceptuj solutionTree (camelCase) aj solution_tree (snake_case zo Supabase)
+  const tree = puzzle.solutionTree || puzzle.solution_tree;
+  if (Array.isArray(tree) && tree.length) {
+    return tree.filter(isValidTreeNode).map(cloneTreeNode);
   }
   if (Array.isArray(puzzle.line) && puzzle.line.length) {
     return buildSolutionTreeFromLine(puzzle.line);
@@ -1927,13 +1929,14 @@ function loadPuzzleObject(puzzle, isAdmin = false) {
 
   resetPuzzleState();
 
-  flipped = (current.turnText || '').includes('Čierny');
+  const turnText = current.turnText || current.turn_text || '';
+  flipped = turnText.includes('Čierny');
 
   const mode = new URLSearchParams(window.location.search).get('mode') || 'mix';
   const isMix = mode === 'mix';
   document.getElementById('promptText').innerText = isMix ? 'Nájdi najlepší ťah' : (current.prompt || 'Nájdi najlepší ťah');
   const turnIndicator = document.getElementById('turnIndicator');
-  turnIndicator.className = 'turn-indicator ' + (((current.turnText || '').includes('Čierny')) ? 'black' : 'white');
+  turnIndicator.className = 'turn-indicator ' + (turnText.includes('Čierny') ? 'black' : 'white');
   updatePuzzleMetaUI(current);
   updatePlayerUI();
   updateAdminBadge();
