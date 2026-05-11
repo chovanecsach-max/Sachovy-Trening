@@ -3,347 +3,1014 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Šachový tréning</title>
-<style>
-* { box-sizing: border-box; margin: 0; padding: 0; }
+<title>Administrácia úloh</title>
 
+<style>
 body {
-  font-family: 'Segoe UI', Arial, sans-serif;
-  background: #e8eaf0;
-  min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  font-family: Arial, sans-serif;
+  background: #f4f4f6;
+  margin: 0;
+  padding: 12px;
+  color: #111827;
+}
+
+.app {
+  max-width: 980px;
+  margin: 0 auto;
+  background: white;
+  border-radius: 14px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.08);
   padding: 16px;
 }
 
-.container {
-  width: min(560px, 100%);
-  border-radius: 18px;
-  overflow: hidden;
-  box-shadow: 0 12px 40px rgba(0,0,0,0.18);
-}
-
-/* ── Header ── */
-.header {
-  background: #0f1117;
-  padding: 18px 22px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.logo { display: flex; align-items: center; gap: 10px; }
-.logo-icon { font-size: 28px; line-height: 1; }
-.logo-text { font-size: 18px; font-weight: 600; color: #d4a843; letter-spacing: 0.4px; }
-
-.user-chip {
-  display: flex; align-items: center; gap: 7px;
-  background: rgba(255,255,255,0.08);
-  border: 1px solid rgba(255,255,255,0.14);
-  border-radius: 20px;
-  padding: 5px 12px 5px 7px;
-}
-
-.avatar {
-  width: 24px; height: 24px; border-radius: 50%;
-  background: #d4a843;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 11px; font-weight: 700; color: #1a1209;
-  flex-shrink: 0;
-}
-
-.chip-name {
-  font-size: 12px; color: rgba(255,255,255,0.75);
-  max-width: 120px; white-space: nowrap;
-  overflow: hidden; text-overflow: ellipsis;
-}
-
-.logout-btn {
-  background: none; border: none;
-  color: rgba(255,255,255,0.4);
-  font-size: 14px; cursor: pointer;
-  padding: 0 0 0 4px; line-height: 1;
-  transition: color 0.15s;
-}
-.logout-btn:hover { color: #d4a843; }
-
-/* ── Stats bar ── */
-.stats-bar {
-  background: #1a1d27;
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-}
-
-.stat-item {
-  padding: 13px 10px; text-align: center;
-  border-right: 1px solid rgba(255,255,255,0.06);
-}
-.stat-item:last-child { border-right: none; }
-.stat-val { font-size: 20px; font-weight: 600; color: #d4a843; line-height: 1; }
-.stat-lbl { font-size: 10px; color: rgba(255,255,255,0.38); text-transform: uppercase; letter-spacing: 0.9px; margin-top: 4px; }
-
-/* ── Body ── */
-.body { background: #ffffff; padding: 18px 16px 20px; }
-
-/* ── Horizontálne nav ── */
-.nav-row {
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  gap: 6px;
-}
-
-.nav-btn {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  padding: 11px 4px;
-  border-radius: 10px;
-  background: #f8f9fc;
-  color: #1a1d2e;
-  border: 1px solid #e2e5ef;
-  cursor: pointer;
-  font-size: 10px;
-  font-weight: 500;
-  line-height: 1.2;
+h1 {
+  margin: 0 0 6px 0;
   text-align: center;
-  transition: border-color 0.15s, background 0.15s;
-}
-.nav-btn:hover  { background: #f1f3f9; border-color: #c8cde0; }
-.nav-btn.active { border-color: #e11d48; background: #fff1f2; }
-
-.nav-icon {
-  width: 30px; height: 30px; border-radius: 8px;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 15px; flex-shrink: 0;
+  font-size: 26px;
 }
 
-.i-skills    { background: #fff1f2; color: #e11d48; }
-.i-taktika   { background: #eff6ff; color: #2563eb; }
-.i-strategia { background: #f5f3ff; color: #7c3aed; }
-.i-koncovka  { background: #fefce8; color: #a16207; }
-.i-mix       { background: #f0fdf4; color: #16a34a; }
-.i-stat      { background: #eff6ff; color: #2563eb; }
-.i-admin     { background: rgba(212,168,67,0.15); color: #a07828; }
-
-.nav-btn.nav-admin {
-  background: #0f1117; color: #d4a843; border-color: #0f1117;
-}
-.nav-btn.nav-admin:hover { background: #1a1d27; border-color: #1a1d27; }
-
-/* ── Submenu zručnosti ── */
-.submenu {
-  display: none;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 6px;
-  padding: 12px;
-  background: #f8f9fc;
-  border: 1px solid #e2e5ef;
-  border-radius: 10px;
-  margin-top: 8px;
-  animation: fadeIn 0.15s ease;
-}
-.submenu.open { display: grid; }
-
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(-5px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-
-.sub-btn {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 5px;
-  padding: 10px 4px;
-  border-radius: 8px;
-  background: #ffffff;
-  border: 1px solid #e2e5ef;
-  cursor: pointer;
-  font-size: 10px;
-  font-weight: 500;
-  color: #1a1d2e;
+.subtitle {
   text-align: center;
-  line-height: 1.2;
-  transition: border-color 0.15s, background 0.15s;
+  color: #475569;
+  margin: 0 0 16px 0;
 }
-.sub-btn:hover { background: #f1f3f9; border-color: #c8cde0; }
 
-.sub-icon {
-  width: 26px; height: 26px; border-radius: 6px;
-  display: flex; align-items: center; justify-content: center;
+.layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.card {
+  border: 1px solid #d1d5db;
+  border-radius: 12px;
+  background: #fff;
+  padding: 14px;
+}
+
+.card h2 {
+  margin: 0 0 12px 0;
+  font-size: 18px;
+}
+
+.row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+input, textarea, select {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  font-size: 14px;
+  background: #fff;
+}
+
+textarea {
+  min-height: 80px;
+  resize: vertical;
+}
+
+.row input, .row select {
+  flex: 1;
+  min-width: 120px;
+}
+
+button {
+  padding: 10px 14px;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.primary { background: #111827; color: white; }
+.secondary { background: #e5e7eb; color: #111827; }
+.success { background: #dcfce7; color: #166534; border: 1px solid #86efac; }
+.danger { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
+.admin { background: #fff7ed; color: #c2410c; border: 1px solid #fdba74; }
+
+.result {
+  margin-top: 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 12px;
+  padding: 14px;
+  background: #f8fafc;
+}
+
+.result.hidden { display: none; }
+
+.result h3 {
+  margin: 0 0 10px 0;
+  font-size: 17px;
+}
+
+.result-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.result-box {
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 10px;
+}
+
+.label {
+  font-size: 11px;
+  color: #64748b;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.value {
+  font-size: 14px;
+  font-weight: 600;
+  word-break: break-word;
+}
+
+/* Edit formulár */
+.edit-section {
+  margin-top: 14px;
+  border-top: 1px solid #e2e8f0;
+  padding-top: 14px;
+}
+
+.edit-section h4 {
+  margin: 0 0 10px 0;
+  font-size: 15px;
+  color: #1d4ed8;
+}
+
+.edit-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.edit-field label {
+  display: block;
+  font-size: 11px;
+  color: #64748b;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.edit-field input,
+.edit-field select,
+.edit-field textarea {
+  margin: 0;
+}
+
+.actions {
+  margin-top: 12px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.status {
+  margin-top: 12px;
+  padding: 10px;
+  border-radius: 10px;
+  border: 1px solid #d1d5db;
+  background: #f8fafc;
+  color: #334155;
+}
+
+.status.error {
+  background: #fef2f2;
+  border-color: #fca5a5;
+  color: #b91c1c;
+}
+
+.status.success {
+  background: #f0fdf4;
+  border-color: #86efac;
+  color: #166534;
+}
+
+.tip {
+  margin-top: 10px;
   font-size: 13px;
+  color: #64748b;
+}
+
+@media (max-width: 900px) {
+  .layout { grid-template-columns: 1fr; }
+  .edit-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 700px) {
+  body { padding: 6px; }
+  .app { padding: 10px; }
+  .result-grid { grid-template-columns: 1fr; }
+  .row { flex-direction: column; }
+  .actions { flex-direction: column; }
+  .actions button { width: 100%; }
 }
 </style>
 </head>
+
 <body>
+<div class="app">
+  <h1>Administrácia úloh</h1>
 
-<div class="container">
+  <!-- Záložky -->
+  <div style="display:flex; gap:8px; margin-bottom:16px; justify-content:center; flex-wrap:wrap;">
+    <button id="tabPuzzles" class="primary" onclick="switchTab('puzzles')" style="padding:8px 18px;font-size:14px;">Taktické puzzle</button>
+    <button id="tabSkills" class="secondary" onclick="switchTab('skills')" style="padding:8px 18px;font-size:14px;">Šachové zručnosti</button>
+    <button id="tabUsers" class="secondary" onclick="switchTab('users')" style="padding:8px 18px;font-size:14px;">👥 Používatelia</button>
+  </div>
 
-  <!-- Header -->
-  <div class="header">
-    <div class="logo">
-      <div class="logo-icon">♟</div>
-      <div class="logo-text">Šachový tréning</div>
+  <div id="puzzleSection">
+  <div class="layout">
+    <div class="card">
+      <h2>Vyhľadanie podľa ID</h2>
+      <div class="row">
+        <input id="puzzleIdInput" type="number" placeholder="Zadaj ID úlohy">
+        <button class="primary" onclick="findById()">Nájsť</button>
+      </div>
+      <div class="tip">Použi, keď poznáš presné ID úlohy.</div>
     </div>
-    <div class="user-chip">
-      <div class="avatar" id="userAvatar">?</div>
-      <span class="chip-name" id="userName">...</span>
-      <button class="logout-btn" onclick="logout()" title="Odhlásiť">✕</button>
+
+    <div class="card">
+      <h2>Vyhľadanie podľa FEN</h2>
+      <textarea id="fenInput" placeholder="Vlož FEN pozície"></textarea>
+      <div class="actions">
+        <button class="primary" onclick="findByFenExact()">Celý FEN</button>
+        <button class="secondary" onclick="findByFenBoardOnly()">Len rozostavenie</button>
+      </div>
+      <div class="tip">Druhá voľba porovnáva iba rozostavenie figúr.</div>
     </div>
   </div>
 
-  <!-- Stats bar -->
-  <div class="stats-bar">
-    <div class="stat-item">
-      <div class="stat-val" id="statElo">—</div>
-      <div class="stat-lbl" id="statEloLbl">ELO</div>
+  <!-- Výsledok + editácia -->
+  <div id="resultBox" class="result hidden">
+    <h3>Nájdená úloha</h3>
+
+    <div class="result-grid">
+      <div class="result-box">
+        <div class="label">ID</div>
+        <div id="resId" class="value">-</div>
+      </div>
+      <div class="result-box">
+        <div class="label">Názov</div>
+        <div id="resTitle" class="value">-</div>
+      </div>
+      <div class="result-box" style="grid-column: span 2;">
+        <div class="label">FEN</div>
+        <div id="resFen" class="value">-</div>
+      </div>
+      <div class="result-box">
+        <div class="label">Kategória</div>
+        <div id="resCategory" class="value">-</div>
+      </div>
+      <div class="result-box">
+        <div class="label">ELO úlohy</div>
+        <div id="resElo" class="value">-</div>
+      </div>
+      <div class="result-box">
+        <div class="label">Čas (sek)</div>
+        <div id="resTime" class="value">-</div>
+      </div>
+      <div class="result-box">
+        <div class="label">Prompt</div>
+        <div id="resPrompt" class="value">-</div>
+      </div>
     </div>
-    <div class="stat-item">
-      <div class="stat-val" id="statAcc">—</div>
-      <div class="stat-lbl">Úspešnosť</div>
+
+    <div class="actions">
+      <button class="admin" onclick="openInAdminTraining()">Otvoriť v testovacom režime</button>
+      <button class="secondary" onclick="clearResult()">Zavrieť</button>
     </div>
-    <div class="stat-item">
-      <div class="stat-val" id="statPlayed">—</div>
-      <div class="stat-lbl">Riešené</div>
+
+    <!-- Editácia -->
+    <div class="edit-section">
+      <h4>✏️ Editácia úlohy</h4>
+
+      <div class="edit-grid">
+        <div class="edit-field">
+          <label>Názov</label>
+          <input id="editTitle" type="text" placeholder="Názov úlohy">
+        </div>
+        <div class="edit-field">
+          <label>Kategória</label>
+          <select id="editCategory">
+            <option value="Taktika">Taktika</option>
+            <option value="Strategia">Strategia</option>
+            <option value="Koncovka">Koncovka</option>
+          </select>
+        </div>
+        <div class="edit-field">
+          <label>ELO úlohy</label>
+          <input id="editElo" type="number" placeholder="napr. 1500">
+        </div>
+        <div class="edit-field">
+          <label>Odporúčaný čas (sek)</label>
+          <input id="editTime" type="number" placeholder="napr. 120">
+        </div>
+        <div class="edit-field" style="grid-column: span 2;">
+          <label>Prompt (text nad šachovnicou)</label>
+          <input id="editPrompt" type="text" placeholder="napr. Nájdi najlepší ťah">
+        </div>
+        <div class="edit-field" style="grid-column: span 2;">
+          <label>Riešenie (JSON — solutionTree)</label>
+          <textarea id="editSolutionTree" placeholder='napr. [{"move":"e2e4","next":[]}]'></textarea>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button class="success" onclick="savePuzzle()">💾 Uložiť zmeny</button>
+        <button class="danger" onclick="deletePuzzle()">🗑️ Vymazať úlohu</button>
+      </div>
     </div>
   </div>
 
-  <!-- Body -->
-  <div class="body">
+  <div id="status" class="status">Stav: pripravené</div>
 
-    <!-- Horizontálne menu — 7 tlačidiel v jednom rade -->
-    <div class="nav-row">
-      <button class="nav-btn" id="btnSkills" onclick="toggleSkillsMenu()">
-        <div class="nav-icon i-skills">♞</div>
-        Zručnosti
-      </button>
-      <button class="nav-btn" onclick="goTraining('taktika')">
-        <div class="nav-icon i-taktika">⚔</div>
-        Taktika
-      </button>
-      <button class="nav-btn" onclick="goTraining('strategia')">
-        <div class="nav-icon i-strategia">♜</div>
-        Stratégia
-      </button>
-      <button class="nav-btn" onclick="goTraining('koncovka')">
-        <div class="nav-icon i-koncovka">♚</div>
-        Koncovka
-      </button>
-      <button class="nav-btn" onclick="goTraining('mix')">
-        <div class="nav-icon i-mix">⚡</div>
-        Mix
-      </button>
-      <button class="nav-btn" onclick="goStats()">
-        <div class="nav-icon i-stat">📊</div>
-        Štatistika
-      </button>
-      <button class="nav-btn nav-admin" id="adminBtn" onclick="goAdmin()" style="display:none;">
-        <div class="nav-icon i-admin">⚙</div>
-        Admin
-      </button>
+  <div class="actions" style="margin-top: 12px;">
+    <button class="primary" onclick="reloadActive()">🔄 Obnoviť zoznam</button>
+    <button class="secondary" onclick="goHome()">Späť do menu</button>
+  </div>
+
+  </div><!-- koniec puzzleSection -->
+
+  <!-- Sekcia skill_puzzles -->
+  <div id="skillSection" style="display:none; margin-top:16px;">
+    <div class="layout">
+      <div class="card">
+        <h2>Vyhľadanie podľa ID</h2>
+        <div class="row">
+          <input id="skillIdInput" type="number" placeholder="Zadaj ID úlohy">
+          <button class="primary" onclick="findSkillById()">Nájsť</button>
+        </div>
+      </div>
+      <div class="card">
+        <h2>Filter podľa typu</h2>
+        <select id="skillTypeFilter" style="margin-bottom:8px;">
+          <option value="">Všetky typy</option>
+          <option value="checks">Šachy</option>
+          <option value="captures">Brania</option>
+          <option value="direct_attack">Priame napadnutia</option>
+          <option value="pawn_breakthrough">Pešiakové prielomy</option>
+          <option value="underdefended">Slabo pokryté figúrky</option>
+        </select>
+        <button class="primary" onclick="loadSkillsByType()">Načítať</button>
+      </div>
     </div>
 
-    <!-- Submenu zručnosti — 3×2 mriežka -->
-    <div id="skillsSubmenu" class="submenu">
-      <button class="sub-btn" onclick="goSkills('checks')">
-        <div class="sub-icon i-skills">♞</div>Šachy
-      </button>
-      <button class="sub-btn" onclick="goSkills('captures')">
-        <div class="sub-icon i-skills">✂</div>Brania
-      </button>
-      <button class="sub-btn" onclick="goSkills('direct_attack')">
-        <div class="sub-icon i-taktika">⚔</div>Priame nap.
-      </button>
-      <button class="sub-btn" onclick="goSkills('pawn_breakthrough')">
-        <div class="sub-icon i-mix">♙</div>Pešiak. priel.
-      </button>
-      <button class="sub-btn" onclick="goSkills('underdefended')">
-        <div class="sub-icon i-strategia">♜</div>Slabo pokryté
-      </button>
-      <button class="sub-btn" onclick="goSkills('direct_threat')">
-        <div class="sub-icon i-koncovka">!</div>Priama hrozba
-      </button>
+    <div id="skillResultBox" class="result hidden" style="margin-top:12px;">
+      <h3>Nájdená úloha (zručnosti)</h3>
+      <div class="result-grid">
+        <div class="result-box">
+          <div class="label">ID</div>
+          <div id="sResId" class="value">-</div>
+        </div>
+        <div class="result-box">
+          <div class="label">Typ</div>
+          <div id="sResType" class="value">-</div>
+        </div>
+        <div class="result-box" style="grid-column:span 2;">
+          <div class="label">FEN</div>
+          <div id="sResFen" class="value">-</div>
+        </div>
+        <div class="result-box" style="grid-column:span 2;">
+          <div class="label">Aktuálne riešenia</div>
+          <div id="sResSolutions" class="value" style="font-family:monospace;font-size:13px;">-</div>
+        </div>
+      </div>
+
+      <div class="edit-section">
+        <h4>✏️ Editácia riešení</h4>
+        <div class="edit-field" style="margin-bottom:10px;">
+          <label>Riešenia (JSON zoznam ťahov)</label>
+          <textarea id="sEditSolutions" style="font-family:monospace;font-size:13px;" placeholder='["e2e4","d2d4"]'></textarea>
+        </div>
+        <div class="edit-field" style="margin-bottom:10px;">
+          <label>ELO</label>
+          <input id="sEditElo" type="number" placeholder="napr. 1300">
+        </div>
+        <div class="edit-field" style="margin-bottom:10px;">
+          <label>Čas (sek)</label>
+          <input id="sEditTime" type="number" placeholder="napr. 120">
+        </div>
+        <div class="actions">
+          <button class="success" onclick="saveSkillPuzzle()">💾 Uložiť zmeny</button>
+          <button class="admin" onclick="openInAdminSkills()">🧪 Otvoriť v testovacom režime</button>
+          <button class="danger" onclick="deleteSkillPuzzle()">🗑️ Vymazať úlohu</button>
+          <button class="secondary" onclick="clearSkillResult()">Zavrieť</button>
+        </div>
+      </div>
     </div>
 
+    <!-- Zoznam úloh -->
+    <div id="skillList" style="margin-top:12px;"></div>
   </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/auth.js"></script>
-<script src="js/player.js"></script>
+<!-- ═══ SEKCIA POUŽÍVATELIA ═══════════════════════════════════════════════ -->
+<div id="userSection" style="display:none;">
+  <div style="display:flex; gap:8px; margin-bottom:12px; align-items:center; flex-wrap:wrap;">
+    <button class="primary" onclick="loadUsers()">🔄 Načítať používateľov</button>
+    <button class="secondary" style="margin-left:auto;" onclick="goHome()">← Menu</button>
+  </div>
+
+  <div id="userStatus" class="status">Klikni na Načítať používateľov.</div>
+
+  <div id="userList" style="margin-top:12px; display:grid; gap:8px;"></div>
+
+  <div id="userEditBox" class="result hidden" style="margin-top:16px;">
+    <h3>✏️ Upraviť používateľa</h3>
+    <div class="result-grid">
+      <div class="result-box"><div class="label">Email</div><div id="uEmail" class="value">-</div></div>
+    </div>
+    <div class="edit-section">
+      <div class="edit-grid">
+        <div class="edit-field">
+          <label>Meno</label>
+          <input type="text" id="uEditName" placeholder="Meno">
+        </div>
+        <div class="edit-field">
+          <label>Priezvisko</label>
+          <input type="text" id="uEditSurname" placeholder="Priezvisko">
+        </div>
+        <div class="edit-field">
+          <label>Nick</label>
+          <input type="text" id="uEditNick" placeholder="Prezývka">
+        </div>
+        <div class="edit-field">
+          <label>Rola</label>
+          <select id="uEditRole" onchange="onUserRoleChange()">
+            <option value="hrac">Hráč</option>
+            <option value="trener">Tréner</option>
+            <option value="admin">Admin</option>
+          </select>
+        </div>
+        <div class="edit-field" id="uTrenerWrap">
+          <label>Tréner (len pre hráča)</label>
+          <select id="uEditTrener">
+            <option value="">— bez trénera —</option>
+          </select>
+        </div>
+      </div>
+      <div class="actions">
+        <button class="success" onclick="saveUser()">💾 Uložiť zmeny</button>
+        <button class="secondary" onclick="closeUserEdit()">Zavrieť</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
 <script>
-async function initPage() {
-  const ok = await refreshSession();
-  if (!ok) { location.href = 'login.html'; return; }
+const SUPABASE_URL = "https://wdjsilryllqksdtmaehy.supabase.co";
+const SUPABASE_KEY = "sb_publishable_45gFQhgPScrDjDCVC0B4Iw_q6uZKf9m";
 
-  const user = getCurrentUser();
-  const nick = user.nick || user.name || user.email || '?';
-  const role = user.role;
+let puzzles = [];
+let selectedPuzzle = null;
 
-  document.getElementById('userAvatar').textContent = nick.charAt(0).toUpperCase();
-  document.getElementById('userName').textContent = nick;
+async function sbFetch(path, options = {}) {
+  const url = `${SUPABASE_URL}/rest/v1/${path}`;
+  const res = await fetch(url, {
+    ...options,
+    headers: {
+      "apikey": SUPABASE_KEY,
+      "Authorization": `Bearer ${SUPABASE_KEY}`,
+      "Content-Type": "application/json",
+      "Prefer": options.prefer || "",
+      ...(options.headers || {})
+    }
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(err);
+  }
+  const text = await res.text();
+  return text ? JSON.parse(text) : null;
+}
 
-  if (role === 'admin') {
-    document.getElementById('adminBtn').style.display = 'flex';
+function setStatus(text, type = "") {
+  const el = document.getElementById("status");
+  el.textContent = "Stav: " + text;
+  el.className = "status" + (type ? " " + type : "");
+}
+
+function normalizeFenBoardOnly(fen) {
+  return String(fen || "").trim().split(/\s+/)[0] || "";
+}
+
+function showPuzzle(puzzle) {
+  selectedPuzzle = puzzle;
+  document.getElementById("resultBox").classList.remove("hidden");
+
+  document.getElementById("resId").textContent = puzzle.id ?? "-";
+  document.getElementById("resTitle").textContent = puzzle.title || "-";
+  document.getElementById("resFen").textContent = puzzle.fen || "-";
+  document.getElementById("resElo").textContent = puzzle.elo ?? "-";
+  document.getElementById("resCategory").textContent = puzzle.category || "-";
+  document.getElementById("resTime").textContent = puzzle.time ?? "-";
+  document.getElementById("resPrompt").textContent = puzzle.prompt || "-";
+
+  // Naplň edit formulár
+  document.getElementById("editTitle").value = puzzle.title || "";
+  document.getElementById("editCategory").value = puzzle.category || "Taktika";
+  document.getElementById("editElo").value = puzzle.elo ?? "";
+  document.getElementById("editTime").value = puzzle.time ?? "";
+  document.getElementById("editPrompt").value = puzzle.prompt || "";
+  document.getElementById("editSolutionTree").value =
+    JSON.stringify(puzzle.solution_tree || puzzle.solutionTree || [], null, 2);
+}
+
+function clearResult() {
+  selectedPuzzle = null;
+  document.getElementById("resultBox").classList.add("hidden");
+  setStatus("Výsledok bol vymazaný");
+}
+
+function findById() {
+  const wantedId = Number(document.getElementById("puzzleIdInput").value);
+  if (!Number.isFinite(wantedId)) {
+    setStatus("Zadaj platné ID úlohy", "error");
+    return;
+  }
+  const puzzle = puzzles.find(p => Number(p.id) === wantedId);
+  if (!puzzle) {
+    setStatus("Úloha s týmto ID neexistuje", "error");
+    return;
+  }
+  showPuzzle(puzzle);
+  setStatus("Úloha podľa ID bola nájdená", "success");
+}
+
+function findByFenExact() {
+  const fen = document.getElementById("fenInput").value.trim();
+  if (!fen) { setStatus("Zadaj FEN", "error"); return; }
+  const puzzle = puzzles.find(p => String(p.fen || "").trim() === fen);
+  if (!puzzle) { setStatus("Úloha s týmto presným FEN sa nenašla", "error"); return; }
+  showPuzzle(puzzle);
+  setStatus("Úloha podľa celého FEN bola nájdená", "success");
+}
+
+function findByFenBoardOnly() {
+  const fen = document.getElementById("fenInput").value.trim();
+  if (!fen) { setStatus("Zadaj FEN", "error"); return; }
+  const wantedBoard = normalizeFenBoardOnly(fen);
+  const puzzle = puzzles.find(p => normalizeFenBoardOnly(p.fen) === wantedBoard);
+  if (!puzzle) { setStatus("Úloha podľa rozostavenia figúr sa nenašla", "error"); return; }
+  showPuzzle(puzzle);
+  setStatus("Úloha podľa rozostavenia figúr bola nájdená", "success");
+}
+
+async function savePuzzle() {
+  if (!selectedPuzzle) { setStatus("Najprv nájdi úlohu", "error"); return; }
+
+  const title = document.getElementById("editTitle").value.trim();
+  const category = document.getElementById("editCategory").value;
+  const elo = Number(document.getElementById("editElo").value);
+  const time = Number(document.getElementById("editTime").value);
+  const prompt = document.getElementById("editPrompt").value.trim();
+  const solutionRaw = document.getElementById("editSolutionTree").value.trim();
+
+  if (!title) { setStatus("Zadaj názov úlohy", "error"); return; }
+  if (!elo || elo < 100) { setStatus("Zadaj platné ELO (min. 100)", "error"); return; }
+  if (!time || time < 10) { setStatus("Zadaj platný čas (min. 10 sekúnd)", "error"); return; }
+
+  let solutionTree;
+  try {
+    solutionTree = JSON.parse(solutionRaw);
+  } catch (e) {
+    setStatus("Riešenie nie je platný JSON", "error");
+    return;
   }
 
   try {
-    const player = await getCurrentPlayer();
-    if (player) {
-      const played = Number(player.played || 0);
-      const solved = Number(player.solved || 0);
-      const acc = played > 0 ? Math.round((solved / played) * 100) : 0;
+    setStatus("Ukladám zmeny...");
+    await sbFetch(`puzzles?id=eq.${selectedPuzzle.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({
+        title,
+        category,
+        elo,
+        time,
+        prompt,
+        solution_tree: solutionTree
+      })
+    });
 
-      const lastMode = localStorage.getItem('lastTrainingMode') || 'mix';
-      let eloVal, eloLabel;
-
-      if (lastMode === 'taktika') {
-        eloVal = player.elo_taktika || 1500; eloLabel = 'ELO Taktika';
-      } else if (lastMode === 'strategia') {
-        eloVal = player.elo_strategia || 1500; eloLabel = 'ELO Stratégia';
-      } else if (lastMode === 'koncovka') {
-        eloVal = player.elo_koncovka || 1500; eloLabel = 'ELO Koncovka';
-      } else if (lastMode.startsWith('skill_')) {
-        eloVal = player.elo_zrucnosti || 1500;
-        const skillNames = {
-          'skill_checks':            'ELO Šachy',
-          'skill_captures':          'ELO Brania',
-          'skill_checks_captures':   'ELO Šachy/Brania',
-          'skill_direct_attack':     'ELO Priame nap.',
-          'skill_pawn_breakthrough': 'ELO Pešiak. priel.',
-          'skill_underdefended':     'ELO Slabo pokryté',
-          'skill_direct_threat':     'ELO Priama hrozba'
-        };
-        eloLabel = skillNames[lastMode] || 'ELO Zručnosti';
-      } else {
-        eloVal = player.elo || 1500; eloLabel = 'ELO Mix';
-      }
-
-      document.getElementById('statElo').textContent    = eloVal;
-      document.getElementById('statEloLbl').textContent = eloLabel;
-      document.getElementById('statAcc').textContent    = acc + '%';
-      document.getElementById('statPlayed').textContent = played;
+    // Aktualizuj lokálne pole
+    const idx = puzzles.findIndex(p => p.id === selectedPuzzle.id);
+    if (idx !== -1) {
+      puzzles[idx] = { ...puzzles[idx], title, category, elo, time, prompt, solution_tree: solutionTree };
+      selectedPuzzle = puzzles[idx];
     }
-  } catch(e) {
-    console.error('Chyba načítania štatistík:', e);
+
+    showPuzzle(selectedPuzzle);
+    setStatus(`Úloha ID ${selectedPuzzle.id} bola úspešne uložená`, "success");
+  } catch (e) {
+    setStatus("Chyba pri ukladaní: " + e.message, "error");
   }
 }
 
-initPage();
+async function deletePuzzle() {
+  if (!selectedPuzzle) { setStatus("Najprv nájdi úlohu", "error"); return; }
+  if (!confirm(`Naozaj chceš vymazať úlohu ID ${selectedPuzzle.id} — "${selectedPuzzle.title}"? Táto akcia je nevratná.`)) return;
 
-function goTraining(mode) { location.href = "training.html?mode=" + mode; }
-function goAdmin()         { location.href = "admin.html"; }
-function goStats()         { location.href = "statistika.html"; }
-function goSkills(type)    { location.href = "skills.html?type=" + type; }
+  try {
+    setStatus("Mažem úlohu...");
+    await sbFetch(`puzzles?id=eq.${selectedPuzzle.id}`, { method: "DELETE" });
+    puzzles = puzzles.filter(p => p.id !== selectedPuzzle.id);
+    clearResult();
+    setStatus(`Úloha bola vymazaná`, "success");
+  } catch (e) {
+    setStatus("Chyba pri mazaní: " + e.message, "error");
+  }
+}
 
-function toggleSkillsMenu() {
-  const menu = document.getElementById('skillsSubmenu');
-  const btn  = document.getElementById('btnSkills');
-  const isOpen = menu.classList.contains('open');
-  menu.classList.toggle('open');
-  btn.classList.toggle('active', !isOpen);
+function openInAdminTraining() {
+  if (!selectedPuzzle) { setStatus("Najprv nájdi úlohu", "error"); return; }
+  localStorage.setItem("adminPuzzleId", String(selectedPuzzle.id));
+  localStorage.setItem("adminMode", "true");
+  location.href = "training.html";
+}
+
+function openInAdminSkills() {
+  if (!selectedSkill) { setStatus("Najprv nájdi úlohu", "error"); return; }
+  localStorage.setItem("adminSkillId", String(selectedSkill.id));
+  localStorage.setItem("adminSkillType", selectedSkill.skill_type || "");
+  location.href = "skills.html?type=" + (selectedSkill.skill_type || "checks_captures");
+}
+
+async function reloadPuzzles() {
+  clearResult();
+  await init();
+}
+
+function goHome() {
+  location.href = "index.html";
+}
+
+async function init() {
+  try {
+    setStatus("Načítavam puzzle zo Supabase...");
+    const data = await sbFetch("puzzles?order=id.asc&limit=2000");
+    if (!data || !data.length) throw new Error("Žiadne puzzle v databáze");
+    puzzles = data;
+    setStatus(`Načítaných ${puzzles.length} puzzle — môžeš vyhľadávať`, "success");
+  } catch (e) {
+    setStatus("Chyba pri načítaní: " + e.message, "error");
+  }
+}
+
+init();
+
+// ─── Záložky ─────────────────────────────────────────────────────────────────
+
+let activeTab = 'puzzles';
+
+function switchTab(tab) {
+  activeTab = tab;
+  const tabs = ['puzzles', 'skills', 'users'];
+  tabs.forEach(t => {
+    document.getElementById('tab' + t.charAt(0).toUpperCase() + t.slice(1)).className =
+      t === tab ? 'primary' : 'secondary';
+  });
+  document.getElementById('puzzleSection').style.display = tab === 'puzzles' ? 'block' : 'none';
+  document.getElementById('skillSection').style.display  = tab === 'skills'  ? 'block' : 'none';
+  document.getElementById('userSection').style.display   = tab === 'users'   ? 'block' : 'none';
+  if (tab === 'users') loadUsers();
+}
+
+async function reloadActive() {
+  if (activeTab === 'puzzles') {
+    await reloadPuzzles();
+  } else {
+    await loadSkillsByType();
+  }
+}
+
+// ─── Skill puzzles ────────────────────────────────────────────────────────────
+
+let skillPuzzles = [];
+let selectedSkill = null;
+
+async function loadSkillsByType() {
+  const type = document.getElementById('skillTypeFilter').value;
+  try {
+    const query = type
+      ? `skill_puzzles?skill_type=eq.${type}&order=id.asc&limit=500`
+      : 'skill_puzzles?order=id.asc&limit=500';
+    const data = await sbFetch(query);
+    skillPuzzles = data || [];
+    renderSkillList();
+    setStatus(`Načítaných ${skillPuzzles.length} úloh zručností`, 'success');
+  } catch(e) {
+    setStatus('Chyba: ' + e.message, 'error');
+  }
+}
+
+function renderSkillList() {
+  const el = document.getElementById('skillList');
+  if (!skillPuzzles.length) {
+    el.innerHTML = '<div style="color:#64748b;font-style:italic;padding:10px;">Žiadne úlohy</div>';
+    return;
+  }
+  el.innerHTML = skillPuzzles.map(p => `
+    <div style="display:flex;align-items:center;gap:10px;padding:8px;border:1px solid #e2e8f0;border-radius:8px;margin-bottom:6px;background:white;cursor:pointer;"
+         onclick="showSkillPuzzle(${p.id})">
+      <span style="font-weight:bold;color:#1d4ed8;min-width:40px;">ID ${p.id}</span>
+      <span style="font-size:12px;background:#f0f9ff;border:1px solid #bae6fd;border-radius:6px;padding:2px 8px;color:#0369a1;">${p.skill_type}</span>
+      <span style="font-size:13px;color:#475569;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${p.fen}</span>
+      <span style="font-size:12px;color:#64748b;">${Array.isArray(p.solutions) ? p.solutions.length : 0} riešení</span>
+    </div>
+  `).join('');
+}
+
+function showSkillPuzzle(id) {
+  const puzzle = skillPuzzles.find(p => p.id === id);
+  if (!puzzle) return;
+  selectedSkill = puzzle;
+
+  document.getElementById('skillResultBox').classList.remove('hidden');
+  document.getElementById('sResId').textContent = puzzle.id;
+  document.getElementById('sResType').textContent = puzzle.skill_type;
+  document.getElementById('sResFen').textContent = puzzle.fen;
+  document.getElementById('sResSolutions').textContent =
+    JSON.stringify(puzzle.solutions, null, 2);
+
+  document.getElementById('sEditSolutions').value =
+    JSON.stringify(puzzle.solutions || [], null, 2);
+  document.getElementById('sEditElo').value = puzzle.elo || 1300;
+  document.getElementById('sEditTime').value = puzzle.time || 120;
+
+  document.getElementById('skillResultBox').scrollIntoView({ behavior: 'smooth' });
+}
+
+async function findSkillById() {
+  const id = Number(document.getElementById('skillIdInput').value);
+  if (!id) return setStatus('Zadaj platné ID', 'error');
+
+  try {
+    const data = await sbFetch(`skill_puzzles?id=eq.${id}&limit=1`);
+    if (!data || !data.length) return setStatus('Úloha nenájdená', 'error');
+    skillPuzzles = data;
+    renderSkillList();
+    showSkillPuzzle(id);
+    setStatus('Úloha nájdená', 'success');
+  } catch(e) {
+    setStatus('Chyba: ' + e.message, 'error');
+  }
+}
+
+async function saveSkillPuzzle() {
+  if (!selectedSkill) return setStatus('Najprv nájdi úlohu', 'error');
+
+  let solutions;
+  try {
+    solutions = JSON.parse(document.getElementById('sEditSolutions').value);
+  } catch(e) {
+    return setStatus('Riešenia nie sú platný JSON', 'error');
+  }
+
+  const elo = Number(document.getElementById('sEditElo').value);
+  const time = Number(document.getElementById('sEditTime').value);
+
+  try {
+    setStatus('Ukladám...');
+    await sbFetch(`skill_puzzles?id=eq.${selectedSkill.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ solutions, elo, time })
+    });
+
+    // Aktualizuj lokálne
+    const idx = skillPuzzles.findIndex(p => p.id === selectedSkill.id);
+    if (idx !== -1) {
+      skillPuzzles[idx] = { ...skillPuzzles[idx], solutions, elo, time };
+      selectedSkill = skillPuzzles[idx];
+    }
+
+    document.getElementById('sResSolutions').textContent =
+      JSON.stringify(solutions, null, 2);
+    setStatus(`Úloha ID ${selectedSkill.id} uložená`, 'success');
+  } catch(e) {
+    setStatus('Chyba: ' + e.message, 'error');
+  }
+}
+
+async function deleteSkillPuzzle() {
+  if (!selectedSkill) return setStatus('Najprv nájdi úlohu', 'error');
+  if (!confirm(`Vymazať úlohu ID ${selectedSkill.id}?`)) return;
+
+  try {
+    await sbFetch(`skill_puzzles?id=eq.${selectedSkill.id}`, { method: 'DELETE' });
+    skillPuzzles = skillPuzzles.filter(p => p.id !== selectedSkill.id);
+    renderSkillList();
+    clearSkillResult();
+    setStatus('Úloha vymazaná', 'success');
+  } catch(e) {
+    setStatus('Chyba: ' + e.message, 'error');
+  }
+}
+
+function clearSkillResult() {
+  selectedSkill = null;
+  document.getElementById('skillResultBox').classList.add('hidden');
+}
+
+// ─── Správa používateľov ─────────────────────────────────────────────────────
+
+let allUsers = [];
+let allTreners = [];
+let selectedUser = null;
+
+function setUserStatus(text, type = '') {
+  const el = document.getElementById('userStatus');
+  el.textContent = text;
+  el.className = 'status' + (type ? ' ' + type : '');
+}
+
+async function loadUsers() {
+  setUserStatus('Načítavam používateľov...');
+  try {
+    // Načítaj všetky profily
+    const profiles = await sbFetch('profiles?order=surname.asc,name.asc&select=id,email,role,nick_name,name,surname');
+    allUsers = profiles || [];
+
+    // Načítaj trénerov pre dropdown
+    allTreners = allUsers.filter(u => u.role === 'trener');
+
+    // Načítaj player záznamy pre trener_id info
+    const players = await sbFetch('players?select=user_id,trener_id');
+    const playerMap = {};
+    (players || []).forEach(p => { if (p.user_id) playerMap[p.user_id] = p.trener_id; });
+
+    renderUserList(playerMap);
+    setUserStatus(`Načítaných ${allUsers.length} používateľov`, 'success');
+  } catch(e) {
+    setUserStatus('Chyba: ' + e.message, 'error');
+  }
+}
+
+function renderUserList(playerMap) {
+  const el = document.getElementById('userList');
+  if (!allUsers.length) {
+    el.innerHTML = '<div style="color:#64748b;font-style:italic;padding:10px;">Žiadni používatelia</div>';
+    return;
+  }
+
+  const roleColors = {
+    admin:  'background:#fff7ed;color:#c2410c;border:1px solid #fdba74;',
+    trener: 'background:#f0fdf4;color:#166534;border:1px solid #86efac;',
+    hrac:   'background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;'
+  };
+  const roleLabels = { admin: '👑 Admin', trener: '🧑‍🏫 Tréner', hrac: '♟ Hráč' };
+
+  // Mapa trénerov id → meno
+  const trenerNameMap = {};
+  allTreners.forEach(t => {
+    trenerNameMap[t.id] = t.nick_name || `${t.name || ''} ${t.surname || ''}`.trim();
+  });
+
+  el.innerHTML = allUsers.map(u => {
+    const roleStyle = roleColors[u.role] || '';
+    const roleLabel = roleLabels[u.role] || u.role;
+    const trenerName = (u.role === 'hrac' && playerMap[u.id])
+      ? `<span style="font-size:12px;color:#64748b;"> · 🧑‍🏫 ${trenerNameMap[playerMap[u.id]] || '?'}</span>`
+      : '';
+    const displayName = u.nick_name || `${u.name || ''} ${u.surname || ''}`.trim() || u.email;
+    return `
+      <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border:1px solid #e2e8f0;border-radius:10px;background:white;">
+        <div style="flex:1;">
+          <span style="font-weight:bold;">${displayName}</span>
+          ${trenerName}
+          <div style="font-size:12px;color:#94a3b8;">${u.email}</div>
+        </div>
+        <span style="padding:3px 10px;border-radius:999px;font-size:12px;font-weight:bold;${roleStyle}">${roleLabel}</span>
+        <button class="secondary" style="padding:6px 12px;font-size:13px;" onclick="openUserEdit('${u.id}')">Upraviť</button>
+        <button class="danger" style="padding:6px 12px;font-size:13px;" onclick="deleteUser('${u.id}', '${displayName.replace(/'/g, '')}')">🗑️</button>
+      </div>
+    `;
+  }).join('');
+}
+
+async function openUserEdit(userId) {
+  selectedUser = allUsers.find(u => u.id === userId);
+  if (!selectedUser) return;
+
+  // Naplň detail
+  document.getElementById('uEmail').textContent        = selectedUser.email || '-';
+  document.getElementById('uEditName').value           = selectedUser.name || '';
+  document.getElementById('uEditSurname').value        = selectedUser.surname || '';
+  document.getElementById('uEditNick').value           = selectedUser.nick_name || '';
+  document.getElementById('uEditRole').value           = selectedUser.role || 'hrac';
+
+  // Naplň dropdown trénerov
+  const sel = document.getElementById('uEditTrener');
+  sel.innerHTML = '<option value="">— bez trénera —</option>';
+  allTreners.forEach(t => {
+    if (t.id === userId) return; // tréner nemôže byť priradený sám sebe
+    const opt = document.createElement('option');
+    opt.value = t.id;
+    opt.textContent = t.nick_name || `${t.name || ''} ${t.surname || ''}`.trim();
+    sel.appendChild(opt);
+  });
+
+  // Načítaj aktuálneho trénera hráča
+  try {
+    const playerData = await sbFetch(`players?user_id=eq.${userId}&select=trener_id&limit=1`);
+    if (playerData && playerData.length && playerData[0].trener_id) {
+      sel.value = playerData[0].trener_id;
+    }
+  } catch(e) {}
+
+  onUserRoleChange();
+  document.getElementById('userEditBox').classList.remove('hidden');
+  document.getElementById('userEditBox').scrollIntoView({ behavior: 'smooth' });
+}
+
+function onUserRoleChange() {
+  const role = document.getElementById('uEditRole').value;
+  document.getElementById('uTrenerWrap').style.display = role === 'hrac' ? 'block' : 'none';
+}
+
+async function saveUser() {
+  if (!selectedUser) return;
+  const newRole    = document.getElementById('uEditRole').value;
+  const trenerId   = document.getElementById('uEditTrener').value || null;
+  const newName    = document.getElementById('uEditName').value.trim();
+  const newSurname = document.getElementById('uEditSurname').value.trim();
+  const newNick    = document.getElementById('uEditNick').value.trim();
+
+  if (!newNick) {
+    setUserStatus('Nick nemôže byť prázdny.', 'error');
+    return;
+  }
+
+  try {
+    setUserStatus('Ukladám...');
+
+    // 1. Zmeň profil (rola + meno + priezvisko + nick)
+    await sbFetch(`profiles?id=eq.${selectedUser.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ role: newRole, name: newName, surname: newSurname, nick_name: newNick })
+    });
+
+    // 2. Zmeň meno aj v players zázname
+    await sbFetch(`players?user_id=eq.${selectedUser.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ name: newName, surname: newSurname })
+    });
+
+    // 3. Ak je hráč, zmeň aj trener_id
+    if (newRole === 'hrac') {
+      await sbFetch(`players?user_id=eq.${selectedUser.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ trener_id: trenerId })
+      });
+    }
+
+    setUserStatus(`✅ Používateľ ${selectedUser.email} bol aktualizovaný.`, 'success');
+    closeUserEdit();
+    await loadUsers();
+  } catch(e) {
+    setUserStatus('Chyba pri ukladaní: ' + e.message, 'error');
+  }
+}
+
+function closeUserEdit() {
+  selectedUser = null;
+  document.getElementById('userEditBox').classList.add('hidden');
+}
+
+async function deleteUser(userId, displayName) {
+  if (!confirm(`Naozaj chceš ÚPLNE vymazať používateľa "${displayName}"?\n\nVymažú sa:\n• Záznamy o tréningu\n• Hráčsky záznam\n• Profil\n\nTáto akcia je NEVRATNÁ.`)) return;
+
+  setUserStatus('Mažem používateľa...');
+  try {
+    // 1. Vymaž training_log záznamy (cez player_id)
+    const playerData = await sbFetch(`players?user_id=eq.${userId}&select=id&limit=1`);
+    if (playerData && playerData.length) {
+      const playerId = playerData[0].id;
+      await sbFetch(`training_log?player_id=eq.${playerId}`, { method: 'DELETE' });
+      // 2. Vymaž player záznam
+      await sbFetch(`players?id=eq.${playerId}`, { method: 'DELETE' });
+    }
+
+    // 3. Vymaž profil
+    await sbFetch(`profiles?id=eq.${userId}`, { method: 'DELETE' });
+
+    setUserStatus(`✅ Používateľ "${displayName}" bol úplne vymazaný.`, 'success');
+    await loadUsers();
+  } catch(e) {
+    setUserStatus('Chyba pri mazaní: ' + e.message, 'error');
+  }
 }
 </script>
 </body>
