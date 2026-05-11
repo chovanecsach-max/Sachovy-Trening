@@ -324,6 +324,10 @@ body {
   <!-- 5 rebríčkov vedľa seba -->
   <div class="leaderboards">
     <div class="lb-card">
+      <div class="lb-header lb-zrucnosti">♞ Zručnosti</div>
+      <div class="lb-body" id="lb-zrucnosti"><div class="lb-loading">Načítavam...</div></div>
+    </div>
+    <div class="lb-card">
       <div class="lb-header lb-taktika">⚔ Taktika</div>
       <div class="lb-body" id="lb-taktika"><div class="lb-loading">Načítavam...</div></div>
     </div>
@@ -338,10 +342,6 @@ body {
     <div class="lb-card">
       <div class="lb-header lb-mix">⚡ Mix</div>
       <div class="lb-body" id="lb-mix"><div class="lb-loading">Načítavam...</div></div>
-    </div>
-    <div class="lb-card">
-      <div class="lb-header lb-zrucnosti">♞ Zručnosti</div>
-      <div class="lb-body" id="lb-zrucnosti"><div class="lb-loading">Načítavam...</div></div>
     </div>
   </div>
 
@@ -433,11 +433,11 @@ function toggleSkillsMenu() {
 // ─── Rebríčky ────────────────────────────────────────────────────────────────
 
 const LB_CATEGORIES = [
-  { id: 'taktika',   field: 'elo_taktika',   label: 'Taktika' },
+  { id: 'zrucnosti', field: 'elo_zrucnosti',  label: 'Zručnosti' },
+  { id: 'taktika',   field: 'elo_taktika',    label: 'Taktika' },
   { id: 'strategia', field: 'elo_strategia',  label: 'Stratégia' },
   { id: 'koncovka',  field: 'elo_koncovka',   label: 'Koncovka' },
-  { id: 'mix',       field: 'elo',            label: 'Mix' },
-  { id: 'zrucnosti', field: 'elo_zrucnosti',  label: 'Zručnosti' }
+  { id: 'mix',       field: 'elo',            label: 'Mix' }
 ];
 
 const MEDALS = ['🥇','🥈','🥉'];
