@@ -447,10 +447,11 @@ async function loadLeaderboards(myName) {
   let players = [];
   try {
     const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/players?select=name,surname,elo,elo_taktika,elo_strategia,elo_koncovka,elo_zrucnosti`,
+      `${SUPABASE_URL}/rest/v1/players?select=name,surname,elo,elo_taktika,elo_strategia,elo_koncovka,elo_zrucnosti,profile:profiles!user_id(role)`,
       { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }
     );
-    players = await res.json() || [];
+    players = (await res.json() || [])
+      .filter(p => p.profile?.role !== 'admin');
   } catch(e) {
     LB_CATEGORIES.forEach(cat => {
       document.getElementById('lb-' + cat.id).innerHTML =
