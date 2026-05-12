@@ -916,8 +916,14 @@ function recordResultOnce(result) {
     localStorage.setItem('lastTrainingMode', getTrainingMode() || 'mix');
   }
 
-  // Zvuk
-  if (!currentPuzzleIsAdmin) playSound(result === 'win' ? 'win' : 'loss');
+  // Zvuk — nezahrávaj win ak hráč už raz chyboval (everFailed)
+  if (!currentPuzzleIsAdmin) {
+    if (result === 'win' && everFailed) {
+      // ticho — hráč už chyboval, zvuk výhry by bol zavádzajúci
+    } else {
+      playSound(result === 'win' ? 'win' : 'loss');
+    }
+  }
 
   resultLogged = true;
   updatePlayerUI();
