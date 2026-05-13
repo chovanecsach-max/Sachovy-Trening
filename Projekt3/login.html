@@ -397,8 +397,22 @@ if (window.location.hash === '#register') {
   // Skontroluj či je už prihlásený
   (async () => {
     const { data } = await sb.auth.getSession();
-    if (data.session) {
-      location.href = 'index.html';
+    if (!data.session) return; // nie je prihlásený — zostaň na login
+
+    // Over že profil existuje — zabrání redirect slučke
+    try {
+      const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/profiles?id=eq.${data.session.user.id}&limit=1`,
+        { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${data.session.access_token}` } }
+      );
+      const profiles = await res.json();
+      if (profiles && profiles.length) {
+        location.href = 'index.html';
+      }
+      // Ak profil neexistuje — zostaň na login (nezačne slučka)
+    } catch(e) {
+      // Sieťová chyba — zostaň na login
+      console.error('Chyba overenia profilu:', e);
     }
   })();
 }
