@@ -284,35 +284,37 @@ button:disabled {
 
 .status {
   text-align: center;
-  padding: 10px;
-  border: 1px solid #d1d5db;
-  border-radius: 10px;
+  padding: 14px 16px;
+  border: 2px solid #d1d5db;
+  border-radius: 12px;
   background: #f9fafb;
   color: #111827;
-  font-size: 14px;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
 }
 
 .status.info {
   background: #f8fafc;
-  border-color: #cbd5e1;
+  border-color: #94a3b8;
   color: #334155;
 }
 
 .status.success {
   background: #f0fdf4;
-  border-color: #86efac;
+  border-color: #4ade80;
   color: #166534;
 }
 
 .status.error {
   background: #fef2f2;
-  border-color: #fca5a5;
+  border-color: #f87171;
   color: #b91c1c;
 }
 
 .status.warning {
   background: #fff7ed;
-  border-color: #fdba74;
+  border-color: #fb923c;
   color: #c2410c;
 }
 
@@ -599,7 +601,6 @@ button:disabled {
           <button class="accent" id="retryBtn" onclick="retryPuzzle()">Skús znova</button>
           <button class="accent" id="showSolutionBtn" onclick="showSolution()">Ukáž riešenie</button>
           <button class="secondary" onclick="goHome()">Menu</button>
-          <button class="danger" id="endTrainingBtn" onclick="openEndTrainingModal()">Ukončiť tréning</button>
         </div>
 
         <div id="status" class="status info">Stav: pripravené</div>
@@ -1102,7 +1103,6 @@ function updateUiLocks() {
   document.getElementById('nextPuzzleBtn').disabled = isAnimatingSolution || pendingPromotion !== null;
   document.getElementById('retryBtn').disabled = isAnimatingSolution || pendingPromotion !== null;
   document.getElementById('showSolutionBtn').disabled = disabled || solved;
-  document.getElementById('endTrainingBtn').disabled = isAnimatingSolution || pendingPromotion !== null;
 }
 
 function saveStats() {
