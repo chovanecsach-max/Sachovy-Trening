@@ -451,6 +451,7 @@ button {
           <select id="uEditRole" onchange="onUserRoleChange()">
             <option value="hrac">Hráč</option>
             <option value="trener">Tréner</option>
+            <option value="hlavny_trener">Hlavný tréner</option>
             <option value="admin">Admin</option>
           </select>
         </div>
@@ -899,11 +900,17 @@ function renderUserList(playerMap) {
   }
 
   const roleColors = {
-    admin:  'background:#fff7ed;color:#c2410c;border:1px solid #fdba74;',
-    trener: 'background:#f0fdf4;color:#166534;border:1px solid #86efac;',
-    hrac:   'background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;'
+    admin:         'background:#fff7ed;color:#c2410c;border:1px solid #fdba74;',
+    trener:        'background:#f0fdf4;color:#166534;border:1px solid #86efac;',
+    hlavny_trener: 'background:#faf5ff;color:#6b21a8;border:1px solid #d8b4fe;',
+    hrac:          'background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;'
   };
-  const roleLabels = { admin: '👑 Admin', trener: '🧑‍🏫 Tréner', hrac: '♟ Hráč' };
+  const roleLabels = {
+    admin:         '👑 Admin',
+    trener:        '🧑‍🏫 Tréner',
+    hlavny_trener: '🏆 Hlavný tréner',
+    hrac:          '♟ Hráč'
+  };
 
   // Mapa trénerov id → meno
   const trenerNameMap = {};
