@@ -31,8 +31,9 @@ function getUserRole() {
 
 function isAdmin() { return getUserRole() === 'admin'; }
 function isTrener() { return getUserRole() === 'trener'; }
+function isHlavnyTrener() { return getUserRole() === 'hlavny_trener'; }
 function isHrac() { return getUserRole() === 'hrac'; }
-function isAdminOrTrener() { return isAdmin() || isTrener(); }
+function isAdminOrTrener() { return isAdmin() || isTrener() || isHlavnyTrener(); }
 
 async function logout() {
   await sbClient.auth.signOut();
