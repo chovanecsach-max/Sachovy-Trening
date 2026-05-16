@@ -162,6 +162,107 @@ tr:hover td { background: #eff6ff; }
   font-style: italic;
   padding: 30px;
 }
+
+/* ─── Grafy ─────────────────────────────────────────────────── */
+.charts-section {
+  margin-top: 32px;
+  border-top: 1px solid #e2e8f0;
+  padding-top: 24px;
+}
+.charts-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.charts-title {
+  font-size: 18px;
+  font-weight: bold;
+  color: #1e3a5f;
+  margin: 0;
+}
+.period-group {
+  display: flex;
+  gap: 5px;
+}
+.period-btn {
+  padding: 5px 13px;
+  border: 1px solid #cbd5e1;
+  border-radius: 20px;
+  background: white;
+  color: #475569;
+  cursor: pointer;
+  font-size: 13px;
+  transition: all .15s;
+}
+.period-btn:hover { border-color: #1e3a5f; color: #1e3a5f; }
+.period-btn.active { background: #1e3a5f; color: white; border-color: #1e3a5f; }
+
+.chart-player-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+.chart-player-row label {
+  font-size: 12px;
+  color: #64748b;
+  text-transform: uppercase;
+  font-weight: bold;
+  display: block;
+  margin-bottom: 4px;
+}
+.chart-player-row select {
+  padding: 8px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 14px;
+  background: white;
+  min-width: 220px;
+}
+
+.chart-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 16px 18px;
+  margin-bottom: 14px;
+}
+.chart-card-title {
+  font-size: 14px;
+  font-weight: bold;
+  color: #1e3a5f;
+  margin: 0 0 2px;
+}
+.chart-card-sub {
+  font-size: 12px;
+  color: #94a3b8;
+  margin: 0 0 12px;
+}
+.chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-bottom: 10px;
+}
+.chart-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: #475569;
+  cursor: pointer;
+  user-select: none;
+  transition: opacity .15s;
+}
+.chart-legend-item.dim { opacity: .35; }
+.chart-legend-dot  { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.chart-legend-dash { width: 18px; height: 2px; flex-shrink: 0; }
+.chart-wrap { position: relative; width: 100%; height: 250px; }
+.chart-msg  { text-align: center; padding: 50px 0; font-size: 14px; color: #94a3b8; font-style: italic; }
 </style>
 </head>
 
@@ -197,6 +298,50 @@ tr:hover td { background: #eff6ff; }
       <tbody id="statsBody"></tbody>
     </table>
     <div id="emptyMsg" class="empty" style="display:none;">Žiadne dáta pre zvolené obdobie.</div>
+  </div>
+
+  <!-- ─── Grafy ─────────────────────────────────────── -->
+  <div class="charts-section">
+    <div class="charts-header">
+      <h2 class="charts-title">📈 Grafy</h2>
+      <div class="period-group" id="periodBtns">
+        <button class="period-btn" data-days="7">7 dní</button>
+        <button class="period-btn active" data-days="30">30 dní</button>
+        <button class="period-btn" data-days="90">3 mesiace</button>
+        <button class="period-btn" data-days="365">Rok</button>
+      </div>
+    </div>
+
+    <!-- Výber hráča — len pre trener / hlavny_trener / admin -->
+    <div id="chartPlayerRow" class="chart-player-row" style="display:none;">
+      <div>
+        <label>Hráč</label>
+        <select id="chartPlayerSelect">
+          <option value="">— vyber hráča —</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- ELO progres -->
+    <div class="chart-card">
+      <p class="chart-card-title">Progres ELO</p>
+      <p class="chart-card-sub">Vývoj hodnotenia v každej kategórii za zvolené obdobie</p>
+      <div class="chart-legend" id="eloLegend"></div>
+      <div class="chart-wrap">
+        <canvas id="eloChart" role="img" aria-label="Čiarový graf progresu ELO vo všetkých kategóriách">ELO progres: Mix, Taktika, Stratégia, Koncovka, Zručnosti</canvas>
+      </div>
+      <div id="eloMsg" class="chart-msg" style="display:none;"></div>
+    </div>
+
+    <!-- Tréningový čas -->
+    <div class="chart-card">
+      <p class="chart-card-title">Tréningový čas</p>
+      <p class="chart-card-sub">Minúty strávené tréningom po dňoch za zvolené obdobie</p>
+      <div class="chart-wrap">
+        <canvas id="timeChart" role="img" aria-label="Stĺpcový graf tréningového času po dňoch">Tréningový čas po dňoch</canvas>
+      </div>
+      <div id="timeMsg" class="chart-msg" style="display:none;"></div>
+    </div>
   </div>
 </div>
 
@@ -487,9 +632,294 @@ function initDates() {
 }
 
 init();
+
+// ══════════════════════════════════════════════════════════════
+// GRAFY
+// ══════════════════════════════════════════════════════════════
+
+const ELO_CATS = [
+  { key: 'mix',        label: 'Mix',        color: '#1e3a5f', dash: [] },
+  { key: 'taktika',    label: 'Taktika',    color: '#3b82f6', dash: [6,3] },
+  { key: 'strategia',  label: 'Stratégia',  color: '#10b981', dash: [3,3] },
+  { key: 'koncovka',   label: 'Koncovka',   color: '#f59e0b', dash: [8,3,2,3] },
+  { key: 'zrucnosti',  label: 'Zručnosti',  color: '#8b5cf6', dash: [2,2] }
+];
+
+let eloChartInst  = null;
+let timeChartInst = null;
+let hiddenElo     = new Set();
+let chartPlayerId = null;
+let chartDays     = 30;
+
+// ─── Inicializácia grafov ──────────────────────────────────────
+async function initCharts() {
+  buildEloLegend();
+
+  if (IS_HRAC) {
+    // Pre hráča: automaticky zisti player.id
+    try {
+      const rows = await sbFetch(`players?user_id=eq.${USER_ID}&limit=1`);
+      if (rows && rows.length) {
+        chartPlayerId = rows[0].id;
+        loadChartData();
+      } else {
+        showChartMsg('eloMsg',  'Hráčsky záznam nebol nájdený.');
+        showChartMsg('timeMsg', 'Hráčsky záznam nebol nájdený.');
+      }
+    } catch(e) {
+      showChartMsg('eloMsg',  'Chyba pri načítaní hráča.');
+      showChartMsg('timeMsg', 'Chyba pri načítaní hráča.');
+    }
+  } else {
+    // Pre trener / hlavny_trener / admin: zobraz select
+    document.getElementById('chartPlayerRow').style.display = '';
+    try {
+      const players = await fetchPlayers();
+      const sel = document.getElementById('chartPlayerSelect');
+      (players || []).forEach(p => {
+        const opt = document.createElement('option');
+        opt.value = p.id;
+        opt.textContent = `${p.surname} ${p.name}`.trim();
+        sel.appendChild(opt);
+      });
+    } catch(e) {
+      console.warn('Nepodarilo sa načítať hráčov pre grafy:', e);
+    }
+
+    document.getElementById('chartPlayerSelect').addEventListener('change', function() {
+      chartPlayerId = this.value ? Number(this.value) : null;
+      if (chartPlayerId) loadChartData();
+      else clearCharts();
+    });
+
+    showChartMsg('eloMsg',  'Vyber hráča pre zobrazenie grafu.');
+    showChartMsg('timeMsg', 'Vyber hráča pre zobrazenie grafu.');
+  }
+
+  // Period buttons
+  document.getElementById('periodBtns').addEventListener('click', e => {
+    const btn = e.target.closest('.period-btn');
+    if (!btn) return;
+    document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    chartDays = Number(btn.dataset.days);
+    if (chartPlayerId) loadChartData();
+  });
+}
+
+// ─── Načítanie dát a render ────────────────────────────────────
+async function loadChartData() {
+  const start = new Date();
+  start.setDate(start.getDate() - chartDays);
+  const startISO = start.toISOString();
+
+  hideChartMsg('eloMsg');
+  hideChartMsg('timeMsg');
+
+  // ELO história
+  try {
+    const eloData = await sbFetch(
+      `elo_history?player_id=eq.${chartPlayerId}&created_at=gte.${startISO}&select=category,elo_value,created_at&order=created_at.asc`
+    );
+    if (!eloData || !eloData.length) {
+      showChartMsg('eloMsg', 'Žiadne ELO dáta pre toto obdobie. Dáta sa zbierajú od ďalšieho tréningu.');
+      if (eloChartInst) { eloChartInst.destroy(); eloChartInst = null; }
+    } else {
+      renderEloChart(eloData);
+    }
+  } catch(e) {
+    showChartMsg('eloMsg', 'Chyba pri načítaní ELO histórie: ' + e.message);
+    console.error(e);
+  }
+
+  // Tréningový čas
+  try {
+    const timeData = await sbFetch(
+      `training_log?player_id=eq.${chartPlayerId}&created_at=gte.${startISO}&select=time_spent,created_at&order=created_at.asc`
+    );
+    if (!timeData || !timeData.length) {
+      showChartMsg('timeMsg', 'Žiadne tréningové dáta pre toto obdobie.');
+      if (timeChartInst) { timeChartInst.destroy(); timeChartInst = null; }
+    } else {
+      renderTimeChart(timeData);
+    }
+  } catch(e) {
+    showChartMsg('timeMsg', 'Chyba pri načítaní tréningového času: ' + e.message);
+    console.error(e);
+  }
+}
+
+// ─── ELO čiarový graf ─────────────────────────────────────────
+function renderEloChart(data) {
+  const timeUnit = chartDays <= 30 ? 'day' : chartDays <= 90 ? 'week' : 'month';
+
+  const datasets = ELO_CATS.map(c => ({
+    label:           c.label,
+    data:            data.filter(d => d.category === c.key)
+                         .map(d => ({ x: d.created_at, y: d.elo_value })),
+    borderColor:     c.color,
+    backgroundColor: c.color + '18',
+    borderDash:      c.dash,
+    tension:         0.3,
+    pointRadius:     chartDays <= 30 ? 3 : 2,
+    pointHoverRadius: 5,
+    fill:            false,
+    hidden:          hiddenElo.has(c.key)
+  }));
+
+  const ctx = document.getElementById('eloChart').getContext('2d');
+  if (eloChartInst) eloChartInst.destroy();
+
+  eloChartInst = new Chart(ctx, {
+    type: 'line',
+    data: { datasets },
+    options: {
+      responsive:          true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#1e293b',
+          titleColor:      '#f1f5f9',
+          bodyColor:       '#cbd5e1',
+          padding:         10,
+          borderWidth:     0,
+          callbacks: {
+            label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.y}`
+          }
+        }
+      },
+      scales: {
+        x: {
+          type:        'time',
+          time: { unit: timeUnit, displayFormats: { day: 'd.M', week: 'd.M', month: 'M/yy' } },
+          ticks: { color: '#94a3b8', font: { size: 11 } },
+          grid:  { color: '#e2e8f0' }
+        },
+        y: {
+          ticks: { color: '#94a3b8', font: { size: 11 } },
+          grid:  { color: '#e2e8f0' }
+        }
+      }
+    }
+  });
+}
+
+// ─── Tréningový čas – stĺpcový graf ──────────────────────────
+function renderTimeChart(data) {
+  // Zoskup sekundy podľa dňa
+  const byDay = {};
+  data.forEach(row => {
+    const day = row.created_at.substring(0, 10);
+    byDay[day] = (byDay[day] || 0) + Number(row.time_spent || 0);
+  });
+  const days   = Object.keys(byDay).sort();
+  const values = days.map(d => Math.round(byDay[d] / 60)); // sekundy → minúty
+
+  const ctx = document.getElementById('timeChart').getContext('2d');
+  if (timeChartInst) timeChartInst.destroy();
+
+  const skip = chartDays > 60;
+  timeChartInst = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels:   days,
+      datasets: [{
+        label:           'Minúty',
+        data:            values,
+        backgroundColor: '#1e3a5f99',
+        borderColor:     '#1e3a5f',
+        borderWidth:     1,
+        borderRadius:    3
+      }]
+    },
+    options: {
+      responsive:          true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#1e293b',
+          titleColor:      '#f1f5f9',
+          bodyColor:       '#cbd5e1',
+          padding:         10,
+          callbacks: {
+            label: ctx => ` ${ctx.parsed.y} min`
+          }
+        }
+      },
+      scales: {
+        x: {
+          ticks: {
+            color:        '#94a3b8',
+            font:         { size: 11 },
+            maxRotation:  45,
+            autoSkip:     skip,
+            maxTicksLimit: skip ? 13 : 31
+          },
+          grid: { display: false }
+        },
+        y: {
+          ticks: {
+            color:    '#94a3b8',
+            font:     { size: 11 },
+            callback: v => v + ' min'
+          },
+          grid: { color: '#e2e8f0' }
+        }
+      }
+    }
+  });
+}
+
+// ─── ELO legenda s prepínaním sérií ───────────────────────────
+function buildEloLegend() {
+  const el = document.getElementById('eloLegend');
+  el.innerHTML = ELO_CATS.map(c => `
+    <span class="chart-legend-item${hiddenElo.has(c.key) ? ' dim' : ''}" data-key="${c.key}" title="Klikni pre skrytie/zobrazenie">
+      <span class="chart-legend-dot" style="background:${c.color};"></span>
+      ${c.label}
+    </span>`).join('');
+
+  el.querySelectorAll('.chart-legend-item').forEach(item => {
+    item.addEventListener('click', () => {
+      const k = item.dataset.key;
+      hiddenElo.has(k) ? hiddenElo.delete(k) : hiddenElo.add(k);
+      buildEloLegend();
+      if (eloChartInst) {
+        const idx = ELO_CATS.findIndex(c => c.key === k);
+        eloChartInst.data.datasets[idx].hidden = hiddenElo.has(k);
+        eloChartInst.update();
+      }
+    });
+  });
+}
+
+// ─── Pomocné ──────────────────────────────────────────────────
+function showChartMsg(id, text) {
+  const el = document.getElementById(id);
+  el.textContent = text;
+  el.style.display = '';
+}
+function hideChartMsg(id) {
+  document.getElementById(id).style.display = 'none';
+}
+function clearCharts() {
+  if (eloChartInst)  { eloChartInst.destroy();  eloChartInst  = null; }
+  if (timeChartInst) { timeChartInst.destroy(); timeChartInst = null; }
+  showChartMsg('eloMsg',  'Vyber hráča pre zobrazenie grafu.');
+  showChartMsg('timeMsg', 'Vyber hráča pre zobrazenie grafu.');
+}
+
+// Spusti grafy po načítaní Chart.js
+window.addEventListener('load', initCharts);
 </script>
 
 <!-- SheetJS pre XLSX export -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<!-- Chart.js + date adapter -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-adapter-date-fns/3.0.0/chartjs-adapter-date-fns.bundle.min.js"></script>
 </body>
 </html>
