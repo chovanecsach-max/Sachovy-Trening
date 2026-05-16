@@ -25,9 +25,10 @@ async function sbFetch(path, options = {}) {
 // ─── ELO podľa režimu ───────────────────────────────────────────────────────
 
 function getEloField(mode) {
-  if (mode === "taktika") return "elo_taktika";
+  if (mode === "taktika")   return "elo_taktika";
   if (mode === "strategia") return "elo_strategia";
-  if (mode === "koncovka") return "elo_koncovka";
+  if (mode === "koncovka")  return "elo_koncovka";
+  if (mode === "zrucnosti") return "elo_zrucnosti";
   return "elo";
 }
 
