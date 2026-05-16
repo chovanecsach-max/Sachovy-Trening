@@ -35,6 +35,34 @@ function getPlayerEloByMode(player, mode) {
   return Number(player[getEloField(mode)] || 1500);
 }
 
+// Mapovanie mode → kategória pre elo_history
+function getEloCategory(mode) {
+  if (mode === "taktika")  return "taktika";
+  if (mode === "strategia") return "strategia";
+  if (mode === "koncovka") return "koncovka";
+  if (mode === "zrucnosti") return "zrucnosti";
+  return "mix";
+}
+
+// ─── ELO história ───────────────────────────────────────────────────────────
+
+async function logEloHistory(playerId, mode, newElo) {
+  try {
+    await sbFetch("elo_history", {
+      method: "POST",
+      prefer: "return=minimal",
+      body: JSON.stringify({
+        player_id: playerId,
+        category:  getEloCategory(mode),
+        elo_value: newElo
+      })
+    });
+  } catch (e) {
+    // Neblokuje tréning — len tiché varovanie
+    console.warn("ELO história sa neuložila:", e);
+  }
+}
+
 // ─── Tréneri ────────────────────────────────────────────────────────────────
 
 async function getTrainers() {
@@ -171,6 +199,9 @@ async function updatePlayerElo(playerId, puzzleElo, result, mode) {
       method: "PATCH",
       body: JSON.stringify({ [eloField]: newElo })
     });
+
+    // Zaloguj novú ELO hodnotu do histórie pre grafy
+    await logEloHistory(playerId, mode, newElo);
   } catch (e) {
     console.error("Chyba pri aktualizácii ELO:", e);
   }
