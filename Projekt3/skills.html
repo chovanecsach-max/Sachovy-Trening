@@ -935,6 +935,8 @@ async function recordResult(result) {
         body: JSON.stringify(updates)
       });
       currentPlayer.elo_zrucnosti = newElo;
+      // Zaloguj ELO do histórie pre grafy (len ak sa ELO zmenilo)
+      if (change !== 0) await logEloHistory(currentPlayer.id, 'zrucnosti', newElo);
       // Obnov zobrazenie ELO v UI
       document.getElementById('playerElo').textContent = newElo + ' (Z)';
     }
