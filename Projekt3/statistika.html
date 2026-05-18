@@ -286,6 +286,7 @@ tr:hover td { background: #eff6ff; }
       </div>
       <button class="primary" onclick="loadStats()">📊 Načítať štatistiku</button>
       <button class="success" id="exportBtn" onclick="exportXlsx()" style="display:none;">⬇️ Exportovať do XLSX</button>
+      <button class="success" id="pgnBtn" onclick="exportPgn()" style="display:none;">♟️ Chyby (PGN)</button>
       <button class="secondary" onclick="goHome()">Späť do menu</button>
     </div>
   </div>
@@ -533,6 +534,7 @@ async function loadStats() {
     const label = IS_HRAC ? 'Tvoja štatistika' : `Načítaných ${players.length} hráčov`;
     setStatus(`${label}. Obdobie: ${formatDate(dateFrom)} — ${formatDate(dateTo)}`, 'success');
     document.getElementById('exportBtn').style.display = '';
+    document.getElementById('pgnBtn').style.display = '';
 
   } catch(e) {
     setStatus('Chyba pri načítaní: ' + e.message, 'error');
@@ -622,6 +624,139 @@ function exportXlsx() {
     a.href = URL.createObjectURL(blob);
     a.download = `Statistika_${dateFrom}_${dateTo}.csv`;
     a.click();
+  }
+}
+
+// ─── PGN export chýb ─────────────────────────────────────────────────────────
+async function exportPgn() {
+  const dateFrom = document.getElementById('dateFrom').value;
+  const dateTo   = document.getElementById('dateTo').value;
+  if (!dateFrom || !dateTo) { alert('Zadaj obe dátumy.'); return; }
+
+  // Zisti player_id — pre hráča automaticky, pre trénera/admina z grafu
+  let playerId   = null;
+  let playerName = '';
+
+  if (IS_HRAC) {
+    try {
+      const rows = await sbFetch(`players?user_id=eq.${USER_ID}&limit=1`);
+      if (rows && rows.length) {
+        playerId   = rows[0].id;
+        playerName = `${rows[0].name || ''} ${rows[0].surname || ''}`.trim();
+      }
+    } catch(e) { /* ignoruj */ }
+  } else {
+    // Použij hráča vybraného v grafe
+    playerId = chartPlayerId;
+    if (playerId && statsData.length) {
+      // Skús nájsť meno v statsData (je tam pre každého hráča jeden záznam)
+      const found = statsData.find(r => {
+        // statsData nemá id, ale môžeme skúsiť z players načítaných pri grafe
+        return true; // fallback — meno doplníme nižšie
+      });
+    }
+    if (!playerId) {
+      alert('Vyber najprv hráča v sekcii Grafy.');
+      return;
+    }
+    // Načítaj meno hráča
+    try {
+      const rows = await sbFetch(`players?id=eq.${playerId}&limit=1`);
+      if (rows && rows.length) playerName = `${rows[0].name || ''} ${rows[0].surname || ''}`.trim();
+    } catch(e) { /* ignoruj */ }
+  }
+
+  if (!playerId) { alert('Hráč nebol nájdený.'); return; }
+
+  setStatus('Načítavam chybné pozície...', '');
+
+  try {
+    const dateFromFull = dateFrom + 'T00:00:00';
+    const dateToFull   = dateTo   + 'T23:59:59';
+
+    // Načítaj všetky chybné záznamy za obdobie (vrátane puzzle_id)
+    const logs = await sbFetch(
+      `training_log?player_id=eq.${playerId}&result=eq.loss&created_at=gte.${dateFromFull}&created_at=lte.${dateToFull}&select=puzzle_id,created_at&order=created_at.asc`
+    );
+
+    if (!logs || !logs.length) {
+      setStatus('Žiadne chyby v zvolenom období. 🎉', 'success');
+      return;
+    }
+
+    // Rozdeľ puzzle_id — skúsime obe tabuľky
+    const puzzleIds = [...new Set(logs.map(l => l.puzzle_id))];
+    const idsParam  = `(${puzzleIds.join(',')})`;
+
+    // Načítaj z puzzles aj skill_puzzles paralelne
+    const [puzRows, skillRows] = await Promise.all([
+      sbFetch(`puzzles?id=in.${idsParam}&select=id,title,fen,category,prompt`).catch(() => []),
+      sbFetch(`skill_puzzles?id=in.${idsParam}&select=id,title,fen,skill_type,prompt`).catch(() => [])
+    ]);
+
+    // Zlúč do jednej mapy id → puzzle
+    const puzzleMap = {};
+    (puzRows  || []).forEach(p => { puzzleMap[p.id] = { ...p, source: 'puzzle'       }; });
+    (skillRows|| []).forEach(p => { puzzleMap[p.id] = { ...p, source: 'skill_puzzle' }; });
+
+    // Zostav PGN — jeden záznam na unikátne puzzle
+    const seenIds  = new Set();
+    const pgnParts = [];
+
+    logs.forEach(log => {
+      const pid = log.puzzle_id;
+      if (seenIds.has(pid)) return; // každé puzzle max raz
+      seenIds.add(pid);
+
+      const p = puzzleMap[pid];
+      if (!p) return; // puzzle sa nenašlo (zmazané?)
+
+      const date    = log.created_at.substring(0, 10).replace(/-/g, '.');
+      const cat     = p.category || p.skill_type || 'Neznáma';
+      const title   = p.title    || `Puzzle ${pid}`;
+      const prompt  = p.prompt   || '';
+      const fen     = p.fen      || '';
+
+      // Sanitizácia FEN pre PGN tag (nesmie obsahovať "]")
+      const safeFen = fen.replace(/]/g, '');
+
+      pgnParts.push(
+        `[Event "Šachový tréning — ${cat}"]`,
+        `[Site "chovanecsach-max.github.io"]`,
+        `[Date "${date}"]`,
+        `[White "${playerName}"]`,
+        `[Black "Puzzle ${pid}"]`,
+        `[Result "*"]`,
+        `[FEN "${safeFen}"]`,
+        `[SetUp "1"]`,
+        `[Annotator "${title}"]`,
+        `[PuzzleId "${pid}"]`,
+        prompt ? `{ ${prompt} }` : '',
+        `*`,
+        ``  // prázdny riadok medzi partiami
+      );
+    });
+
+    if (!pgnParts.length) {
+      setStatus('Žiadne pozície sa nenašli v databáze.', 'error');
+      return;
+    }
+
+    const pgn  = pgnParts.filter(l => l !== null).join('
+');
+    const blob = new Blob([pgn], { type: 'application/x-chess-pgn;charset=utf-8' });
+    const a    = document.createElement('a');
+    a.href     = URL.createObjectURL(blob);
+    a.download = `Chyby_${playerName.replace(/\s+/g,'_')}_${dateFrom}_${dateTo}.pgn`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+
+    const count = seenIds.size;
+    setStatus(`Exportovaných ${count} chybných pozíc${count === 1 ? 'ia' : count < 5 ? 'ie' : 'í'} do PGN. ✓`, 'success');
+
+  } catch(e) {
+    setStatus('Chyba pri exporte PGN: ' + e.message, 'error');
+    console.error(e);
   }
 }
 
