@@ -304,11 +304,14 @@ tr:hover td { background: #eff6ff; }
   <div class="charts-section">
     <div class="charts-header">
       <h2 class="charts-title">📈 Grafy</h2>
-      <div class="period-group" id="periodBtns">
-        <button class="period-btn" data-days="7">7 dní</button>
-        <button class="period-btn active" data-days="30">30 dní</button>
-        <button class="period-btn" data-days="90">3 mesiace</button>
-        <button class="period-btn" data-days="365">Rok</button>
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <div class="period-group" id="periodBtns">
+          <button class="period-btn" data-days="7">7 dní</button>
+          <button class="period-btn active" data-days="30">30 dní</button>
+          <button class="period-btn" data-days="90">3 mesiace</button>
+          <button class="period-btn" data-days="365">Rok</button>
+        </div>
+        <button class="success" id="chartExportBtn" onclick="exportChartsXlsx()" style="display:none;">⬇️ Export grafov</button>
       </div>
     </div>
 
@@ -650,6 +653,8 @@ let timeChartInst = null;
 let hiddenElo     = new Set();
 let chartPlayerId = null;
 let chartDays     = 30;
+let lastEloData   = null;   // surové dáta z elo_history pre XLSX export
+let lastTimeData  = null;   // surové dáta z training_log pre XLSX export
 
 // ─── Inicializácia grafov ──────────────────────────────────────
 async function initCharts() {
@@ -725,6 +730,7 @@ async function loadChartData() {
       showChartMsg('eloMsg', 'Žiadne ELO dáta pre toto obdobie. Dáta sa zbierajú od ďalšieho tréningu.');
       if (eloChartInst) { eloChartInst.destroy(); eloChartInst = null; }
     } else {
+      lastEloData = eloData;
       renderEloChart(eloData);
     }
   } catch(e) {
@@ -741,7 +747,9 @@ async function loadChartData() {
       showChartMsg('timeMsg', 'Žiadne tréningové dáta pre toto obdobie.');
       if (timeChartInst) { timeChartInst.destroy(); timeChartInst = null; }
     } else {
+      lastTimeData = timeData;
       renderTimeChart(timeData);
+      document.getElementById('chartExportBtn').style.display = '';
     }
   } catch(e) {
     showChartMsg('timeMsg', 'Chyba pri načítaní tréningového času: ' + e.message);
@@ -900,6 +908,78 @@ function renderTimeChart(data) {
   });
 }
 
+// ─── Export grafov do XLSX ────────────────────────────────────
+function exportChartsXlsx() {
+  if (!lastEloData && !lastTimeData) {
+    alert('Najprv načítaj grafy.');
+    return;
+  }
+
+  if (typeof XLSX === 'undefined') {
+    alert('XLSX knižnica nie je dostupná.');
+    return;
+  }
+
+  const wb = XLSX.utils.book_new();
+
+  // ── List 1: ELO história ──
+  if (lastEloData && lastEloData.length) {
+    const allDates = [...new Set(lastEloData.map(d => d.created_at.substring(0, 10)))].sort();
+
+    // Pre každý deň posledná hodnota každej kategórie
+    const byDayCat = {};
+    lastEloData.forEach(d => {
+      const day = d.created_at.substring(0, 10);
+      if (!byDayCat[day]) byDayCat[day] = {};
+      byDayCat[day][d.category] = d.elo_value;
+    });
+
+    const eloHeaders = ['Dátum', 'Mix', 'Taktika', 'Stratégia', 'Koncovka', 'Zručnosti'];
+    const eloRows = allDates.map(day => [
+      day,
+      byDayCat[day]['mix']        ?? '',
+      byDayCat[day]['taktika']    ?? '',
+      byDayCat[day]['strategia']  ?? '',
+      byDayCat[day]['koncovka']   ?? '',
+      byDayCat[day]['zrucnosti']  ?? ''
+    ]);
+
+    const wsElo = XLSX.utils.aoa_to_sheet([eloHeaders, ...eloRows]);
+    wsElo['!cols'] = [{ wch: 12 }, { wch: 8 }, { wch: 10 }, { wch: 12 }, { wch: 12 }, { wch: 12 }];
+    XLSX.utils.book_append_sheet(wb, wsElo, 'ELO Progres');
+  }
+
+  // ── List 2: Tréningový čas ──
+  if (lastTimeData && lastTimeData.length) {
+    const byDay = {};
+    lastTimeData.forEach(row => {
+      const day = row.created_at.substring(0, 10);
+      byDay[day] = (byDay[day] || 0) + Number(row.time_spent || 0);
+    });
+    const days = Object.keys(byDay).sort();
+
+    const timeHeaders = ['Dátum', 'Čas (min)', 'Čas (hh:mm:ss)'];
+    const timeRows = days.map(day => {
+      const secs = byDay[day];
+      const mins = Math.round(secs / 60);
+      const h = Math.floor(secs / 3600);
+      const m = Math.floor((secs % 3600) / 60);
+      const s = secs % 60;
+      const hms = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+      return [day, mins, hms];
+    });
+
+    const wsTime = XLSX.utils.aoa_to_sheet([timeHeaders, ...timeRows]);
+    wsTime['!cols'] = [{ wch: 12 }, { wch: 12 }, { wch: 14 }];
+    XLSX.utils.book_append_sheet(wb, wsTime, 'Tréningový čas');
+  }
+
+  // Názov súboru podľa hráča a periódy
+  const end = new Date().toISOString().substring(0, 10);
+  const start = new Date(Date.now() - chartDays * 86400000).toISOString().substring(0, 10);
+  XLSX.writeFile(wb, `Grafy_${start}_${end}.xlsx`);
+}
+
 // ─── ELO legenda s prepínaním sérií ───────────────────────────
 function buildEloLegend() {
   const el = document.getElementById('eloLegend');
@@ -935,6 +1015,9 @@ function hideChartMsg(id) {
 function clearCharts() {
   if (eloChartInst)  { eloChartInst.destroy();  eloChartInst  = null; }
   if (timeChartInst) { timeChartInst.destroy(); timeChartInst = null; }
+  lastEloData  = null;
+  lastTimeData = null;
+  document.getElementById('chartExportBtn').style.display = 'none';
   showChartMsg('eloMsg',  'Vyber hráča pre zobrazenie grafu.');
   showChartMsg('timeMsg', 'Vyber hráča pre zobrazenie grafu.');
 }
