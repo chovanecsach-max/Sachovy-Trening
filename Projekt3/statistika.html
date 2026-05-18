@@ -768,7 +768,9 @@ function renderEloChart(data) {
   }));
 
   const ctx = document.getElementById('eloChart').getContext('2d');
-  if (eloChartInst) eloChartInst.destroy();
+  const existingElo = Chart.getChart('eloChart');
+  if (existingElo) existingElo.destroy();
+  eloChartInst = null;
 
   eloChartInst = new Chart(ctx, {
     type: 'line',
@@ -818,7 +820,9 @@ function renderTimeChart(data) {
   const values = days.map(d => Math.round(byDay[d] / 60)); // sekundy → minúty
 
   const ctx = document.getElementById('timeChart').getContext('2d');
-  if (timeChartInst) timeChartInst.destroy();
+  const existingTime = Chart.getChart('timeChart');
+  if (existingTime) existingTime.destroy();
+  timeChartInst = null;
 
   const skip = chartDays > 60;
   timeChartInst = new Chart(ctx, {
