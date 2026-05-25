@@ -841,8 +841,8 @@ function finishTrainingAndGoHome() {
   location.href = "index.html";
 }
 
-async function updatePlayerUI() {
-  currentPlayer = await getCurrentPlayer();
+async function updatePlayerUI(skipFetch = false) {
+  if (!skipFetch) currentPlayer = await getCurrentPlayer();
   if (!currentPlayer) return;
   const mode = getTrainingMode();
   const eloLabel = { taktika: 'Taktika', strategia: 'Stratégia', koncovka: 'Koncovka', mix: 'Mix' }[mode] || 'Mix';
@@ -905,6 +905,13 @@ function recordResultOnce(result) {
     registerPlayerResult(currentPlayer.id, result, usedTime);
     if (!everFailed || result === 'loss') {
       updatePlayerElo(currentPlayer.id, current.elo, result, getTrainingMode());
+      // Okamžite aktualizuj lokálny objekt — rovnaký vzorec ako v player.js
+      const _mode   = getTrainingMode();
+      const _field  = getEloField(_mode);
+      const _curElo = Number(currentPlayer[_field] || 1500);
+      const _diff   = Number(current.elo) - _curElo;
+      const _change = result === 'win' ? 10 + _diff / 50 : -(10 - _diff / 50);
+      currentPlayer[_field] = Math.max(100, Math.round(_curElo + _change));
     }
     updateSessionStats(result, usedTime);
   }
@@ -927,7 +934,7 @@ function recordResultOnce(result) {
   }
 
   resultLogged = true;
-  updatePlayerUI();
+  updatePlayerUI(true); // použij lokálny currentPlayer — ELO už je aktualizované
 }
 
 // ─── Zvuky ───────────────────────────────────────────────────────────────────
