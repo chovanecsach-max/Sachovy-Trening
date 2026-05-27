@@ -1024,6 +1024,8 @@ async function loadPuzzles() {
     filter = "skill_type=eq.pawn_breakthrough";
   } else if (type === "underdefended") {
     filter = "skill_type=eq.underdefended";
+  } else if (type === "direct_threat") {
+    filter = "skill_type=eq.direct_threat";
   }
   const query = filter
     ? `skill_puzzles?${filter}&order=id.asc&limit=2000`
