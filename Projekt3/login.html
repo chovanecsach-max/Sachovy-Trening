@@ -193,6 +193,10 @@ button {
         <option value="">— bez trénera —</option>
       </select>
     </div>
+    <div class="field">
+      <label>Vstupné ELO (nepovinné)</label>
+      <input id="regElo" type="number" min="1000" max="3000" placeholder="napr. 1200 (1000–3000) — ak nevyplníš, nastaví sa 1000">
+    </div>
     <button class="btn-primary" onclick="register()">Zaregistrovať sa</button>
     <div id="registerStatus" class="status"></div>
   </div>
@@ -306,6 +310,8 @@ async function register() {
   const role = 'hrac'; // Rola je vždy hráč — tréner/admin sa nastaví cez admin panel
   const trenerIdRaw = document.getElementById('regTrener').value;
   const trenerId = trenerIdRaw || null;
+  const eloInput = parseInt(document.getElementById('regElo').value);
+  const baseElo = (!isNaN(eloInput) && eloInput >= 1000 && eloInput <= 3000) ? eloInput : 1000;
 
   if (!name || !surname || !nick || !email || !password) {
     setStatus('registerStatus', 'Vyplň všetky povinné polia.', 'error');
@@ -337,11 +343,11 @@ async function register() {
     name: name,
     surname: surname,
     email: email,
-    elo: 1500,
-    elo_taktika: 1500,
-    elo_strategia: 1500,
-    elo_koncovka: 1500,
-    elo_zrucnosti: 1500,
+    elo: baseElo,
+    elo_taktika: baseElo,
+    elo_strategia: baseElo,
+    elo_koncovka: baseElo,
+    elo_zrucnosti: 1000,
     played: 0,
     solved: 0,
     total_time: 0,
