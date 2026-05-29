@@ -158,6 +158,21 @@ button {
       <input id="loginPassword" type="password" placeholder="Vaše heslo">
     </div>
     <button class="btn-primary" onclick="login()">Prihlásiť sa</button>
+    <div style="text-align:center;margin-top:10px;">
+      <a href="#" onclick="showForgotPassword()" style="font-size:13px;color:#475569;text-decoration:none;">Zabudol som heslo</a>
+    </div>
+
+    <!-- Reset hesla -->
+    <div id="forgotBox" style="display:none;margin-top:14px;padding:14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;">
+      <div style="font-size:14px;font-weight:bold;margin-bottom:8px;">🔑 Reset hesla</div>
+      <div style="font-size:13px;color:#475569;margin-bottom:10px;">Zadaj svoj email a pošleme ti odkaz na nastavenie nového hesla.</div>
+      <input id="resetEmail" type="email" placeholder="vas@email.com" style="width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:10px;font-size:14px;box-sizing:border-box;margin-bottom:8px;">
+      <button class="btn-primary" onclick="sendResetEmail()" style="margin-top:0;">Poslať odkaz</button>
+      <div style="text-align:center;margin-top:8px;">
+        <a href="#" onclick="hideForgotPassword()" style="font-size:12px;color:#94a3b8;text-decoration:none;">Zavrieť</a>
+      </div>
+    </div>
+
     <div id="loginStatus" class="status"></div>
   </div>
 
@@ -286,6 +301,18 @@ async function login() {
     return;
   }
 
+  // Kontrola platnosti účtu (admin a hlavny_trener sú vždy platní)
+  if (profile.role === 'hrac' || profile.role === 'trener') {
+    const now = new Date();
+    const validTo = profile.valid_to ? new Date(profile.valid_to) : null;
+    if (validTo && now > validTo) {
+      await sb.auth.signOut();
+      const validToStr = validTo.toLocaleDateString('sk-SK');
+      setStatus('loginStatus', `⛔ Platnosť účtu vypršala dňa ${validToStr}. Kontaktuj trénera alebo administrátora.`, 'error');
+      return;
+    }
+  }
+
   // Ulož do sessionStorage
   sessionStorage.setItem('user_id', data.user.id);
   sessionStorage.setItem('user_email', data.user.email);
@@ -371,7 +398,14 @@ async function register() {
   // 1. Najprv vytvor profil (player.user_id je FK na profiles)
   const profileRes = await fetch(`${SUPABASE_URL}/rest/v1/profiles`, {
     method: 'POST', headers,
-    body: JSON.stringify({ id: data.user.id, email, role, nick_name: nick, name, surname })
+    body: JSON.stringify({
+      id: data.user.id,
+      email, role,
+      nick_name: nick,
+      name, surname,
+      valid_from: new Date().toISOString(),
+      valid_to:   new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString()
+    })
   });
   if (!profileRes.ok) {
     const err = await profileRes.text();
@@ -394,6 +428,36 @@ async function register() {
 
   // Prepni na prihlásenie
   setTimeout(() => switchTab('login'), 2000);
+}
+
+function showForgotPassword() {
+  document.getElementById('forgotBox').style.display = 'block';
+  document.getElementById('resetEmail').value = document.getElementById('loginEmail').value;
+  document.getElementById('resetEmail').focus();
+}
+
+function hideForgotPassword() {
+  document.getElementById('forgotBox').style.display = 'none';
+}
+
+async function sendResetEmail() {
+  const email = document.getElementById('resetEmail').value.trim();
+  if (!email) {
+    setStatus('loginStatus', 'Zadaj email.', 'error');
+    return;
+  }
+
+  const { error } = await sb.auth.resetPasswordForEmail(email, {
+    redirectTo: window.location.origin + window.location.pathname.replace('login.html', '') + 'reset.html'
+  });
+
+  if (error) {
+    setStatus('loginStatus', 'Chyba: ' + error.message, 'error');
+    return;
+  }
+
+  hideForgotPassword();
+  setStatus('loginStatus', '✅ Odkaz na reset hesla bol odoslaný na ' + email + '. Skontroluj email.', 'success');
 }
 
 // Ak prídeš z menu na registráciu, nekontrolujem session
