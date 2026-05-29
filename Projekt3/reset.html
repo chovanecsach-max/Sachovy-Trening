@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Šachový tréning — Reset hesla</title>
+<style>
+* { box-sizing: border-box; }
+
+body {
+  font-family: Arial, sans-serif;
+  background: #f4f4f6;
+  margin: 0;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.container {
+  width: min(420px, 92vw);
+  background: white;
+  border-radius: 16px;
+  padding: 32px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+}
+
+h1 {
+  margin: 0 0 6px 0;
+  font-size: 26px;
+  text-align: center;
+}
+
+.subtitle {
+  text-align: center;
+  color: #475569;
+  margin: 0 0 24px 0;
+  font-size: 14px;
+}
+
+.field {
+  margin-bottom: 14px;
+}
+
+.field label {
+  display: block;
+  font-size: 12px;
+  color: #64748b;
+  text-transform: uppercase;
+  margin-bottom: 5px;
+  font-weight: bold;
+}
+
+.field input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  font-size: 14px;
+  background: white;
+}
+
+.field input:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37,99,235,0.1);
+}
+
+button {
+  width: 100%;
+  padding: 12px;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: bold;
+  margin-top: 6px;
+  background: #111827;
+  color: white;
+}
+
+button:hover { background: #1f2937; }
+
+.status {
+  margin-top: 14px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 13px;
+  display: none;
+}
+
+.status.error   { background: #fef2f2; border: 1px solid #fca5a5; color: #b91c1c; display: block; }
+.status.success { background: #f0fdf4; border: 1px solid #86efac; color: #166534; display: block; }
+.status.info    { background: #eff6ff; border: 1px solid #bfdbfe; color: #1d4ed8; display: block; }
+
+.back-link {
+  display: block;
+  text-align: center;
+  margin-top: 16px;
+  font-size: 13px;
+  color: #475569;
+  text-decoration: none;
+}
+.back-link:hover { color: #111827; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>♟ Šachový tréning</h1>
+  <p class="subtitle">Nastavenie nového hesla</p>
+
+  <div id="loadingBox" style="text-align:center;color:#475569;padding:20px 0;">
+    Overujem odkaz...
+  </div>
+
+  <div id="resetBox" style="display:none;">
+    <div class="field">
+      <label>Nové heslo (min. 6 znakov)</label>
+      <input id="newPassword" type="password" placeholder="Nové heslo">
+    </div>
+    <div class="field">
+      <label>Zopakuj heslo</label>
+      <input id="confirmPassword" type="password" placeholder="Zopakuj heslo">
+    </div>
+    <button onclick="setNewPassword()">Nastaviť heslo</button>
+    <div id="resetStatus" class="status"></div>
+  </div>
+
+  <div id="errorBox" style="display:none;text-align:center;padding:20px 0;">
+    <div style="font-size:48px;margin-bottom:12px;">⛔</div>
+    <div style="font-weight:bold;margin-bottom:8px;">Neplatný alebo expirovaný odkaz</div>
+    <div style="font-size:13px;color:#475569;margin-bottom:16px;">Odkaz na reset hesla je platný len 60 minút. Požiadaj o nový reset.</div>
+    <a href="login.html" style="display:inline-block;padding:10px 20px;background:#111827;color:white;border-radius:10px;text-decoration:none;font-size:14px;">← Späť na prihlásenie</a>
+  </div>
+
+  <a href="login.html" class="back-link" id="backLink" style="display:none;">← Späť na prihlásenie</a>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const SUPABASE_URL    = "https://wdjsilryllqksdtmaehy.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_45gFQhgPScrDjDCVC0B4Iw_q6uZKf9m";
+
+const { createClient } = supabase;
+const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+function setStatus(text, type) {
+  const el = document.getElementById('resetStatus');
+  el.textContent = text;
+  el.className = 'status ' + type;
+}
+
+function showError() {
+  document.getElementById('loadingBox').style.display = 'none';
+  document.getElementById('resetBox').style.display   = 'none';
+  document.getElementById('errorBox').style.display   = 'block';
+}
+
+function showForm() {
+  document.getElementById('loadingBox').style.display = 'none';
+  document.getElementById('resetBox').style.display   = 'block';
+  document.getElementById('backLink').style.display   = 'block';
+}
+
+async function setNewPassword() {
+  const pwd  = document.getElementById('newPassword').value;
+  const pwd2 = document.getElementById('confirmPassword').value;
+
+  if (pwd.length < 6) {
+    setStatus('Heslo musí mať aspoň 6 znakov.', 'error');
+    return;
+  }
+
+  if (pwd !== pwd2) {
+    setStatus('Heslá sa nezhodujú.', 'error');
+    return;
+  }
+
+  setStatus('Nastavujem heslo...', 'info');
+
+  const { error } = await sb.auth.updateUser({ password: pwd });
+
+  if (error) {
+    setStatus('Chyba: ' + error.message, 'error');
+    return;
+  }
+
+  setStatus('✅ Heslo bolo úspešne zmenené! Presmerovanie...', 'success');
+  setTimeout(() => { location.href = 'login.html'; }, 2000);
+}
+
+// Supabase po kliknutí na odkaz v emaili nastaví session automaticky
+// cez URL fragment (#access_token=...&type=recovery)
+// Počkáme na onAuthStateChange
+sb.auth.onAuthStateChange((event, session) => {
+  if (event === 'PASSWORD_RECOVERY') {
+    showForm();
+  } else if (event === 'SIGNED_IN' && session) {
+    // Ak príde SIGNED_IN bez PASSWORD_RECOVERY — skontroluj URL
+    const hash = window.location.hash;
+    if (hash.includes('type=recovery') || hash.includes('access_token')) {
+      showForm();
+    }
+  }
+});
+
+// Timeout — ak do 4 sekúnd nepríde event, odkaz je neplatný
+setTimeout(() => {
+  if (document.getElementById('loadingBox').style.display !== 'none') {
+    showError();
+  }
+}, 4000);
+</script>
+</body>
+</html>
