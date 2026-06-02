@@ -61,7 +61,9 @@ async function pickPuzzleForPlayer(player, puzzles) {
   if (!pool.length) pool = filterByRange(unsolved, 200);
   if (!pool.length) pool = filterByRange(unsolved, 300);
   if (!pool.length) pool = unsolved;
-  if (!pool.length) pool = filtered.length ? filtered : puzzles;
+  // Ak nie sú nevyriešené — vráť null (hráč vyriešil všetky v kategórii)
+  // NIKDY nepadaj na iné kategórie
+  if (!pool.length) return null;
 
   return pool[Math.floor(Math.random() * pool.length)];
 }
