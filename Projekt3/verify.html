@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Šachový tréning — Overenie emailu</title>
+<style>
+* { box-sizing: border-box; }
+body {
+  font-family: Arial, sans-serif;
+  background: #f4f4f6;
+  margin: 0;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.container {
+  width: min(460px, 92vw);
+  background: white;
+  border-radius: 16px;
+  padding: 40px 32px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+  text-align: center;
+}
+.icon { font-size: 56px; margin-bottom: 16px; }
+h1 { font-size: 22px; margin: 0 0 10px; color: #111827; }
+p  { font-size: 14px; color: #475569; margin: 0 0 20px; line-height: 1.6; }
+.status {
+  padding: 12px 16px;
+  border-radius: 10px;
+  font-size: 13px;
+  margin-top: 16px;
+  display: none;
+}
+.status.error   { background: #fef2f2; border: 1px solid #fca5a5; color: #b91c1c; display: block; }
+.status.success { background: #f0fdf4; border: 1px solid #86efac; color: #166534; display: block; }
+.status.info    { background: #eff6ff; border: 1px solid #bfdbfe; color: #1d4ed8; display: block; }
+button {
+  width: 100%;
+  padding: 12px;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: bold;
+  background: #111827;
+  color: white;
+  margin-top: 16px;
+}
+button:hover { background: #1f2937; }
+a.back {
+  display: block;
+  margin-top: 14px;
+  font-size: 13px;
+  color: #475569;
+  text-decoration: none;
+}
+a.back:hover { color: #111827; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <div id="loadingBox">
+    <div class="icon">⏳</div>
+    <h1>Overujem email...</h1>
+    <p>Chvíľu počkaj, dokončujeme registráciu.</p>
+  </div>
+
+  <div id="successBox" style="display:none;">
+    <div class="icon">✅</div>
+    <h1>Email overený!</h1>
+    <p>Tvoj účet bol úspešne aktivovaný. Teraz sa môžeš prihlásiť.</p>
+    <button onclick="location.href='login.html'">Prejsť na prihlásenie</button>
+  </div>
+
+  <div id="errorBox" style="display:none;">
+    <div class="icon">⛔</div>
+    <h1>Overenie zlyhalo</h1>
+    <p id="errorText">Odkaz je neplatný alebo vypršal. Skús sa zaregistrovať znova.</p>
+    <a class="back" href="login.html">← Späť na prihlásenie</a>
+  </div>
+
+  <div id="statusMsg" class="status"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const SUPABASE_URL     = "https://wdjsilryllqksdtmaehy.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_45gFQhgPScrDjDCVC0B4Iw_q6uZKf9m";
+
+const { createClient } = supabase;
+const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const SUPABASE_KEY = SUPABASE_ANON_KEY;
+
+function setStatus(text, type) {
+  const el = document.getElementById('statusMsg');
+  el.textContent = text;
+  el.className = 'status ' + type;
+}
+
+function showSuccess() {
+  document.getElementById('loadingBox').style.display = 'none';
+  document.getElementById('successBox').style.display = 'block';
+}
+
+function showError(msg) {
+  document.getElementById('loadingBox').style.display = 'none';
+  document.getElementById('errorBox').style.display = 'block';
+  if (msg) document.getElementById('errorText').textContent = msg;
+}
+
+async function createProfileAndPlayer(user) {
+  // Načítaj dáta z user_metadata (uložené pri signUp)
+  const meta     = user.user_metadata || {};
+  const name     = meta.name     || '';
+  const surname  = meta.surname  || '';
+  const nick     = meta.nick_name || '';
+  const role     = 'hrac';
+  const email    = user.email    || '';
+  const baseElo  = (meta.base_elo && meta.base_elo >= 1000 && meta.base_elo <= 3000)
+                   ? meta.base_elo : 1000;
+  const trenerId = meta.trener_id || null;
+
+  const token = (await sb.auth.getSession()).data.session?.access_token || SUPABASE_KEY;
+  const headers = {
+    'apikey': SUPABASE_KEY,
+    'Authorization': `Bearer ${token}`,
+    'Content-Type': 'application/json',
+    'Prefer': 'return=minimal'
+  };
+
+  // 1. Skontroluj či profil už existuje (prípad opätovného kliknutia na odkaz)
+  const checkRes = await fetch(
+    `${SUPABASE_URL}/rest/v1/profiles?id=eq.${user.id}&limit=1`,
+    { headers }
+  );
+  const existing = await checkRes.json();
+  if (existing && existing.length > 0) {
+    // Profil už existuje — len zobraziť úspech
+    showSuccess();
+    return;
+  }
+
+  // 2. Vytvor profil
+  const profileRes = await fetch(`${SUPABASE_URL}/rest/v1/profiles`, {
+    method: 'POST', headers,
+    body: JSON.stringify({
+      id: user.id, email, role, nick_name: nick, name, surname,
+      valid_from: new Date().toISOString(),
+      valid_to:   new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString()
+    })
+  });
+  if (!profileRes.ok) {
+    const err = await profileRes.text();
+    showError('Chyba pri vytváraní profilu: ' + err);
+    return;
+  }
+
+  // 3. Vytvor player záznam
+  const playerBody = {
+    name, surname, email,
+    elo: baseElo, elo_taktika: baseElo, elo_strategia: baseElo, elo_koncovka: baseElo,
+    elo_zrucnosti: 1000,
+    played: 0, solved: 0, total_time: 0,
+    user_id: user.id
+  };
+  if (trenerId) playerBody.trener_id = trenerId;
+
+  const playerRes = await fetch(`${SUPABASE_URL}/rest/v1/players`, {
+    method: 'POST', headers,
+    body: JSON.stringify(playerBody)
+  });
+  if (!playerRes.ok) {
+    const err = await playerRes.text();
+    showError('Profil vytvorený, ale chyba pri vytváraní hráča: ' + err);
+    return;
+  }
+
+  showSuccess();
+}
+
+// Spracuj potvrdenie emailu
+sb.auth.onAuthStateChange(async (event, session) => {
+  if (event === 'SIGNED_IN' && session) {
+    setStatus('Vytváram účet...', 'info');
+    try {
+      await createProfileAndPlayer(session.user);
+    } catch(e) {
+      showError('Neočakávaná chyba: ' + e.message);
+    }
+  } else if (event === 'USER_UPDATED' && session) {
+    // Niektoré verzie Supabase posielajú USER_UPDATED pri potvrdení
+    setStatus('Vytváram účet...', 'info');
+    try {
+      await createProfileAndPlayer(session.user);
+    } catch(e) {
+      showError('Neočakávaná chyba: ' + e.message);
+    }
+  }
+});
+
+// Timeout — ak do 8 sekúnd nepríde event, odkaz je neplatný
+setTimeout(() => {
+  if (document.getElementById('loadingBox').style.display !== 'none') {
+    showError('Odkaz na overenie je neplatný alebo vypršal. Skús sa zaregistrovať znova.');
+  }
+}, 8000);
+</script>
+</body>
+</html>
