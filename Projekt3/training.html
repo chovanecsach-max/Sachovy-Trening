@@ -1979,10 +1979,33 @@ async function loadPuzzleForPlayer() {
     return;
   }
 
+  const mode = getTrainingMode();
+
+  // Filtruj puzzle podľa kategórie pred výberom
+  let filtered = puzzles;
+  if (mode === 'taktika')   filtered = puzzles.filter(p => p.category === 'Taktika');
+  else if (mode === 'strategia') filtered = puzzles.filter(p => p.category === 'Strategia');
+  else if (mode === 'koncovka')  filtered = puzzles.filter(p => p.category === 'Koncovka');
+
+  // Ak v danej kategórii nie sú žiadne puzzle vôbec
+  if (mode !== 'mix' && !filtered.length) {
+    setStatus('Žiadne úlohy pre tento režim.', 'info');
+    return;
+  }
+
   const puzzle = await pickPuzzleForPlayer(currentPlayer, puzzles);
   if (!puzzle) {
-    alert("Nenašla sa žiadna úloha.");
+    setStatus('Žiadne ďalšie úlohy.', 'info');
     return;
+  }
+
+  // Skontroluj či vybrané puzzle patrí do správnej kategórie
+  if (mode !== 'mix' && puzzle.category) {
+    const expected = { taktika: 'Taktika', strategia: 'Strategia', koncovka: 'Koncovka' }[mode];
+    if (puzzle.category !== expected) {
+      setStatus('Stav: žiadne ďalšie úlohy.', 'info');
+      return;
+    }
   }
 
   loadPuzzleObject(puzzle, false);
