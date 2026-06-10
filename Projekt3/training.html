@@ -960,25 +960,38 @@ function playSound(type) {
   try {
     const ctx = getAudioContext();
     if (!ctx) return;
-    if (ctx.state !== 'running') return; // ak stále nie je ready, preskočí
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    if (type === 'win') {
-      osc.frequency.setValueAtTime(520, ctx.currentTime);
-      osc.frequency.setValueAtTime(780, ctx.currentTime + 0.12);
-      gain.gain.setValueAtTime(0.25, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
-      osc.start(ctx.currentTime);
-      osc.stop(ctx.currentTime + 0.4);
+
+    // Po dlhšej nečinnosti môže byť context uspatý — prebuď ho.
+    // Zvuk naplánuj s malou rezervou (60 ms), aby audio hardware stihol
+    // nabehnúť a tóny zazneli postupne, nie zlepené naraz.
+    const schedule = () => {
+      if (ctx.state !== 'running') return;
+      const t0 = ctx.currentTime + 0.06; // rezerva na rozbeh hardvéru
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      if (type === 'win') {
+        osc.frequency.setValueAtTime(520, t0);
+        osc.frequency.setValueAtTime(780, t0 + 0.12);
+        gain.gain.setValueAtTime(0.25, t0);
+        gain.gain.exponentialRampToValueAtTime(0.001, t0 + 0.4);
+        osc.start(t0);
+        osc.stop(t0 + 0.4);
+      } else {
+        osc.frequency.setValueAtTime(340, t0);
+        osc.frequency.setValueAtTime(200, t0 + 0.15);
+        gain.gain.setValueAtTime(0.25, t0);
+        gain.gain.exponentialRampToValueAtTime(0.001, t0 + 0.35);
+        osc.start(t0);
+        osc.stop(t0 + 0.35);
+      }
+    };
+
+    if (ctx.state === 'suspended') {
+      ctx.resume().then(schedule).catch(() => {});
     } else {
-      osc.frequency.setValueAtTime(340, ctx.currentTime);
-      osc.frequency.setValueAtTime(200, ctx.currentTime + 0.15);
-      gain.gain.setValueAtTime(0.25, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
-      osc.start(ctx.currentTime);
-      osc.stop(ctx.currentTime + 0.35);
+      schedule();
     }
   } catch(e) {}
 }
@@ -1979,33 +1992,10 @@ async function loadPuzzleForPlayer() {
     return;
   }
 
-  const mode = getTrainingMode();
-
-  // Filtruj puzzle podľa kategórie pred výberom
-  let filtered = puzzles;
-  if (mode === 'taktika')   filtered = puzzles.filter(p => p.category === 'Taktika');
-  else if (mode === 'strategia') filtered = puzzles.filter(p => p.category === 'Strategia');
-  else if (mode === 'koncovka')  filtered = puzzles.filter(p => p.category === 'Koncovka');
-
-  // Ak v danej kategórii nie sú žiadne puzzle vôbec
-  if (mode !== 'mix' && !filtered.length) {
-    setStatus('Žiadne úlohy pre tento režim.', 'info');
-    return;
-  }
-
   const puzzle = await pickPuzzleForPlayer(currentPlayer, puzzles);
   if (!puzzle) {
-    setStatus('Žiadne ďalšie úlohy.', 'info');
+    alert("Nenašla sa žiadna úloha.");
     return;
-  }
-
-  // Skontroluj či vybrané puzzle patrí do správnej kategórie
-  if (mode !== 'mix' && puzzle.category) {
-    const expected = { taktika: 'Taktika', strategia: 'Strategia', koncovka: 'Koncovka' }[mode];
-    if (puzzle.category !== expected) {
-      setStatus('Stav: žiadne ďalšie úlohy.', 'info');
-      return;
-    }
   }
 
   loadPuzzleObject(puzzle, false);
