@@ -61,18 +61,28 @@ async function pickPuzzleForPlayer(player, puzzles) {
   if (!pool.length) pool = filterByRange(unsolved, 200);
   if (!pool.length) pool = filterByRange(unsolved, 300);
   if (!pool.length) pool = unsolved;
-  // Ak nie sú nevyriešené — vráť null (hráč vyriešil všetky v kategórii)
-  // NIKDY nepadaj na iné kategórie
-  if (!pool.length) return null;
+  if (!pool.length) pool = filtered.length ? filtered : puzzles;
 
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
 async function loadPuzzlesFromSupabase() {
   try {
-    const data = await sbFetch("puzzles?order=id.asc&limit=2000");
-    if (!data || !data.length) throw new Error("Žiadne puzzle v databáze");
-    return data.map(p => ({
+    // Načítavaj po dávkach 1000 — Supabase Free má limit 1000 riadkov/request
+    const BATCH = 1000;
+    let allData = [];
+    let offset = 0;
+    while (true) {
+      const data = await sbFetch(
+        `puzzles?order=id.asc&limit=${BATCH}&offset=${offset}`
+      );
+      if (!data || !data.length) break;
+      allData = allData.concat(data);
+      if (data.length < BATCH) break; // posledná dávka
+      offset += BATCH;
+    }
+    if (!allData.length) throw new Error("Žiadne puzzle v databáze");
+    return allData.map(p => ({
       id: p.id,
       title: p.title,
       fen: p.fen,
