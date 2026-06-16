@@ -706,9 +706,9 @@ function click(i) {
 
   const skillType = getSkillsType();
 
-  // Pre underdefended — hráč kliká priamo na slabo pokrytú figúrku.
+  // Pre underdefended a pin — hráč kliká priamo na figúrku (jednoklik).
   // Za obidve strany: dovolíme kliknúť na figúrku ktorejkoľvek farby.
-  if (skillType === 'underdefended') {
+  if (skillType === 'underdefended' || skillType === 'pin') {
     if (!board[i]) return setStatus('Klikni na figúrku', 'info');
     handleMoveAttempt(name(i));
     return;
@@ -807,6 +807,7 @@ function getSkillTypeName() {
   if (current.skill_type === 'direct_attack') return 'priame napadnutia';
   if (current.skill_type === 'pawn_breakthrough') return 'pešiakové prielomy';
   if (current.skill_type === 'underdefended') return 'slabo pokryté figúrky';
+  if (current.skill_type === 'pin') return 'viazané figúrky';
   return 'ťahy';
 }
 
@@ -818,6 +819,7 @@ function getSkillTypeSingular() {
   if (current.skill_type === 'direct_attack') return 'priame napadnutie';
   if (current.skill_type === 'pawn_breakthrough') return 'pešiakový prielom';
   if (current.skill_type === 'underdefended') return 'slabo pokrytú figúrku';
+  if (current.skill_type === 'pin') return 'viazanú figúrku';
   return 'ťah';
 }
 
@@ -981,6 +983,7 @@ async function loadLeaderboard() {
     'direct_attack':     'Priame napadnutia',
     'pawn_breakthrough': 'Pešiakové prielomy',
     'underdefended':     'Slabo pokryté',
+    'pin':               'Väzby',
     'direct_threat':     'Priama hrozba'
   };
   const type = getSkillsType();
@@ -1045,6 +1048,8 @@ async function loadPuzzles() {
     filter = "skill_type=eq.pawn_breakthrough";
   } else if (type === "underdefended") {
     filter = "skill_type=eq.underdefended";
+  } else if (type === "pin") {
+    filter = "skill_type=eq.pin";
   } else if (type === "direct_threat") {
     filter = "skill_type=eq.direct_threat";
   }
@@ -1212,6 +1217,9 @@ async function init() {
   } else if (type === "underdefended") {
     document.title = "Slabo pokryté figúrky";
     document.getElementById("promptText").textContent = "Nájdi všetky slabo pokryté figúrky (biele aj čierne)";
+  } else if (type === "pin") {
+    document.title = "Viazané figúrky";
+    document.getElementById("promptText").textContent = "Nájdi všetky absolútne viazané figúrky (biele aj čierne)";
   } else {
     document.title = "Šachy a brania";
     document.getElementById("promptText").textContent = "Nájdi všetky šachy a brania";
