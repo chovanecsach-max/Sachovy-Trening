@@ -638,9 +638,10 @@ function getLegalTargetsForPiece(fromIndex) {
   return result;
 }
 
-// Pri úlohe "šachy za obidve strany" sú vyberateľné figúrky oboch farieb.
+// Šachy sa odteraz riešia za obidve strany (jednostranná verzia zanikla).
+// 'checks_both' ponechané pre spätnú kompatibilitu so staršími záznamami.
 function isSkillBothSides() {
-  return current && current.skill_type === 'checks_both';
+  return current && (current.skill_type === 'checks' || current.skill_type === 'checks_both');
 }
 
 function canSelectPiece(i) {
@@ -1194,7 +1195,7 @@ async function init() {
   const type = getSkillsType();
   if (type === "checks") {
     document.title = "Šachy";
-    document.getElementById("promptText").textContent = "Nájdi všetky šachy";
+    document.getElementById("promptText").textContent = "Nájdi všetky šachy za bieleho aj čierneho";
   } else if (type === "checks_both") {
     document.title = "Šachy za obidve strany";
     document.getElementById("promptText").textContent = "Nájdi všetky šachy za bieleho aj čierneho";
