@@ -638,14 +638,11 @@ function getLegalTargetsForPiece(fromIndex) {
   return result;
 }
 
-// Zručnosti sa riešia za obidve strany (jednostranná verzia zanikla).
-// 'checks_both' ponechané pre spätnú kompatibilitu so staršími záznamami.
+// Všetky zručnosti sa riešia za OBIDVE strany — jednostranný režim už neexistuje.
+// (Preto vraciame true vždy; výber figúrok je tým povolený pre bieleho aj čierneho
+//  bez ohľadu na konkrétny skill_type.)
 function isSkillBothSides() {
-  return current && (
-    current.skill_type === 'checks' ||
-    current.skill_type === 'checks_both' ||
-    current.skill_type === 'captures'
-  );
+  return true;
 }
 
 function canSelectPiece(i) {
