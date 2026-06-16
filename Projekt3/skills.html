@@ -628,12 +628,25 @@ function getPieceImagePath(pieceChar) {
 
 function getLegalTargetsForPiece(fromIndex) {
   const result = [];
+  const moverColor = pieceColor(board[fromIndex]);
   for (let ti = 0; ti < 64; ti++) {
     if (ti === fromIndex) continue;
-    if (board[ti] && pieceColor(board[ti]) === meta.activeColor) continue;
+    // nemôžeš brať vlastnú figúrku (farba podľa vybranej figúrky, nie podľa strany na ťahu)
+    if (board[ti] && pieceColor(board[ti]) === moverColor) continue;
     result.push({ index: ti, capture: !!board[ti] });
   }
   return result;
+}
+
+// Pri úlohe "šachy za obidve strany" sú vyberateľné figúrky oboch farieb.
+function isSkillBothSides() {
+  return current && current.skill_type === 'checks_both';
+}
+
+function canSelectPiece(i) {
+  if (!board[i]) return false;
+  if (isSkillBothSides()) return true;          // biely aj čierny
+  return pieceColor(board[i]) === meta.activeColor;
 }
 
 function render() {
@@ -701,7 +714,7 @@ function click(i) {
 
   if (selected === null) {
     if (!board[i]) return setStatus('Vyber figúrku', 'info');
-    if (pieceColor(board[i]) !== meta.activeColor) return setStatus('Vyber správnu stranu', 'warning');
+    if (!canSelectPiece(i)) return setStatus('Vyber správnu stranu', 'warning');
     selected = i;
     render();
     return setStatus('Vybraná figúrka: ' + name(i), 'info');
@@ -713,8 +726,9 @@ function click(i) {
     return setStatus('Výber zrušený', 'info');
   }
 
-  // Klikol na inú figúrku rovnakej farby
-  if (board[i] && pieceColor(board[i]) === meta.activeColor) {
+  // Klikol na inú figúrku ROVNAKEJ farby ako vybraná → prevýber.
+  // (Klik na figúrku opačnej farby sa berie ako pokus o ťah/branie.)
+  if (board[i] && pieceColor(board[i]) === pieceColor(board[selected])) {
     selected = i;
     render();
     return setStatus('Vybraná figúrka: ' + name(i), 'info');
@@ -786,6 +800,7 @@ function handleMoveAttempt(attempted) {
 function getSkillTypeName() {
   if (!current) return 'ťahy';
   if (current.skill_type === 'checks') return 'šachy';
+  if (current.skill_type === 'checks_both') return 'šachy za obidve strany';
   if (current.skill_type === 'captures') return 'brania';
   if (current.skill_type === 'direct_attack') return 'priame napadnutia';
   if (current.skill_type === 'pawn_breakthrough') return 'pešiakové prielomy';
@@ -796,6 +811,7 @@ function getSkillTypeName() {
 function getSkillTypeSingular() {
   if (!current) return 'ťah';
   if (current.skill_type === 'checks') return 'šach';
+  if (current.skill_type === 'checks_both') return 'šach';
   if (current.skill_type === 'captures') return 'branie';
   if (current.skill_type === 'direct_attack') return 'priame napadnutie';
   if (current.skill_type === 'pawn_breakthrough') return 'pešiakový prielom';
@@ -957,6 +973,7 @@ function getSkillsType() {
 async function loadLeaderboard() {
   const skillNames = {
     'checks':            'Šachy',
+    'checks_both':       'Šachy za obidve strany',
     'captures':          'Brania',
     'checks_captures':   'Šachy a brania',
     'direct_attack':     'Priame napadnutia',
@@ -1016,6 +1033,8 @@ async function loadPuzzles() {
     filter = "skill_type=in.(checks,captures)";
   } else if (type === "checks") {
     filter = "skill_type=eq.checks";
+  } else if (type === "checks_both") {
+    filter = "skill_type=eq.checks_both";
   } else if (type === "captures") {
     filter = "skill_type=eq.captures";
   } else if (type === "direct_attack") {
@@ -1176,6 +1195,9 @@ async function init() {
   if (type === "checks") {
     document.title = "Šachy";
     document.getElementById("promptText").textContent = "Nájdi všetky šachy";
+  } else if (type === "checks_both") {
+    document.title = "Šachy za obidve strany";
+    document.getElementById("promptText").textContent = "Nájdi všetky šachy za bieleho aj čierneho";
   } else if (type === "captures") {
     document.title = "Brania";
     document.getElementById("promptText").textContent = "Nájdi všetky brania";
