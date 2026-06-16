@@ -704,12 +704,12 @@ function render() {
 function click(i) {
   if (puzzleDone) return;
 
-  // Pre underdefended - hráč kliká priamo na figúrku súpera
   const skillType = getSkillsType();
+
+  // Pre underdefended — hráč kliká priamo na slabo pokrytú figúrku.
+  // Za obidve strany: dovolíme kliknúť na figúrku ktorejkoľvek farby.
   if (skillType === 'underdefended') {
-    if (!board[i]) return setStatus('Klikni na figúrku súpera', 'info');
-    const opponent = meta.activeColor === 'w' ? 'b' : 'w';
-    if (pieceColor(board[i]) !== opponent) return setStatus('Klikni na figúrku súpera', 'warning');
+    if (!board[i]) return setStatus('Klikni na figúrku', 'info');
     handleMoveAttempt(name(i));
     return;
   }
@@ -1211,7 +1211,7 @@ async function init() {
     document.getElementById("promptText").textContent = "Nájdi všetky pešiakové prielomy za bieleho aj čierneho";
   } else if (type === "underdefended") {
     document.title = "Slabo pokryté figúrky";
-    document.getElementById("promptText").textContent = "Nájdi všetky slabo pokryté figúrky súpera";
+    document.getElementById("promptText").textContent = "Nájdi všetky slabo pokryté figúrky (biele aj čierne)";
   } else {
     document.title = "Šachy a brania";
     document.getElementById("promptText").textContent = "Nájdi všetky šachy a brania";
