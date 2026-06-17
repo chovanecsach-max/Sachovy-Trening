@@ -130,7 +130,7 @@ body {
 /* ── Submenu zručnosti ── */
 .submenu {
   display: none;
-  grid-template-columns: repeat(8, 1fr);
+  grid-template-columns: repeat(9, 1fr);
   gap: 10px;
   padding: 16px;
   background: #f8f9fc;
@@ -299,7 +299,7 @@ body {
     </button>
   </div>
 
-  <!-- Submenu zručnosti — 8 v rade -->
+  <!-- Submenu zručnosti — 9 v rade -->
   <div id="skillsSubmenu" class="submenu">
     <button class="sub-btn" onclick="goSkills('checks')">
       <div class="sub-icon i-skills">♞</div>Šachy
@@ -321,6 +321,9 @@ body {
     </button>
     <button class="sub-btn" onclick="goSkills('relative_pin')">
       <div class="sub-icon i-taktika">📍</div>Relatívne väzby
+    </button>
+    <button class="sub-btn" onclick="goSkills('fork')">
+      <div class="sub-icon i-taktika">🍴</div>Vidličky
     </button>
     <button class="sub-btn" onclick="goSkills('direct_threat')">
       <div class="sub-icon i-koncovka">!</div>Priama hrozba
@@ -399,6 +402,7 @@ async function initPage() {
           'skill_underdefended':     'ELO Slabo pokryté',
           'skill_pin':               'ELO Abs. väzby',
           'skill_relative_pin':      'ELO Rel. väzby',
+          'skill_fork':              'ELO Vidličky',
           'skill_direct_threat':     'ELO Priama hrozba'
         };
         eloLabel = skillNames[lastMode] || 'ELO Zručnosti';
