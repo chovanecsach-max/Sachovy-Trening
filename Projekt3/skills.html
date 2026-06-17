@@ -503,6 +503,10 @@ let flipped = false;
 let pendingPromotion = null;
 let solutions = [];       // všetky správne ťahy
 let foundMoves = [];      // už nájdené ťahy
+// Vidličky (skill_type === 'fork'): riešenie je zoznam skupín polí
+let forkGroups = [];      // [{sq:[...], by:"..."}]
+let forkClicked = [];     // označené polia (súčasť nejakej skupiny)
+let forkFound = [];       // indexy už nájdených skupín
 let puzzleDone = false;
 let puzzleFailed = false;
 let resultLogged = false;
@@ -664,13 +668,22 @@ function render() {
 
     if (selected === bi) d.classList.add('selected');
 
-    // Zvýrazni nájdené ťahy
-    foundMoves.forEach(move => {
-      const fi = sqToIndex(move.substring(0,2));
-      const ti = sqToIndex(move.substring(2,4));
-      if (bi === fi) d.classList.add('found-move');
-      if (bi === ti) d.classList.add('found-move-to');
-    });
+    if (current && current.skill_type === 'fork') {
+      // Vidličky: polia nájdených skupín = found-move; rozrobené kliky = selected
+      const foundSquares = new Set();
+      forkFound.forEach(idx => forkGroups[idx].sq.forEach(s => foundSquares.add(s)));
+      const nm = name(bi);
+      if (foundSquares.has(nm)) d.classList.add('found-move');
+      else if (forkClicked.includes(nm)) d.classList.add('selected');
+    } else {
+      // Zvýrazni nájdené ťahy
+      foundMoves.forEach(move => {
+        const fi = sqToIndex(move.substring(0,2));
+        const ti = sqToIndex(move.substring(2,4));
+        if (bi === fi) d.classList.add('found-move');
+        if (bi === ti) d.classList.add('found-move-to');
+      });
+    }
 
     if (board[bi]) {
       const img = document.createElement('img');
@@ -705,6 +718,13 @@ function click(i) {
   if (puzzleDone) return;
 
   const skillType = getSkillsType();
+
+  // Vidličky — hráč kliká na ohrozené figúrky; keď označí celú skupinu, je nájdená.
+  if (skillType === 'fork') {
+    if (!board[i]) return setStatus('Klikni na figúrku', 'info');
+    handleForkClick(name(i));
+    return;
+  }
 
   // Pre underdefended a pin — hráč kliká priamo na figúrku (jednoklik).
   // Za obidve strany: dovolíme kliknúť na figúrku ktorejkoľvek farby.
@@ -748,6 +768,59 @@ function click(i) {
 
   const attempted = name(selected) + name(i);
   handleMoveAttempt(attempted);
+}
+
+function handleForkClick(sq) {
+  // Je toto pole súčasťou nejakej vidličkovej skupiny?
+  const inAnyGroup = forkGroups.some(g => g.sq.includes(sq));
+
+  if (!inAnyGroup) {
+    if (!puzzleFailed) {
+      puzzleFailed = true;
+      everFailed = true;
+      stopTimer();
+      recordResult('loss');
+    }
+    setStatus('Toto pole nie je vo vidličkovom postavení. Skús znova alebo ukáž riešenie.', 'error');
+    return;
+  }
+
+  if (forkClicked.includes(sq)) {
+    return setStatus('Toto pole si už označil.', 'warning');
+  }
+
+  markPlayed();
+  forkClicked.push(sq);
+
+  // Skontroluj, či sa práve nedokončila niektorá skupina
+  const newlyFound = [];
+  forkGroups.forEach((g, idx) => {
+    if (forkFound.includes(idx)) return;
+    if (g.sq.every(s => forkClicked.includes(s))) {
+      forkFound.push(idx);
+      newlyFound.push(g);
+    }
+  });
+
+  render();
+  updateRemainingUI();
+  updateFoundMovesUI();
+
+  if (forkFound.length === forkGroups.length) {
+    puzzleDone = true;
+    stopTimer();
+    markSolved();
+    recordResult('win');
+    if (current) solvedSkillIds.add(current.id);
+    playSound('win');
+    setStatus('🎉 Výborne! Našiel si všetky vidličkové postavenia!', 'success');
+  } else if (newlyFound.length > 0) {
+    playSound('win');
+    const g = newlyFound[newlyFound.length - 1];
+    setStatus('Vidlička nájdená: ' + g.sq.join('') + ' (' + g.by + '). Hľadaj ďalšiu.', 'success');
+  } else {
+    setStatus('Označené: ' + sq + '. Doplň zvyšok vidličky.', 'info');
+  }
 }
 
 function handleMoveAttempt(attempted) {
@@ -809,6 +882,7 @@ function getSkillTypeName() {
   if (current.skill_type === 'underdefended') return 'slabo pokryté figúrky';
   if (current.skill_type === 'pin') return 'viazané figúrky';
   if (current.skill_type === 'relative_pin') return 'relatívne viazané figúrky';
+  if (current.skill_type === 'fork') return 'figúrky vo vidličkovom postavení';
   return 'ťahy';
 }
 
@@ -822,13 +896,17 @@ function getSkillTypeSingular() {
   if (current.skill_type === 'underdefended') return 'slabo pokrytú figúrku';
   if (current.skill_type === 'pin') return 'viazanú figúrku';
   if (current.skill_type === 'relative_pin') return 'relatívne viazanú figúrku';
+  if (current.skill_type === 'fork') return 'figúrku vo vidličkovom postavení';
   return 'ťah';
 }
 
 // ─── Počítadlo a nájdené ťahy ─────────────────────────────────────────────────
 
 function updateRemainingUI() {
-  const remaining = solutions.length - foundMoves.length;
+  const isFork = current && current.skill_type === 'fork';
+  const total = isFork ? forkGroups.length : solutions.length;
+  const found = isFork ? forkFound.length : foundMoves.length;
+  const remaining = total - found;
   const box = document.getElementById('remainingBox');
   const count = document.getElementById('remainingCount');
   const label = document.getElementById('remainingLabel');
@@ -840,13 +918,23 @@ function updateRemainingUI() {
     label.textContent = 'Všetky nájdené!';
   } else {
     box.className = 'remaining-box';
-    label.textContent = 'Zostáva nájsť';
+    label.textContent = isFork ? 'Zostáva vidličiek' : 'Zostáva nájsť';
   }
 }
 
 function updateFoundMovesUI() {
   const el = document.getElementById('foundMoves');
   el.innerHTML = '';
+  if (current && current.skill_type === 'fork') {
+    forkFound.forEach(idx => {
+      const g = forkGroups[idx];
+      const badge = document.createElement('span');
+      badge.className = 'found-move-badge';
+      badge.textContent = g.sq.join('') + ' (' + g.by + ')';
+      el.appendChild(badge);
+    });
+    return;
+  }
   foundMoves.forEach(move => {
     const badge = document.createElement('span');
     badge.className = 'found-move-badge';
@@ -867,6 +955,17 @@ function showSolution() {
   puzzleFailed = true;
 
   // Ukáž všetky riešenia
+  if (current && current.skill_type === 'fork') {
+    forkFound = forkGroups.map((_, idx) => idx);
+    forkClicked = [];
+    forkGroups.forEach(g => g.sq.forEach(s => { if (!forkClicked.includes(s)) forkClicked.push(s); }));
+    render();
+    updateRemainingUI();
+    updateFoundMovesUI();
+    const txt = forkGroups.map(g => g.sq.join('') + ' (' + g.by + ')').join(', ');
+    setStatus('Riešenie: ' + txt, 'warning');
+    return;
+  }
   foundMoves = [...solutions];
   render();
   updateRemainingUI();
@@ -875,6 +974,14 @@ function showSolution() {
 }
 
 function showAllSolutionsOnBoard() {
+  if (current && current.skill_type === 'fork') {
+    forkFound = forkGroups.map((_, idx) => idx);
+    forkClicked = [];
+    forkGroups.forEach(g => g.sq.forEach(s => { if (!forkClicked.includes(s)) forkClicked.push(s); }));
+    render();
+    updateFoundMovesUI();
+    return;
+  }
   foundMoves = [...solutions];
   render();
   updateFoundMovesUI();
@@ -987,6 +1094,7 @@ async function loadLeaderboard() {
     'underdefended':     'Slabo pokryté',
     'pin':               'Absolútne väzby',
     'relative_pin':      'Relatívne väzby',
+    'fork':              'Vidličky',
     'direct_threat':     'Priama hrozba'
   };
   const type = getSkillsType();
@@ -1055,6 +1163,8 @@ async function loadPuzzles() {
     filter = "skill_type=eq.pin";
   } else if (type === "relative_pin") {
     filter = "skill_type=eq.relative_pin";
+  } else if (type === "fork") {
+    filter = "skill_type=eq.fork";
   } else if (type === "direct_threat") {
     filter = "skill_type=eq.direct_threat";
   }
@@ -1118,6 +1228,14 @@ function loadPuzzle(puzzle) {
   current = puzzle;
   solutions = Array.isArray(puzzle.solutions) ? puzzle.solutions : [];
   foundMoves = [];
+  // Vidličky: riešenie je zoznam skupín
+  if (puzzle.skill_type === 'fork') {
+    forkGroups = Array.isArray(puzzle.solutions) ? puzzle.solutions : [];
+  } else {
+    forkGroups = [];
+  }
+  forkClicked = [];
+  forkFound = [];
   puzzleDone = false;
   puzzleFailed = false;
   resultLogged = false;
@@ -1228,6 +1346,9 @@ async function init() {
   } else if (type === "relative_pin") {
     document.title = "Relatívne väzby";
     document.getElementById("promptText").textContent = "Nájdi všetky relatívne viazané figúrky (biele aj čierne)";
+  } else if (type === "fork") {
+    document.title = "Vidličkové postavenie";
+    document.getElementById("promptText").textContent = "Nájdi všetky figúrky vo vidličkovom postavení (biele aj čierne)";
   } else {
     document.title = "Šachy a brania";
     document.getElementById("promptText").textContent = "Nájdi všetky šachy a brania";
