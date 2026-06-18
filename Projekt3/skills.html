@@ -1109,12 +1109,14 @@ async function loadLeaderboard() {
     'captures':          'Brania',
     'checks_captures':   'Šachy a brania',
     'direct_attack':     'Priame napadnutia',
+    'direct_threat':     'Priame hrozby',
     'pawn_breakthrough': 'Pešiakové prielomy',
     'underdefended':     'Slabo pokryté',
     'pin':               'Absolútne väzby',
     'relative_pin':      'Relatívne väzby',
     'fork':              'Vidličky',
     'direct_attack':     'Priame napadnutia',
+    'direct_threat':     'Priame hrozby',
     'direct_threat':     'Priama hrozba'
   };
   const type = getSkillsType();
@@ -1175,6 +1177,8 @@ async function loadPuzzles() {
     filter = "skill_type=eq.captures";
   } else if (type === "direct_attack") {
     filter = "skill_type=eq.direct_attack";
+  } else if (type === "direct_threat") {
+    filter = "skill_type=eq.direct_threat";
   } else if (type === "pawn_breakthrough") {
     filter = "skill_type=eq.pawn_breakthrough";
   } else if (type === "underdefended") {
@@ -1187,6 +1191,8 @@ async function loadPuzzles() {
     filter = "skill_type=eq.fork";
   } else if (type === "direct_attack") {
     filter = "skill_type=eq.direct_attack";
+  } else if (type === "direct_threat") {
+    filter = "skill_type=eq.direct_threat";
   } else if (type === "direct_threat") {
     filter = "skill_type=eq.direct_threat";
   }
@@ -1374,6 +1380,9 @@ async function init() {
   } else if (type === "direct_attack") {
     document.title = "Priame napadnutia";
     document.getElementById("promptText").textContent = "Nájdi všetky priame materiálne napadnutia (biele aj čierne)";
+  } else if (type === "direct_threat") {
+    document.title = "Priame hrozby";
+    document.getElementById("promptText").textContent = "Nájdi všetky ťahy vytvárajúce priame materiálne hrozby (biele aj čierne)";
   } else {
     document.title = "Šachy a brania";
     document.getElementById("promptText").textContent = "Nájdi všetky šachy a brania";
