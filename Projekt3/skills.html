@@ -505,7 +505,7 @@ let solutions = [];       // všetky správne ťahy
 let foundMoves = [];      // už nájdené ťahy
 // Vidličky (skill_type === 'fork'): riešenie je zoznam skupín polí
 let forkGroups = [];      // [{sq:[...], by:"..."}]
-let forkClicked = [];     // označené polia (súčasť nejakej skupiny)
+let forkSel = [];         // aktuálny rozrobený výber polí (jedna vidlička)
 let forkFound = [];       // indexy už nájdených skupín
 let puzzleDone = false;
 let puzzleFailed = false;
@@ -673,8 +673,8 @@ function render() {
       const foundSquares = new Set();
       forkFound.forEach(idx => forkGroups[idx].sq.forEach(s => foundSquares.add(s)));
       const nm = name(bi);
-      if (foundSquares.has(nm)) d.classList.add('found-move');
-      else if (forkClicked.includes(nm)) d.classList.add('selected');
+      if (forkSel.includes(nm)) d.classList.add('selected');
+      else if (foundSquares.has(nm)) d.classList.add('found-move');
     } else {
       // Zvýrazni nájdené ťahy
       foundMoves.forEach(move => {
@@ -771,9 +771,8 @@ function click(i) {
 }
 
 function handleForkClick(sq) {
-  // Je toto pole súčasťou nejakej vidličkovej skupiny?
+  // Je toto pole vôbec súčasťou nejakej vidličkovej skupiny?
   const inAnyGroup = forkGroups.some(g => g.sq.includes(sq));
-
   if (!inAnyGroup) {
     if (!puzzleFailed) {
       puzzleFailed = true;
@@ -785,27 +784,52 @@ function handleForkClick(sq) {
     return;
   }
 
-  if (forkClicked.includes(sq)) {
-    return setStatus('Toto pole si už označil.', 'warning');
+  const isUnfound = (idx) => !forkFound.includes(idx);
+
+  // skús pole pridať do rozrobeného výberu
+  const candidate = forkSel.includes(sq) ? forkSel.slice() : forkSel.concat([sq]);
+  const fits = forkGroups.some((g, idx) =>
+    isUnfound(idx) && candidate.every(s => g.sq.includes(s)));
+
+  if (!fits) {
+    // pole nepasuje k rozrobenej vidličke → začni novú vidličku týmto poľom
+    const startsNew = forkGroups.some((g, idx) => isUnfound(idx) && g.sq.includes(sq));
+    if (startsNew) {
+      markPlayed();
+      forkSel = [sq];
+      render();
+      setStatus('Začal si novú vidličku: ' + sq + '. Doplň zvyšok.', 'info');
+    } else {
+      setStatus('Túto vidličku si už našiel.', 'warning');
+    }
+    return;
   }
 
   markPlayed();
-  forkClicked.push(sq);
+  forkSel = candidate;
 
-  // Skontroluj, či sa práve nedokončila niektorá skupina
-  const newlyFound = [];
+  // zodpovedá výber presne niektorej nenájdenej skupine?
+  let completedIdx = -1;
   forkGroups.forEach((g, idx) => {
-    if (forkFound.includes(idx)) return;
-    if (g.sq.every(s => forkClicked.includes(s))) {
-      forkFound.push(idx);
-      newlyFound.push(g);
+    if (completedIdx !== -1) return;
+    if (isUnfound(idx) && g.sq.length === forkSel.length && g.sq.every(s => forkSel.includes(s))) {
+      completedIdx = idx;
     }
   });
 
+  if (completedIdx === -1) {
+    render();
+    setStatus('Označené: ' + forkSel.join('') + '. Doplň zvyšok vidličky.', 'info');
+    return;
+  }
+
+  forkFound.push(completedIdx);
+  forkSel = [];
   render();
   updateRemainingUI();
   updateFoundMovesUI();
 
+  const g = forkGroups[completedIdx];
   if (forkFound.length === forkGroups.length) {
     puzzleDone = true;
     stopTimer();
@@ -814,12 +838,9 @@ function handleForkClick(sq) {
     if (current) solvedSkillIds.add(current.id);
     playSound('win');
     setStatus('🎉 Výborne! Našiel si všetky vidličkové postavenia!', 'success');
-  } else if (newlyFound.length > 0) {
-    playSound('win');
-    const g = newlyFound[newlyFound.length - 1];
-    setStatus('Vidlička nájdená: ' + g.sq.join('') + ' (' + g.by + '). Hľadaj ďalšiu.', 'success');
   } else {
-    setStatus('Označené: ' + sq + '. Doplň zvyšok vidličky.', 'info');
+    playSound('win');
+    setStatus('Vidlička nájdená: ' + g.sq.join('') + ' (' + g.by + '). Hľadaj ďalšiu.', 'success');
   }
 }
 
@@ -957,8 +978,7 @@ function showSolution() {
   // Ukáž všetky riešenia
   if (current && current.skill_type === 'fork') {
     forkFound = forkGroups.map((_, idx) => idx);
-    forkClicked = [];
-    forkGroups.forEach(g => g.sq.forEach(s => { if (!forkClicked.includes(s)) forkClicked.push(s); }));
+    forkSel = [];
     render();
     updateRemainingUI();
     updateFoundMovesUI();
@@ -976,8 +996,7 @@ function showSolution() {
 function showAllSolutionsOnBoard() {
   if (current && current.skill_type === 'fork') {
     forkFound = forkGroups.map((_, idx) => idx);
-    forkClicked = [];
-    forkGroups.forEach(g => g.sq.forEach(s => { if (!forkClicked.includes(s)) forkClicked.push(s); }));
+    forkSel = [];
     render();
     updateFoundMovesUI();
     return;
@@ -1234,7 +1253,7 @@ function loadPuzzle(puzzle) {
   } else {
     forkGroups = [];
   }
-  forkClicked = [];
+  forkSel = [];
   forkFound = [];
   puzzleDone = false;
   puzzleFailed = false;
