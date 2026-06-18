@@ -1114,6 +1114,7 @@ async function loadLeaderboard() {
     'pin':               'Absolútne väzby',
     'relative_pin':      'Relatívne väzby',
     'fork':              'Vidličky',
+    'direct_attack':     'Priame napadnutia',
     'direct_threat':     'Priama hrozba'
   };
   const type = getSkillsType();
@@ -1184,6 +1185,8 @@ async function loadPuzzles() {
     filter = "skill_type=eq.relative_pin";
   } else if (type === "fork") {
     filter = "skill_type=eq.fork";
+  } else if (type === "direct_attack") {
+    filter = "skill_type=eq.direct_attack";
   } else if (type === "direct_threat") {
     filter = "skill_type=eq.direct_threat";
   }
@@ -1368,6 +1371,9 @@ async function init() {
   } else if (type === "fork") {
     document.title = "Vidličkové postavenie";
     document.getElementById("promptText").textContent = "Nájdi všetky figúrky vo vidličkovom postavení (biele aj čierne)";
+  } else if (type === "direct_attack") {
+    document.title = "Priame napadnutia";
+    document.getElementById("promptText").textContent = "Nájdi všetky priame materiálne napadnutia (biele aj čierne)";
   } else {
     document.title = "Šachy a brania";
     document.getElementById("promptText").textContent = "Nájdi všetky šachy a brania";
