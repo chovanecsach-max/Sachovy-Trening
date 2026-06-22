@@ -391,6 +391,7 @@ button:disabled { opacity: 0.6; cursor: not-allowed; }
       <div class="board-card">
         <div class="board-area">
           <h2 id="promptText" class="board-prompt">Nájdi všetky šachy</h2>
+          <div id="completeProgress" style="display:none; font-size:0.85em; color:#2E75B6; font-weight:600; margin-top:4px;"></div>
           <div id="board" class="board"></div>
           <div id="turnIndicator" class="turn-indicator white"></div>
         </div>
@@ -507,6 +508,21 @@ let foundMoves = [];      // už nájdené ťahy
 let forkGroups = [];      // [{sq:[...], by:"..."}]
 let forkSel = [];         // aktuálny rozrobený výber polí (jedna vidlička)
 let forkFound = [];       // indexy už nájdených skupín
+// Komplexný sekvenčný režim
+let completePositions = [];
+let completePos = null;
+let completeSkillIdx = 0;
+const COMPLETE_SKILLS = [
+  { key: 'checks',            label: 'Šachy',              prompt: 'Nájdi všetky šachy za bieleho aj čierneho' },
+  { key: 'captures',          label: 'Brania',             prompt: 'Nájdi všetky brania za bieleho aj čierneho' },
+  { key: 'pawn_breakthrough',  label: 'Pešiakové prielomy',prompt: 'Nájdi všetky pešiakové prielomy za bieleho aj čierneho' },
+  { key: 'direct_attack',     label: 'Priame napadnutia',  prompt: 'Nájdi všetky priame materiálne napadnutia (biele aj čierne)' },
+  { key: 'underdefended',     label: 'Slabo pokryté',      prompt: 'Nájdi všetky slabo pokryté figúrky (biele aj čierne)' },
+  { key: 'pin',               label: 'Absolútne väzby',    prompt: 'Nájdi všetky absolútne viazané figúrky (biele aj čierne)' },
+  { key: 'relative_pin',      label: 'Relatívne väzby',    prompt: 'Nájdi všetky relatívne viazané figúrky (biele aj čierne)' },
+  { key: 'fork',              label: 'Vidličky',           prompt: 'Nájdi všetky figúrky vo vidličkovom postavení (biele aj čierne)' },
+  { key: 'direct_threat',     label: 'Priame hrozby',      prompt: 'Nájdi všetky ťahy vytvárajúce priame materiálne hrozby (biele aj čierne)' },
+];
 let puzzleDone = false;
 let puzzleFailed = false;
 let resultLogged = false;
@@ -1166,6 +1182,15 @@ function renderLeaderboard(players) {
 
 async function loadPuzzles() {
   const type = getSkillsType();
+
+  // Komplexný sekvenčný režim — načíta z vision_puzzles
+  if (type === 'complete') {
+    const data = await sbFetch('vision_puzzles?order=id.asc&limit=2000');
+    if (!data || !data.length) throw new Error('Žiadne pozície v vision_puzzles');
+    completePositions = data;
+    return [];   // puzzles sa nepoužíva v complete režime
+  }
+
   let filter = "";
   if (type === "checks_captures") {
     filter = "skill_type=in.(checks,captures)";
@@ -1295,9 +1320,72 @@ function loadPuzzle(puzzle) {
 }
 
 function nextPuzzle() {
+  if (getSkillsType() === 'complete') { loadCompleteNext(); return; }
   const puzzle = pickPuzzle();
   if (!puzzle) return setStatus('Žiadne ďalšie úlohy', 'warning');
   loadPuzzle(puzzle);
+}
+
+// ─── Komplexný sekvenčný režim ───────────────────────────────────────────────
+
+function loadCompleteNext() {
+  // Hľadaj ďalšiu zručnosť v aktuálnej pozícii
+  if (completePos) {
+    for (let i = completeSkillIdx + 1; i < COMPLETE_SKILLS.length; i++) {
+      const key = COMPLETE_SKILLS[i].key;
+      if (completePos[key] && completePos[key].length > 0) {
+        completeSkillIdx = i;
+        loadCompleteSkill();
+        return;
+      }
+    }
+  }
+  // Všetky zručnosti hotové — načítaj novú pozíciu
+  loadCompletePosition();
+}
+
+function loadCompletePosition() {
+  if (!completePositions.length) { setStatus('Žiadne ďalšie pozície', 'info'); return; }
+  let pool = completePos
+    ? completePositions.filter(p => p.id !== completePos.id)
+    : completePositions;
+  if (!pool.length) pool = completePositions;
+  completePos = pool[Math.floor(Math.random() * pool.length)];
+  completeSkillIdx = -1;
+  for (let i = 0; i < COMPLETE_SKILLS.length; i++) {
+    if (completePos[COMPLETE_SKILLS[i].key]?.length > 0) { completeSkillIdx = i; break; }
+  }
+  if (completeSkillIdx === -1) {
+    completePositions = completePositions.filter(p => p.id !== completePos.id);
+    loadCompletePosition();
+    return;
+  }
+  loadCompleteSkill();
+}
+
+function loadCompleteSkill() {
+  const sk = COMPLETE_SKILLS[completeSkillIdx];
+  const sols = completePos[sk.key];
+  const found = COMPLETE_SKILLS.filter(s => completePos[s.key]?.length > 0);
+  const posInFound = found.findIndex(s => s.key === sk.key);
+  const pseudo = {
+    id:           completePos.id * 100 + completeSkillIdx,
+    fen:          completePos.fen,
+    turn_text:    completePos.turn_text,
+    title:        completePos.title,
+    skill_type:   sk.key,
+    solutions:    sols,
+    elo:          1300,
+    time:         120,
+    _isComplete:  true,
+    _skillLabel:  sk.label,
+    _skillNo:     posInFound + 1,
+    _skillTotal:  found.length,
+  };
+  document.getElementById('promptText').textContent = sk.prompt;
+  const el = document.getElementById('completeProgress');
+  if (el) el.textContent = `Zručnosť ${posInFound + 1} / ${found.length}: ${sk.label}`;
+  loadPuzzle(pseudo);
 }
 
 function retryPuzzle() {
@@ -1350,7 +1438,11 @@ async function init() {
 
   // Nastav názov podľa typu
   const type = getSkillsType();
-  if (type === "checks") {
+  if (type === 'complete') {
+    document.title = "Komplexný board-vision tréning";
+    document.getElementById('promptText').textContent = 'Načítavam pozície...';
+    document.getElementById('completeProgress').style.display = 'block';
+  } else if (type === "checks") {
     document.title = "Šachy";
     document.getElementById("promptText").textContent = "Nájdi všetky šachy za bieleho aj čierneho";
   } else if (type === "checks_both") {
@@ -1412,6 +1504,13 @@ async function init() {
     setStatus(`Načítaných ${puzzles.length} úloh`, 'success');
   } catch(e) {
     setStatus('Chyba pri načítaní: ' + e.message, 'error');
+    return;
+  }
+
+  // Komplexný sekvenčný režim
+  if (type === 'complete') {
+    setStatus(`Načítaných ${completePositions.length} pozícií`, 'success');
+    loadCompletePosition();
     return;
   }
 
