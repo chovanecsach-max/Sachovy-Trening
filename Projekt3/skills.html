@@ -499,6 +499,7 @@ let board = [];
 let meta = null;
 let current = null;
 let selected = null;
+let xMarked = new Set();  // polia s X po dokončení úlohy (ostanú do novej úlohy)
 let flipped = false;
 
 let pendingPromotion = null;
@@ -675,21 +676,18 @@ function drawX(d) {
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
   svg.setAttribute('viewBox', '0 0 100 100');
   svg.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:5;';
-  const lines = [['10,10 90,90'], ['90,10 10,90']];
-  lines.forEach(pts => {
-    // tieň
+  [['10,10 90,90'], ['90,10 10,90']].forEach(pts => {
     const sh = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
     sh.setAttribute('points', pts[0]);
-    sh.setAttribute('stroke', 'rgba(0,0,0,0.55)');
-    sh.setAttribute('stroke-width', '16');
+    sh.setAttribute('stroke', 'rgba(0,0,0,0.4)');
+    sh.setAttribute('stroke-width', '9');
     sh.setAttribute('stroke-linecap', 'round');
     sh.setAttribute('fill', 'none');
     svg.appendChild(sh);
-    // samotná čiara
     const ln = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
     ln.setAttribute('points', pts[0]);
     ln.setAttribute('stroke', '#facc15');
-    ln.setAttribute('stroke-width', '11');
+    ln.setAttribute('stroke-width', '5');
     ln.setAttribute('stroke-linecap', 'round');
     ln.setAttribute('fill', 'none');
     svg.appendChild(ln);
@@ -735,9 +733,9 @@ function render() {
       d.appendChild(img);
     }
 
-    // X na rozrobenom výbere (nad figúrkou aj nad prázdnym poľom)
+    // X na rozrobenom výbere aj na dokončených označeniach (ostáva do novej úlohy)
     const nm = name(bi);
-    if (selected === bi || forkSel.includes(nm)) drawX(d);
+    if (selected === bi || forkSel.includes(nm) || xMarked.has(nm)) drawX(d);
 
     if (r === 7) {
       const f = document.createElement('span');
@@ -869,6 +867,7 @@ function handleForkClick(sq) {
   }
 
   forkFound.push(completedIdx);
+  forkGroups[completedIdx].sq.forEach(s => xMarked.add(s));
   forkSel = [];
   render();
   updateRemainingUI();
@@ -906,6 +905,9 @@ function handleMoveAttempt(attempted) {
 
   if (isCorrect) {
     foundMoves.push(attempted);
+    // X ostane na políčkach po dokončení
+    xMarked.add(attempted.substring(0,2));
+    if (attempted.length === 4) xMarked.add(attempted.substring(2,4));
     selected = null;
     render();
     updateRemainingUI();
@@ -1328,6 +1330,7 @@ function loadPuzzle(puzzle) {
   }
   forkSel = [];
   forkFound = [];
+  xMarked = new Set();
   puzzleDone = false;
   puzzleFailed = false;
   resultLogged = false;
