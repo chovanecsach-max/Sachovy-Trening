@@ -1113,7 +1113,17 @@ async function recordResult(result) {
 
 function getSkillsType() {
   const params = new URLSearchParams(window.location.search);
-  return params.get("type") || "checks_captures";
+  const urlType = params.get("type") || "checks_captures";
+  // V komplexnom režime vráti aktuálnu zručnosť (nie 'complete')
+  if (urlType === 'complete' && current && current.skill_type) {
+    return current.skill_type;
+  }
+  return urlType;
+}
+
+function isCompleteMode() {
+  const params = new URLSearchParams(window.location.search);
+  return params.get("type") === 'complete';
 }
 
 // ─── Rebríček Top 10 ─────────────────────────────────────────────────────────
@@ -1184,7 +1194,7 @@ async function loadPuzzles() {
   const type = getSkillsType();
 
   // Komplexný sekvenčný režim — načíta z vision_puzzles
-  if (type === 'complete') {
+  if (isCompleteMode()) {
     const data = await sbFetch('vision_puzzles?order=id.asc&limit=2000');
     if (!data || !data.length) throw new Error('Žiadne pozície v vision_puzzles');
     completePositions = data;
@@ -1304,7 +1314,9 @@ function loadPuzzle(puzzle) {
   flipped = meta.activeColor === 'b';
 
   // UI
-  document.getElementById('promptText').textContent = puzzle.prompt || 'Nájdi všetky šachy';
+  if (!isCompleteMode()) {
+    document.getElementById('promptText').textContent = puzzle.prompt || 'Nájdi všetky šachy';
+  }
   document.getElementById('puzzleId').textContent = puzzle.id ?? '-';
   document.getElementById('puzzleElo').textContent = puzzle.elo ?? '-';
   document.getElementById('puzzleTime').textContent = formatTime(puzzle.time || 120);
@@ -1320,7 +1332,7 @@ function loadPuzzle(puzzle) {
 }
 
 function nextPuzzle() {
-  if (getSkillsType() === 'complete') { loadCompleteNext(); return; }
+  if (isCompleteMode()) { loadCompleteNext(); return; }
   const puzzle = pickPuzzle();
   if (!puzzle) return setStatus('Žiadne ďalšie úlohy', 'warning');
   loadPuzzle(puzzle);
@@ -1438,7 +1450,7 @@ async function init() {
 
   // Nastav názov podľa typu
   const type = getSkillsType();
-  if (type === 'complete') {
+  if (isCompleteMode()) {
     document.title = "Komplexný board-vision tréning";
     document.getElementById('promptText').textContent = 'Načítavam pozície...';
     document.getElementById('completeProgress').style.display = 'block';
@@ -1508,7 +1520,7 @@ async function init() {
   }
 
   // Komplexný sekvenčný režim
-  if (type === 'complete') {
+  if (isCompleteMode()) {
     setStatus(`Načítaných ${completePositions.length} pozícií`, 'success');
     loadCompletePosition();
     return;
