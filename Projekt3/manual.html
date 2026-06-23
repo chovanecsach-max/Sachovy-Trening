@@ -7,75 +7,30 @@
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: Arial, sans-serif; font-size: 15px; color: #1f2937; background: #f3f4f6; }
-
-  /* Hlavička */
-  .top-bar {
-    background: #0f172a;
-    color: #f8c43a;
-    padding: 14px 28px;
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    font-size: 20px;
-    font-weight: bold;
-    position: sticky; top: 0; z-index: 100;
-  }
-  .top-bar a {
-    margin-left: auto;
-    color: #94a3b8;
-    font-size: 14px;
-    font-weight: normal;
-    text-decoration: none;
-    background: #1e293b;
-    padding: 6px 14px;
-    border-radius: 6px;
-    cursor: pointer;
-  }
+  .top-bar { background: #0f172a; color: #f8c43a; padding: 14px 28px; display: flex; align-items: center; gap: 14px; font-size: 20px; font-weight: bold; position: sticky; top: 0; z-index: 100; }
+  .top-bar a { margin-left: auto; color: #94a3b8; font-size: 14px; font-weight: normal; text-decoration: none; background: #1e293b; padding: 6px 14px; border-radius: 6px; }
   .top-bar a:hover { background: #2E75B6; color: #fff; }
-
-  /* Obsah */
   .container { max-width: 900px; margin: 0 auto; padding: 32px 24px 60px; }
-
-  /* Nadpisy */
-  h1 { font-size: 24px; color: #1F4E79; margin: 40px 0 10px;
-       border-bottom: 3px solid #2E75B6; padding-bottom: 8px; }
+  h1 { font-size: 24px; color: #1F4E79; margin: 40px 0 10px; border-bottom: 3px solid #2E75B6; padding-bottom: 8px; }
   h1:first-of-type { margin-top: 0; }
   h2 { font-size: 18px; color: #2E75B6; margin: 28px 0 8px; }
   h3 { font-size: 15px; color: #374151; font-weight: bold; margin: 18px 0 6px; }
-
-  /* Odseky */
   p { line-height: 1.65; margin-bottom: 10px; }
-
-  /* Zoznamy */
   ul, ol { padding-left: 24px; margin-bottom: 10px; }
   li { line-height: 1.65; margin-bottom: 4px; }
-
-  /* Info boxy */
   .box { border-left: 4px solid #2E75B6; padding: 10px 14px; margin: 14px 0; border-radius: 0 6px 6px 0; }
-  .box.tip    { background: #D6E4F0; }
-  .box.warn   { background: #FFF3CD; border-color: #d97706; }
-  .box.note   { background: #e8f5e9; border-color: #16a34a; }
+  .box.tip { background: #D6E4F0; }
+  .box.warn { background: #FFF3CD; border-color: #d97706; }
+  .box.note { background: #e8f5e9; border-color: #16a34a; }
   .box strong { display: block; color: #1F4E79; margin-bottom: 4px; }
-
-  /* Tabuľky */
   table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 14px; }
   th { background: #1F4E79; color: #fff; padding: 8px 10px; text-align: left; }
   td { padding: 8px 10px; border: 1px solid #d1d5db; }
   tr:nth-child(odd) td { background: #f9fafb; }
   tr:nth-child(even) td { background: #fff; }
   td:first-child { font-weight: bold; }
-
-  /* Download tlačidlo */
-  .download-btn {
-    display: inline-flex; align-items: center; gap: 8px;
-    background: #1F4E79; color: #fff;
-    padding: 10px 20px; border-radius: 8px;
-    text-decoration: none; font-weight: bold;
-    margin: 16px 0;
-  }
+  .download-btn { display: inline-flex; align-items: center; gap: 8px; background: #1F4E79; color: #fff; padding: 10px 20px; border-radius: 8px; text-decoration: none; font-weight: bold; margin: 16px 0; }
   .download-btn:hover { background: #2E75B6; }
-
-  /* TOC */
   .toc { background: #fff; border: 1px solid #d1d5db; border-radius: 8px; padding: 20px 24px; margin-bottom: 32px; }
   .toc h2 { margin-top: 0; font-size: 16px; color: #1F4E79; }
   .toc ol { margin-bottom: 0; }
@@ -84,230 +39,226 @@
 </style>
 </head>
 <body>
-
-<div class="top-bar">
-  ♟ Šachový tréning — Manuál
-  <a href="index.html">← Späť do menu</a>
-</div>
-
+<div class="top-bar">♟ Šachový tréning — Manuál<a href="index.html">← Späť do menu</a></div>
 <div class="container">
 
-  <!-- Stiahnutie -->
-  <a class="download-btn" href="Sachovy_Trening_Manual_Pouzivatelsky.docx" download>
-    📄 Stiahnuť manuál ako Word dokument (.docx)
-  </a>
+<a class="download-btn" href="Sachovy_Trening_Manual_Pouzivatelsky.docx" download>📄 Stiahnuť manuál ako Word dokument (.docx)</a>
 
-  <!-- TOC -->
-  <div class="toc">
-    <h2>Obsah</h2>
-    <ol>
-      <li><a href="#uvod">Úvod</a></li>
-      <li><a href="#prihlasenie">Prihlásenie a účet</a></li>
-      <li><a href="#hlavna">Hlavná stránka</a></li>
-      <li><a href="#trening">Tréning — Taktika, Stratégia, Koncovka, Mix</a></li>
-      <li><a href="#zrucnosti">Zručnosti (Board Vision)</a></li>
-      <li><a href="#statistika">Štatistika</a></li>
-      <li><a href="#role">Role v systéme</a></li>
-      <li><a href="#admin">Administrácia</a></li>
-      <li><a href="#faq">Časté otázky</a></li>
-      <li><a href="#priloha">Príloha: Rýchla referenčná karta</a></li>
-    </ol>
-  </div>
-
-  <!-- 1 -->
-  <h1 id="uvod">1. Úvod</h1>
-  <p>Šachový tréning je webová aplikácia dostupná na adrese <strong>sachovytrening.eu</strong>, určená pre hráčov šachovej akadémie. Umožňuje systematicky trénovať šachové zručnosti formou riešenia úloh priamo na šachovnici.</p>
-  <p>Aplikácia pokrýva tieto oblasti:</p>
-  <ul>
-    <li><strong>Taktika</strong> — kombinačné úlohy</li>
-    <li><strong>Stratégia</strong> — pozičné úlohy</li>
-    <li><strong>Koncovky</strong> — záverečná fáza partie</li>
-    <li><strong>Zručnosti (board vision)</strong> — rozpoznávanie taktických motívov</li>
-    <li><strong>Mix</strong> — náhodný výber úloh</li>
-  </ul>
-  <p>Každý hráč má vlastné konto s ELO hodnotením, štatistikami a históriou tréningov.</p>
-
-  <!-- 2 -->
-  <h1 id="prihlasenie">2. Prihlásenie a účet</h1>
-  <h2>2.1 Prihlásenie</h2>
-  <p>Otvorte stránku <strong>sachovytrening.eu</strong> v prehliadači. Zobrazí sa prihlasovacia obrazovka.</p>
+<div class="toc">
+  <h2>Obsah</h2>
   <ol>
-    <li>Zadajte e-mailovú adresu a heslo</li>
-    <li>Kliknite na tlačidlo <strong>Prihlásiť sa</strong></li>
-    <li>Po úspešnom prihlásení sa zobrazí hlavná stránka s vašimi štatistikami</li>
+    <li><a href="#uvod">Úvod</a></li>
+    <li><a href="#prihlasenie">Prihlásenie a účet</a></li>
+    <li><a href="#hlavna">Hlavná stránka</a></li>
+    <li><a href="#trening">Tréning — Taktika, Stratégia, Koncovka, Mix</a></li>
+    <li><a href="#zrucnosti">Zručnosti (Board Vision)</a></li>
+    <li><a href="#statistika">Štatistika</a></li>
+    <li><a href="#role">Role v systéme</a></li>
+    <li><a href="#faq">Časté otázky</a></li>
+    <li><a href="#kontakt">Kontakt a podpora</a></li>
+    <li><a href="#priloha">Príloha: Rýchla referenčná karta</a></li>
   </ol>
-  <div class="box warn"><strong>Platnosť účtu</strong>Váš účet má obmedzenú platnosť. Ak sa nemôžete prihlásiť, kontaktujte trénera — platnosť vám predĺži v administrácii.</div>
+</div>
 
-  <h2>2.2 Registrácia nového hráča</h2>
-  <p>Nový hráč si zaregistruje účet priamo na prihlasovacej stránke. Tréner mu následne nastaví rolu a predĺži platnosť v admin paneli.</p>
+<h1 id="uvod">1. Úvod</h1>
+<p>Šachový tréning je webová aplikácia dostupná na adrese <strong>sachovytrening.eu</strong>. Umožňuje systematicky trénovať šachové zručnosti formou riešenia úloh priamo na šachovnici.</p>
+<p>Aplikácia pokrýva tieto oblasti:</p>
+<ul>
+  <li><strong>Taktika</strong> — kombinačné úlohy</li>
+  <li><strong>Stratégia</strong> — pozičné úlohy</li>
+  <li><strong>Koncovky</strong> — záverečná fáza partie</li>
+  <li><strong>Zručnosti</strong> — rozpoznávanie taktických motívov, forsírované ťahy</li>
+  <li><strong>Mix</strong> — náhodný výber úloh</li>
+</ul>
+<p>Každý hráč má vlastné konto s ELO hodnotením, štatistikami a históriou tréningov.</p>
 
-  <h2>2.3 Reset hesla</h2>
-  <p>Ak ste zabudli heslo, kliknite na odkaz <strong>Zabudnuté heslo</strong> na prihlasovacej stránke. Na váš e-mail bude odoslaný odkaz na nastavenie nového hesla.</p>
+<h1 id="prihlasenie">2. Prihlásenie a účet</h1>
+<h2>2.1 Prihlásenie</h2>
+<p>Otvorte stránku <strong>sachovytrening.eu</strong> v prehliadači. Zobrazí sa prihlasovacia obrazovka.</p>
+<ul>
+  <li>Zadajte e-mailovú adresu a heslo</li>
+  <li>Kliknite na tlačidlo <strong>Prihlásiť sa</strong></li>
+  <li>Po úspešnom prihlásení sa zobrazí hlavná stránka s vašimi štatistikami</li>
+</ul>
+<div class="box warn"><strong>Platnosť účtu</strong>Váš účet má obmedzenú platnosť. Ak sa nemôžete prihlásiť, kontaktujte trénera — platnosť vám predĺži v administrácii.</div>
 
-  <!-- 3 -->
-  <h1 id="hlavna">3. Hlavná stránka</h1>
-  <h2>3.1 Horná lišta — vaše štatistiky</h2>
-  <ul>
-    <li><strong>ELO MIX</strong> — vaše celkové ELO hodnotenie</li>
-    <li><strong>ÚSPEŠNOSŤ</strong> — percento správne vyriešených úloh</li>
-    <li><strong>RIEŠENÉ</strong> — celkový počet vyriešených úloh</li>
-  </ul>
-  <h2>3.2 Navigačné tlačidlá</h2>
-  <ul>
-    <li><strong>Zručnosti</strong> — tréning rozpoznávania taktických motívov (board vision)</li>
-    <li><strong>Taktika</strong> — kombinačné úlohy</li>
-    <li><strong>Stratégia</strong> — pozičné úlohy</li>
-    <li><strong>Koncovka</strong> — úlohy z koncoviek</li>
-    <li><strong>Mix</strong> — náhodný mix úloh zo všetkých kategórií</li>
-    <li><strong>Štatistika</strong> — podrobné štatistiky a grafy</li>
-    <li><strong>Manuál</strong> — tento návod</li>
-  </ul>
-  <h2>3.3 Rebríčky</h2>
-  <p>V dolnej časti hlavnej stránky sú rebríčky Top 10 hráčov v každej kategórii. Váš výsledok je zvýraznený modrou farbou.</p>
+<h2>2.2 Registrácia nového hráča</h2>
+<p>Nový hráč si zaregistruje účet priamo na prihlasovacej stránke. Tréner mu následne nastaví rolu a predĺži platnosť v admin paneli.</p>
 
-  <!-- 4 -->
-  <h1 id="trening">4. Tréning — Taktika, Stratégia, Koncovka, Mix</h1>
-  <h2>4.1 Spustenie tréningu</h2>
-  <p>Kliknite na príslušné tlačidlo. Zobrazí sa šachovnica s úlohou.</p>
+<h2>2.3 Reset hesla</h2>
+<p>Ak ste zabudli heslo, kliknite na odkaz <strong>Zabudnuté heslo</strong> na prihlasovacej stránke. Na váš e-mail bude odoslaný odkaz na nastavenie nového hesla.</p>
 
-  <h2>4.2 Popis obrazovky</h2>
-  <ul>
-    <li><strong>HRÁČ</strong> — vaše meno</li>
-    <li><strong>ELO HRÁČA</strong> — aktuálne ELO hodnotenie</li>
-    <li><strong>ELO ÚLOHY</strong> — obtiažnosť úlohy</li>
-    <li><strong>ODPORÚČANÝ ČAS</strong> — čas na rozmyslenie</li>
-    <li><strong>ZOSTÁVA</strong> — odpočítavanie času</li>
-    <li><strong>ZOSTÁVA NÁJSŤ</strong> — počet ťahov, ktoré ešte treba nájsť</li>
-    <li><strong>NÁJDENÉ ŤAHY</strong> — ťahy, ktoré ste už správne zadali</li>
-  </ul>
+<h1 id="hlavna">3. Hlavná stránka</h1>
+<p>Po prihlásení vidíte hlavnú stránku s prehľadom vašich výsledkov a navigáciou.</p>
+<h2>3.1 Horná lišta — vaše štatistiky</h2>
+<ul>
+  <li><strong>ELO MIX</strong> — náhodný výber úloh z taktiky, stratégie a koncoviek</li>
+  <li><strong>ÚSPEŠNOSŤ</strong> — percento správne vyriešených úloh</li>
+  <li><strong>RIEŠENÉ</strong> — celkový počet vyriešených úloh</li>
+</ul>
+<h2>3.2 Navigačné tlačidlá</h2>
+<ul>
+  <li><strong>Zručnosti</strong> — tréning rozpoznávania taktických motívov a forsírovaných ťahov</li>
+  <li><strong>Taktika</strong> — kombinačné úlohy</li>
+  <li><strong>Stratégia</strong> — pozičné úlohy</li>
+  <li><strong>Koncovka</strong> — úlohy z koncoviek</li>
+  <li><strong>Mix</strong> — náhodný mix úloh zo všetkých kategórií</li>
+  <li><strong>Štatistika</strong> — podrobné štatistiky a grafy</li>
+  <li><strong>Manuál</strong> — tento návod</li>
+</ul>
+<h2>3.3 Rebríčky</h2>
+<p>V dolnej časti hlavnej stránky sú rebríčky Top 10 hráčov v každej kategórii. Váš výsledok je zvýraznený modrou farbou.</p>
 
-  <h2>4.3 Ako zadávať riešenie</h2>
-  <ol>
-    <li>Kliknite na figúrku, ktorú chcete ťahať — pole sa označí žltým X</li>
-    <li>Kliknite na cieľové pole, kam má figúrka ísť</li>
-    <li>Ak je ťah správny, obe polia zostanú označené X a počítadlo sa zníži</li>
-    <li>Ak je ťah nesprávny, pole sa odznačí — skúste znova</li>
-  </ol>
-  <div class="box tip"><strong>Tip</strong>Úlohy môžu mať viac správnych riešení (napr. viacero šachov). Nájdite všetky!</div>
+<h1 id="trening">4. Tréning — Taktika, Stratégia, Koncovka, Mix</h1>
+<h2>4.1 Spustenie tréningu</h2>
+<p>Kliknite na príslušné tlačidlo (Taktika / Stratégia / Koncovka / Mix). Zobrazí sa šachovnica s úlohou.</p>
+<h2>4.2 Popis obrazovky</h2>
+<p>Ľavá strana — šachovnica s pozíciou. Pravá strana — informácie o úlohe:</p>
+<ul>
+  <li><strong>HRÁČ</strong> — vaše meno</li>
+  <li><strong>ELO HRÁČA</strong> — aktuálne ELO hodnotenie</li>
+  <li><strong>ELO ÚLOHY</strong> — obtiažnosť úlohy</li>
+  <li><strong>ODPORÚČANÝ ČAS</strong> — čas na rozmyslenie</li>
+  <li><strong>ZOSTÁVA</strong> — odpočítavanie času</li>
+</ul>
+<h2>4.3 Tlačidlá počas tréningu</h2>
+<ul>
+  <li><strong>Ďalšia úloha</strong> — preskočí na novú úlohu (aktuálna sa nezapočíta)</li>
+  <li><strong>Skús znova</strong> — resetuje aktuálnu úlohu (ELO sa nepočíta)</li>
+  <li><strong>Ukáž riešenie</strong> — zobrazí správne riešenie (úloha sa počíta ako neúspešná)</li>
+  <li><strong>Menu</strong> — návrat na hlavnú stránku</li>
+</ul>
+<h2>4.4 ELO hodnotenie</h2>
+<p>Po každej úlohe sa aktualizuje vaše ELO. Závisí od:</p>
+<ul>
+  <li>Správnosti riešenia (áno/nie)</li>
+  <li>Či ste použili tlačidlo Ukáž riešenie</li>
+  <li>Rozdielu medzi vaším ELO a obtiažnosťou úlohy</li>
+</ul>
 
-  <h2>4.4 Tlačidlá počas tréningu</h2>
-  <ul>
-    <li><strong>Ďalšia úloha</strong> — preskočí na novú úlohu (aktuálna sa nezapočíta do ELO)</li>
-    <li><strong>Skús znova</strong> — resetuje aktuálnu úlohu (ELO sa nepočíta)</li>
-    <li><strong>Ukáž riešenie</strong> — zobrazí správne riešenie (úloha sa počíta ako neúspešná)</li>
-    <li><strong>Menu</strong> — návrat na hlavnú stránku</li>
-  </ul>
+<h1 id="zrucnosti">5. Zručnosti (Board Vision)</h1>
+<h2>5.1 Čo sú zručnosti</h2>
+<p>Sekcia Zručnosti trénuje schopnosť okamžite rozpoznávať taktické motívy a nachádzať forsírované ťahy na šachovnici za obidve strany. Na rozdiel od bežného tréningu sa tu nehľadá najlepší ťah — hľadáte <strong>všetky výskyty</strong> daného javu v pozícii.</p>
+<div class="box warn"><strong>Dôležité</strong>Pri zručnostiach hľadáte situácie za BIELEHO AJ ČIERNEHO. Nájdite všetky výskyty v pozícii, nielen pre jednu stranu.</div>
 
-  <h2>4.5 ELO hodnotenie</h2>
-  <p>Po každej úlohe sa aktualizuje vaše ELO. Závisí od správnosti riešenia, použitia tlačidla Ukáž riešenie a rozdielu medzi vaším ELO a obtiažnosťou úlohy.</p>
+<h2>5.2 Dostupné zručnosti</h2>
+<table>
+  <tr><th>Zručnosť</th><th>Čo hľadáte</th><th>Ako zadávate</th><th>Príklad</th></tr>
+  <tr><td>Šachy</td><td>Všetky legálne ťahy, ktoré dávajú šach súperovmu kráľovi</td><td>Kliknite figúrku → kliknite pole (ťah)</td><td>Vf1–f8+</td></tr>
+  <tr><td>Brania</td><td>Všetky legálne ťahy, ktorými môžete zobrať súperovu figúrku</td><td>Kliknite figúrku → kliknite pole (ťah)</td><td>Sxd5</td></tr>
+  <tr><td>Pešiakové prielomy</td><td>Postup pešiaka, po ktorom ho môže zobrať súperov pešiak</td><td>Kliknite pešiaka → kliknite cieľ (ťah)</td><td>e4–e5</td></tr>
+  <tr><td>Priame napadnutia</td><td>Brania so ziskom materiálu (SEE > 0)</td><td>Kliknite figúrku → kliknite pole (ťah)</td><td>Jxe5 (nekryté)</td></tr>
+  <tr><td>Slabo pokryté figúrky</td><td>Figúrky, kde počet útočníkov ≥ počtu obrancov</td><td>Kliknite priamo na danú figúrku (pole)</td><td>e5 (2 útok., 1 obra.)</td></tr>
+  <tr><td>Absolútne väzby</td><td>Figúrky absolútne viazané voči vlastnému kráľovi</td><td>Kliknite priamo na viazanú figúrku (pole)</td><td>Jc6 viazaný Vb1</td></tr>
+  <tr><td>Relatívne väzby</td><td>Figúrky relatívne viazané voči cennejšej figúrke</td><td>Kliknite priamo na viazanú figúrku (pole)</td><td>Jf6 viazaný Df8</td></tr>
+  <tr><td>Vidličky</td><td>Pozície, kde figúrka môže vidličkovať dve súperove figúrky</td><td>Kliknite všetky vidličkované figúrky jednej vidličky</td><td>Jd5 vidličkuje V+S</td></tr>
+  <tr><td>Priame hrozby</td><td>Tiché ťahy (nie šach ani branie), ktoré hrozia ziskom materiálu</td><td>Kliknite figúrku → kliknite pole (ťah)</td><td>Sb3 hrozí Sxf7</td></tr>
+</table>
 
-  <!-- 5 -->
-  <h1 id="zrucnosti">5. Zručnosti (Board Vision)</h1>
-  <h2>5.1 Čo sú zručnosti</h2>
-  <p>Sekcia Zručnosti trénuje schopnosť okamžite rozpoznávať taktické motívy na šachovnici za obidve strany. Nehľadáte najlepší ťah — hľadáte <strong>všetky výskyty</strong> daného javu v pozícii, za bieleho aj čierneho.</p>
-  <div class="box warn"><strong>Dôležité</strong>Pri zručnostiach hľadáte situácie za BIELEHO AJ ČIERNEHO. Nájdite všetky výskyty v pozícii.</div>
+<h2>5.3 Podrobné vysvetlenie zadávania</h2>
+<h3>Ťahové zručnosti (šachy, brania, prielomy, priame napadnutia, priame hrozby)</h3>
+<p>Zadávate ťah v dvoch kliknutiach:</p>
+<ul>
+  <li>Kliknite na figúrku, ktorú chcete ťahať — pole sa označí žltým X</li>
+  <li>Kliknite na cieľové pole — ťah sa vyhodnotí</li>
+</ul>
+<p>Ak je ťah správny, obe polia dostanú trvalý X (farebný podľa počtu použití):</p>
+<ul>
+  <li>Žltý X — pole použité 1× v riešeniach</li>
+  <li>Modrý X — pole použité 2×</li>
+  <li>Červený X — pole použité 3× a viac</li>
+</ul>
+<div class="box tip"><strong>Príklad</strong>Hľadáte šachy. Kliknite na Vf1 (veža na f1), potom na f8 (cieľové pole) → ak je to šach, ťah sa potvrdí.</div>
 
-  <h2>5.2 Prehľad zručností</h2>
-  <table>
-    <tr><th>Zručnosť</th><th>Čo hľadáte</th><th>Ako zadávate</th></tr>
-    <tr><td>Šachy</td><td>Všetky ťahy dávajúce šach súperovi</td><td>Figúrka → cieľové pole (2 kliky)</td></tr>
-    <tr><td>Brania</td><td>Všetky legálne brania figúrok</td><td>Figúrka → cieľové pole (2 kliky)</td></tr>
-    <tr><td>Pešiakové prielomy</td><td>Postup pešiaka, po ktorom ho berie súperov pešiak</td><td>Pešiak → cieľové pole (2 kliky)</td></tr>
-    <tr><td>Priame napadnutia</td><td>Brania so ziskom materiálu (SEE &gt; 0)</td><td>Figúrka → cieľové pole (2 kliky)</td></tr>
-    <tr><td>Slabo pokryté figúrky</td><td>Figúrky kde útočníci ≥ obrancovia</td><td>Klik priamo na figúrku (1 klik)</td></tr>
-    <tr><td>Absolútne väzby</td><td>Figúrky absolútne viazané voči kráľovi</td><td>Klik priamo na figúrku (1 klik)</td></tr>
-    <tr><td>Relatívne väzby</td><td>Figúrky relatívne viazané voči cennejšej figúrke</td><td>Klik priamo na figúrku (1 klik)</td></tr>
-    <tr><td>Vidličky</td><td>Pozície kde figúrka vidličkuje dve súperove figúrky</td><td>Klikajte obe vidličkované figúrky (skupinový klik)</td></tr>
-    <tr><td>Priame hrozby</td><td>Tiché ťahy hroziace ziskom materiálu</td><td>Figúrka → cieľové pole (2 kliky)</td></tr>
-  </table>
+<h3>Jednoklikové zručnosti (slabo pokryté figúrky, absolútne väzby, relatívne väzby)</h3>
+<p>Kliknete priamo na pole, kde stojí hľadaná figúrka — bez výberu cieľa.</p>
+<div class="box tip"><strong>Príklad</strong>Hľadáte slabo pokryté figúrky. Ak je na e5 čierny jazdec napadnutý dvakrát a bránený raz — kliknite priamo na e5.</div>
 
-  <h2>5.3 Podrobné vysvetlenie zadávania</h2>
-  <h3>Ťahové zručnosti (šachy, brania, prielomy, priame napadnutia, priame hrozby)</h3>
-  <p>Zadávate ťah v dvoch kliknutiach: najprv kliknite na figúrku, potom na cieľové pole. Ak je ťah správny, obe polia dostanú trvalý X.</p>
-  <p>Farba X závisí od počtu použití poľa: <strong>žltý</strong> = 1×, <strong>modrý</strong> = 2×, <strong>červený</strong> = 3×+</p>
+<h3>Vidličky</h3>
+<p>Vidličky majú skupinové zadávanie — jedna vidlička = skupina figúrok, ktoré sú vidličkované spoločne:</p>
+<ul>
+  <li>Kliknite na prvú vidličkovanú figúrku — pole sa označí X</li>
+  <li>Kliknite na druhú vidličkovanú figúrku (v tej istej vidličke) — skupina sa vyhodnotí</li>
+  <li>Ak je vidlička správna, obe polia dostanú trvalý X</li>
+  <li>Kliknite znova pre ďalšiu vidličku (ak existuje viac vidličiek v pozícii)</li>
+</ul>
+<div class="box tip"><strong>Príklad</strong>Jazdec na d5 vidličkuje vežu a8 a kráľa e7. Kliknite a8, potom e7 (alebo opačne) → vidlička sa potvrdí.</div>
+<div class="box warn"><strong>Upozornenie</strong>Jedno pole môže byť súčasťou viacerých vidličiek. V takom prípade ho musíte kliknúť pre každú vidličku zvlášť. Modrý alebo červený X signalizuje, že pole patrí do viacerých riešení.</div>
 
-  <h3>Jednoklikové zručnosti (slabo pokryté figúrky, absolútne väzby, relatívne väzby)</h3>
-  <p>Kliknete priamo na pole, kde stojí hľadaná figúrka — bez výberu cieľa.</p>
-  <div class="box tip"><strong>Príklad</strong>Hľadáte slabo pokryté figúrky. Ak je na e5 čierny jazdec napadnutý dvakrát a bránený raz — kliknite priamo na e5.</div>
+<h2>5.4 Komplexný tréning</h2>
+<p>Komplexný tréning (tlačidlo <strong>Komplexný tréning</strong> s modrým rámčekom) spája všetky zručnosti na jednej pozícii za sebou.</p>
+<p>Priebeh tréningu:</p>
+<ul>
+  <li>Načíta sa pozícia</li>
+  <li>Zobrazí sa prvá zručnosť, ktorá je v pozícii prítomná (napr. Šachy)</li>
+  <li>Pod promptom vidíte progress: napr. „Zručnosť 1 / 4: Šachy"</li>
+  <li>Po nájdení všetkých šachov kliknite Ďalšia úloha → zobrazí sa ďalšia zručnosť tej istej pozície</li>
+  <li>Po prejdení všetkých zručností sa načíta nová pozícia</li>
+</ul>
+<p>Poradie zručností je pevné: Šachy → Brania → Pešiakové prielomy → Priame napadnutia → Slabo pokryté → Absolútne väzby → Relatívne väzby → Vidličky → Priame hrozby.</p>
+<div class="box tip"><strong>Tip</strong>Nie každá pozícia obsahuje všetky zručnosti — preskočí sa tá, ktorá v danej pozícii neexistuje. Každá zručnosť sa hodnotí samostatne do príslušného ELO.</div>
 
-  <h3>Vidličky</h3>
-  <p>Jedna vidlička = skupina figúrok, ktoré sú vidličkované spoločne. Klikajte na obe vidličkované figúrky (nie na vidličkujúcu). Poradie kliknutia nezáleží.</p>
-  <div class="box tip"><strong>Príklad</strong>Jazdec d5 vidličkuje vežu a8 a kráľa e7. Kliknite a8, potom e7 → vidlička sa potvrdí.</div>
-  <div class="box warn"><strong>Upozornenie</strong>Jedno pole môže byť súčasťou viacerých vidličiek. V takom prípade ho musíte kliknúť pre každú vidličku zvlášť. Modrý alebo červený X signalizuje viaceré riešenia.</div>
+<h1 id="statistika">6. Štatistika</h1>
+<h2>6.1 Štatistická tabuľka</h2>
+<p>Kliknutím na <strong>Štatistika</strong> v hlavnom menu sa dostanete na stránku so štatistikami. Vyberte časové obdobie (od–do) a kliknite <strong>Načítať štatistiku</strong>. Zobrazí sa tabuľka s výsledkami:</p>
+<ul>
+  <li>Meno hráča</li>
+  <li>Počet riešených úloh v období</li>
+  <li>Počet úspešne vyriešených</li>
+  <li>Úspešnosť v %</li>
+  <li>Celkový čas tréningu</li>
+  <li>Čas tréningu v zobrazenom období</li>
+</ul>
+<h2>6.2 Grafy</h2>
+<ul>
+  <li><strong>Progres ELO</strong> — vývoj ELO hodnotenia v čase pre každú kategóriu</li>
+  <li><strong>Tréningový čas</strong> — koľko ste trénovali v jednotlivých dňoch</li>
+</ul>
+<p>Zmeňte časové okno: 7 dní / 30 dní / 3 mesiace / Rok.</p>
 
-  <h2>5.4 Komplexný tréning</h2>
-  <p>Komplexný tréning (tlačidlo s modrým rámčekom) spája všetky zručnosti na jednej pozícii za sebou.</p>
-  <ol>
-    <li>Načíta sa pozícia</li>
-    <li>Zobrazí sa prvá dostupná zručnosť (napr. Šachy)</li>
-    <li>Pod promptom vidíte progress: napr. „Zručnosť 1 / 4: Šachy"</li>
-    <li>Po nájdení všetkých kliknite <strong>Ďalšia úloha</strong> → ďalšia zručnosť tej istej pozície</li>
-    <li>Po prejdení všetkých zručností sa načíta nová pozícia</li>
-  </ol>
-  <div class="box tip"><strong>Tip</strong>Poradie zručností je pevné. Každá zručnosť sa hodnotí samostatne do príslušného ELO.</div>
+<h1 id="role">7. Role v systéme</h1>
+<p>Aplikácia má štyri role s rôznymi právomocami:</p>
+<table>
+  <tr><th>Rola</th><th>Právomoci</th></tr>
+  <tr><td>Hráč</td><td>Trénuje, vidí vlastné štatistiky a rebríčky.</td></tr>
+  <tr><td>Tréner</td><td>Tréni, vidí štatistiky svojich hráčov.</td></tr>
+  <tr><td>Hlavný tréner</td><td>Vidí štatistiky všetkých hráčov.</td></tr>
+  <tr><td>Admin</td><td>Plný prístup — správa všetkých používateľov a nastavení.</td></tr>
+</table>
 
-  <!-- 6 -->
-  <h1 id="statistika">6. Štatistika</h1>
-  <h2>6.1 Štatistická tabuľka</h2>
-  <p>Vyberte časové obdobie a kliknite <strong>Načítať štatistiku</strong>. Zobrazí sa tabuľka s výsledkami hráčov (počet riešených úloh, úspešnosť, čas tréningu).</p>
-  <h2>6.2 Grafy</h2>
-  <ul>
-    <li><strong>Progres ELO</strong> — vývoj ELO hodnotenia v čase pre každú kategóriu</li>
-    <li><strong>Tréningový čas</strong> — koľko ste trénovali v jednotlivých dňoch</li>
-  </ul>
-  <p>Zmeňte časové okno: 7 dní / 30 dní / 3 mesiace / Rok.</p>
+<h1 id="faq">8. Časté otázky</h1>
+<h3>Nemôžem sa prihlásiť.</h3>
+<p>Skontrolujte e-mail a heslo. Ak ste heslo zabudli, kliknite Zabudnuté heslo. Ak sa hlási vypršaná platnosť účtu, kontaktujte trénera.</p>
+<h3>Moje ELO sa nezmenilo.</h3>
+<p>ELO sa nemení ak použijete tlačidlo <strong>Skús znova</strong> (reset bez hodnotenia). Tiež sa hodnotí len ak úlohu dokončíte (nájdete všetky riešenia) alebo kliknete <strong>Ukáž riešenie</strong>.</p>
+<h3>Nerozumiem čo mám hľadať pri vidličkách.</h3>
+<p>Hľadáte pozíciu, kde jedna figúrka napadá dve súperove figúrky súčasne. Klikajte na obe napadnuté figúrky (nie na vidličkujúcu). Napríklad jazdec d5 napadá vežu a8 aj kráľa e7 — kliknete a8 a e7.</p>
+<h3>Prečo mám červený X na niektorých poliach?</h3>
+<p>Červený X znamená, že dané pole sa objavilo v 3 alebo viacerých riešeniach tej istej úlohy. Žltý = 1×, modrý = 2×, červený = 3×+</p>
+<h3>Ako funguje komplexný tréning?</h3>
+<p>Načíta sa pozícia a vy ju riešite pre každú zručnosť zvlášť, za sebou. Poradie je pevné, preskočia sa len zručnosti, ktoré v pozícii nie sú prítomné. Progress vidíte pod promptom.</p>
 
-  <!-- 7 -->
-  <h1 id="role">7. Role v systéme</h1>
-  <table>
-    <tr><th>Rola</th><th>Právomoci</th></tr>
-    <tr><td>Hráč</td><td>Trénuje, vidí vlastné štatistiky a rebríčky.</td></tr>
-    <tr><td>Tréner</td><td>Tréni, vidí štatistiky svojich hráčov, predlžuje platnosť účtov.</td></tr>
-    <tr><td>Hlavný tréner</td><td>Vidí štatistiky všetkých hráčov, spravuje účty.</td></tr>
-    <tr><td>Admin</td><td>Plný prístup — správa všetkých používateľov a nastavení.</td></tr>
-  </table>
+<h1 id="kontakt">9. Kontakt a podpora</h1>
+<p>V prípade technických problémov alebo otázok kontaktujte správcu aplikácie.</p>
+<p><strong>Milan Chovanec</strong>, <a href="mailto:chovanec.sach@gmail.com">chovanec.sach@gmail.com</a></p>
+<p>Aplikácia je dostupná na adrese: <strong><a href="https://sachovytrening.eu">https://sachovytrening.eu</a></strong></p>
+<p>Šachová akadémia — Považské Podhradie</p>
 
-  <!-- 8 -->
-  <h1 id="admin">8. Administrácia (pre trénera / admina)</h1>
-  <h2>8.1 Správa hráčov</h2>
-  <p>Admin a hlavný tréner majú prístup do admin panelu cez tlačidlo <strong>Admin</strong> v pravom hornom rohu.</p>
-  <h2>8.2 Predĺženie platnosti účtu</h2>
-  <ol>
-    <li>V admin paneli kliknite na meno hráča</li>
-    <li>V pravom paneli uvidíte aktuálnu platnosť</li>
-    <li>Do poľa <strong>Predĺžiť o</strong> zadajte počet dní</li>
-    <li>Kliknite <strong>Predĺžiť</strong></li>
-  </ol>
-  <div class="box note"><strong>Poznámka</strong>Platnosť sa počíta od konca aktuálnej platnosti. Ak platnosť vypršala, počíta sa od dnes.</div>
-
-  <!-- 9 -->
-  <h1 id="faq">9. Časté otázky</h1>
-  <h3>Nemôžem sa prihlásiť.</h3>
-  <p>Skontrolujte e-mail a heslo. Ak ste heslo zabudli, kliknite Zabudnuté heslo. Ak sa hlási vypršaná platnosť účtu, kontaktujte trénera.</p>
-  <h3>Moje ELO sa nezmenilo.</h3>
-  <p>ELO sa nemení ak použijete tlačidlo <strong>Skús znova</strong>. Hodnotí sa len keď úlohu dokončíte alebo kliknete <strong>Ukáž riešenie</strong>.</p>
-  <h3>Nerozumiem čo mám hľadať pri vidličkách.</h3>
-  <p>Hľadáte pozíciu, kde jedna figúrka napadá dve súperove figúrky súčasne. Klikajte na obe <em>napadnuté</em> figúrky (nie na vidličkujúcu). Napríklad jazdec d5 napadá vežu a8 aj kráľa e7 — kliknite a8 a e7.</p>
-  <h3>Prečo mám červený X na niektorých poliach?</h3>
-  <p>Červený X znamená, že dané pole sa objavilo v 3 alebo viacerých riešeniach tej istej úlohy. Žltý = 1×, modrý = 2×, červený = 3×+</p>
-  <h3>Ako funguje komplexný tréning?</h3>
-  <p>Načíta sa pozícia a riešite ju pre každú zručnosť zvlášť, za sebou. Poradie je pevné, preskočia sa len chýbajúce zručnosti. Progress vidíte pod promptom.</p>
-
-  <!-- Príloha -->
-  <h1 id="priloha">Príloha: Rýchla referenčná karta zručností</h1>
-  <table>
-    <tr><th>Zručnosť</th><th>ELO / čas</th><th>Čo hľadáte</th><th>Ako zadávate</th></tr>
-    <tr><td>Šachy</td><td>1200 / 60s</td><td>Všetky ťahy dávajúce šach</td><td>2 kliky (figúrka → pole)</td></tr>
-    <tr><td>Brania</td><td>1250 / 90s</td><td>Všetky legálne brania</td><td>2 kliky (figúrka → pole)</td></tr>
-    <tr><td>Pešiakové prielomy</td><td>1200 / 60s</td><td>Postup pešiaka pred súperovým pešiakom</td><td>2 kliky (pešiak → pole)</td></tr>
-    <tr><td>Priame napadnutia</td><td>1250 / 90s</td><td>Brania so ziskom materiálu</td><td>2 kliky (figúrka → pole)</td></tr>
-    <tr><td>Slabo pokryté</td><td>1300 / 120s</td><td>Figúrky kde útočníci ≥ obrancovia</td><td>1 klik (na figúrku)</td></tr>
-    <tr><td>Absolútne väzby</td><td>1250 / 90s</td><td>Viazané figúrky voči kráľovi</td><td>1 klik (na figúrku)</td></tr>
-    <tr><td>Relatívne väzby</td><td>1400 / 360s</td><td>Viazané figúrky voči cennejšej figúrke</td><td>1 klik (na figúrku)</td></tr>
-    <tr><td>Vidličky</td><td>1500 / 420s</td><td>Figúrka vidličkuje dve súperove figúrky</td><td>Skupinový klik (obe napadnuté)</td></tr>
-    <tr><td>Priame hrozby</td><td>1400 / 420s</td><td>Tiché ťahy hroziace ziskom materiálu</td><td>2 kliky (figúrka → pole)</td></tr>
-  </table>
-  <div class="box tip"><strong>Pamätajte</strong>Vždy hľadáte situácie za bieleho AJ čierneho. X na poli zostáva až do novej úlohy — farebne ukazuje koľkokrát bolo pole použité v riešeniach.</div>
+<h1 id="priloha">Príloha: Rýchla referenčná karta zručností</h1>
+<p>Stručný prehľad všetkých 9 zručností — čo hľadáte a ako zadávate riešenie.</p>
+<table>
+  <tr><th>Zručnosť</th><th>ELO / čas</th><th>Čo hľadáte</th><th>Ako zadávate</th></tr>
+  <tr><td>Šachy</td><td>1200 / 60s</td><td>Všetky legálne ťahy dávajúce šach súperovi</td><td>Figúrka → cieľové pole (2 kliky)</td></tr>
+  <tr><td>Brania</td><td>1250 / 90s</td><td>Všetky legálne brania figúrok</td><td>Figúrka → cieľové pole (2 kliky)</td></tr>
+  <tr><td>Pešiakové prielomy</td><td>1200 / 60s</td><td>Postup pešiaka, po ktorom ho berie súperov pešiak</td><td>Pešiak → cieľové pole (2 kliky)</td></tr>
+  <tr><td>Priame napadnutia</td><td>1250 / 90s</td><td>Brania so ziskom materiálu (SEE > 0)</td><td>Figúrka → cieľové pole (2 kliky)</td></tr>
+  <tr><td>Slabo pokryté</td><td>1300 / 120s</td><td>Figúrky kde útočníci ≥ obrancovia</td><td>Klik priamo na figúrku (1 klik)</td></tr>
+  <tr><td>Absolútne väzby</td><td>1250 / 90s</td><td>Figúrky absolútne viazané voči kráľovi</td><td>Klik priamo na viazanú figúrku (1 klik)</td></tr>
+  <tr><td>Relatívne väzby</td><td>1400 / 360s</td><td>Figúrky relatívne viazané voči cennejšej figúrke</td><td>Klik priamo na viazanú figúrku (1 klik)</td></tr>
+  <tr><td>Vidličky</td><td>1500 / 420s</td><td>Pozície kde figúrka vidličkuje dve súperove figúrky</td><td>Klikajte obe vidličkované figúrky (skupinový klik)</td></tr>
+  <tr><td>Priame hrozby</td><td>1400 / 420s</td><td>Tiché ťahy hroziace ziskom materiálu</td><td>Figúrka → cieľové pole (2 kliky)</td></tr>
+</table>
+<div class="box tip"><strong>Pamätajte</strong>Pri všetkých zručnostiach hľadáte situácie za BIELEHO AJ ČIERNEHO. Vidličky klikáte po skupinách — obe napadnuté figúrky tvoria jednu skupinu. Polia označené modrým alebo červeným X sú súčasťou viacerých riešení.</div>
 
 </div>
 </body>
