@@ -4,11 +4,18 @@ const CURRENT_KEY = "currentPlayer";
 
 async function sbFetch(path, options = {}) {
   const url = `${SUPABASE_URL}/rest/v1/${path}`;
+  // Použi access token prihláseného používateľa ak je dostupný,
+  // inak fall-back na anon kľúč (pre verejné dotazy)
+  let authToken = SUPABASE_KEY;
+  try {
+    const { data } = await sb.auth.getSession();
+    if (data?.session?.access_token) authToken = data.session.access_token;
+  } catch(e) {}
   const res = await fetch(url, {
     ...options,
     headers: {
       "apikey": SUPABASE_KEY,
-      "Authorization": `Bearer ${SUPABASE_KEY}`,
+      "Authorization": `Bearer ${authToken}`,
       "Content-Type": "application/json",
       "Prefer": options.prefer || "",
       ...(options.headers || {})
