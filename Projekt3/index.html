@@ -79,7 +79,7 @@ body {
 /* ── Nav mriežka ── */
 .nav-row {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: repeat(8, 1fr);
   gap: 10px;
   margin-bottom: 12px;
 }
@@ -293,6 +293,10 @@ body {
       <div class="nav-icon i-stat">📊</div>
       Štatistika
     </button>
+    <button class="nav-btn" onclick="goManual()">
+      <div class="nav-icon i-stat">📖</div>
+      Manuál
+    </button>
     <button class="nav-btn nav-admin" id="adminBtn" onclick="goAdmin()" style="display:none;">
       <div class="nav-icon i-admin">⚙</div>
       Admin
@@ -436,6 +440,7 @@ function goTraining(mode) { location.href = "training.html?mode=" + mode; }
 function goAdmin()         { location.href = "admin.html"; }
 function goStats()         { location.href = "statistika.html"; }
 function goSkills(type)    { location.href = "skills.html?type=" + type; }
+function goManual()        { location.href = "manual.html"; }
 
 function toggleSkillsMenu() {
   const menu = document.getElementById('skillsSubmenu');
