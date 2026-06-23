@@ -438,44 +438,15 @@ function setStatus(text, type = '') {
 }
 
 // ─── Načítanie hráčov podľa roly ─────────────────────────────────────────────
-
-// Pseudo-záznam prihláseného trénera/admina do zoznamu hráčov
-async function fetchSelfAsPlayer() {
-  try {
-    const profiles = await sbFetch(`profiles?id=eq.${USER_ID}&select=id,name,surname,nick_name,role&limit=1`);
-    const p = (profiles || [])[0];
-    if (!p) return null;
-    const roleLabel = {
-      'trener': 'Tréner',
-      'hlavny_trener': 'Hlavný tréner',
-      'admin': 'Admin',
-    }[p.role] || p.role;
-    return {
-      id:         `profile_${p.id}`,   // unikátne ID aby nekolidovalo s players.id
-      user_id:    p.id,
-      name:       p.name || '',
-      surname:    p.nick_name || `${p.surname || ''} (${roleLabel})`,
-      trener_id:  null,
-      elo_mix:    null,
-      _isSelf:    true,
-      _roleLabel: roleLabel,
-    };
-  } catch(e) { return null; }
-}
-
 async function fetchPlayers() {
   if (IS_HRAC) {
     return await sbFetch(`players?user_id=eq.${USER_ID}&limit=1`);
   } else if (IS_TRENER) {
-    const players = await sbFetch(`players?trener_id=eq.${USER_ID}&order=surname.asc,name.asc`);
-    const self = await fetchSelfAsPlayer();
-    return self ? [self, ...(players || [])] : (players || []);
+    return await sbFetch(`players?trener_id=eq.${USER_ID}&order=surname.asc,name.asc`);
   } else {
     // admin aj hlavny_trener vidia všetkých — vylúč adminov
     const all = await sbFetch(`players?select=*,profile:profiles!user_id(role)&order=surname.asc,name.asc`);
-    const players = (all || []).filter(p => p.profile?.role !== 'admin');
-    const self = await fetchSelfAsPlayer();
-    return self ? [self, ...players] : players;
+    return (all || []).filter(p => p.profile?.role !== 'admin');
   }
 }
 
@@ -515,55 +486,35 @@ async function loadStats() {
     // Načítaj trénerov pre admin view
     const trenerMap = await fetchTrenerMap();
 
-    // Oddeľ pseudo-hráča (tréner/admin sám seba) od skutočných hráčov
-    const selfPlayer = players.find(p => p._isSelf);
-    const realPlayers = players.filter(p => !p._isSelf);
-
-    // Načítaj training_log za obdobie — pre skutočných hráčov podľa player_id
+    // Načítaj training_log za obdobie — len pre relevantných hráčov
+    const playerIds = players.map(p => p.id);
     const dateFromFull = dateFrom + 'T00:00:00';
     const dateToFull   = dateTo   + 'T23:59:59';
+
+    // Supabase IN filter: player_id=in.(id1,id2,...)
+    const idsParam = `(${playerIds.join(',')})`;
+    const logs = await sbFetch(
+      `training_log?player_id=in.${idsParam}&created_at=gte.${dateFromFull}&created_at=lte.${dateToFull}&select=player_id,result,time_spent`
+    );
+
+    // Zosumarizuj logy podľa hráča
     const logMap = {};
-
-    if (realPlayers.length) {
-      const idsParam = `(${realPlayers.map(p => p.id).join(',')})`;
-      const logs = await sbFetch(
-        `training_log?player_id=in.${idsParam}&created_at=gte.${dateFromFull}&created_at=lte.${dateToFull}&select=player_id,result,time_spent`
-      );
-      (logs || []).forEach(log => {
-        const pid = log.player_id;
-        if (!logMap[pid]) logMap[pid] = { played: 0, solved: 0, timeSpent: 0 };
-        logMap[pid].played   += 1;
-        if (log.result === 'win') logMap[pid].solved += 1;
-        logMap[pid].timeSpent += Number(log.time_spent || 0);
-      });
-    }
-
-    // Pre pseudo-hráča (tréner/admin) načítaj logy podľa user_id
-    if (selfPlayer) {
-      const selfLogs = await sbFetch(
-        `training_log?user_id=eq.${USER_ID}&created_at=gte.${dateFromFull}&created_at=lte.${dateToFull}&select=result,time_spent`
-      );
-      const selfLog = { played: 0, solved: 0, timeSpent: 0 };
-      (selfLogs || []).forEach(log => {
-        selfLog.played += 1;
-        if (log.result === 'win') selfLog.solved += 1;
-        selfLog.timeSpent += Number(log.time_spent || 0);
-      });
-      logMap[selfPlayer.id] = selfLog;
-    }
+    (logs || []).forEach(log => {
+      const pid = log.player_id;
+      if (!logMap[pid]) logMap[pid] = { played: 0, solved: 0, timeSpent: 0 };
+      logMap[pid].played   += 1;
+      if (log.result === 'win') logMap[pid].solved += 1;
+      logMap[pid].timeSpent += Number(log.time_spent || 0);
+    });
 
     // Zostav štatistiku
     statsData = players.map(p => {
       const log = logMap[p.id] || { played: 0, solved: 0, timeSpent: 0 };
       const acc = log.played > 0 ? Math.round((log.solved / log.played) * 100) : 0;
-      // Pre pseudo-hráča (tréner/admin) zobraz jeho meno s rolou
-      const displaySurname = p._isSelf
-        ? `${USER_NICK} (${p._roleLabel})`
-        : (p.surname || '');
       return {
-        name:         p._isSelf ? '' : (p.name || ''),
-        surname:      displaySurname,
-        trenerName:   p._isSelf ? '—' : (trenerMap[p.trener_id] || '—'),
+        name:         p.name || '',
+        surname:      p.surname || '',
+        trenerName:   trenerMap[p.trener_id] || '—',
         played:       log.played,
         solved:       log.solved,
         accuracy:     acc,
@@ -835,7 +786,6 @@ let eloChartInst  = null;
 let timeChartInst = null;
 let hiddenElo     = new Set();
 let chartPlayerId = null;
-let chartUserIdOverride = null;  // pre trénerov/adminov — grafy podľa user_id
 let chartDays     = 30;
 let lastEloData   = null;   // surové dáta z elo_history pre XLSX export
 let lastTimeData  = null;   // surové dáta z training_log pre XLSX export
@@ -867,10 +817,8 @@ async function initCharts() {
       const sel = document.getElementById('chartPlayerSelect');
       (players || []).forEach(p => {
         const opt = document.createElement('option');
-        opt.value = p.id;  // pre _isSelf je to 'profile_UUID'
-        opt.textContent = p._isSelf
-          ? `${USER_NICK} (${p._roleLabel})`
-          : `${p.surname} ${p.name}`.trim();
+        opt.value = p.id;
+        opt.textContent = `${p.surname} ${p.name}`.trim();
         sel.appendChild(opt);
       });
     } catch(e) {
@@ -878,18 +826,9 @@ async function initCharts() {
     }
 
     document.getElementById('chartPlayerSelect').addEventListener('change', function() {
-      const val = this.value;
-      if (!val) { chartPlayerId = null; clearCharts(); return; }
-      // Pseudo-hráč (tréner/admin) — grafy načítame podľa user_id
-      if (val.startsWith('profile_')) {
-        chartPlayerId = null;
-        chartUserIdOverride = USER_ID;
-        loadChartData();
-      } else {
-        chartUserIdOverride = null;
-        chartPlayerId = Number(val);
-        loadChartData();
-      }
+      chartPlayerId = this.value ? Number(this.value) : null;
+      if (chartPlayerId) loadChartData();
+      else clearCharts();
     });
 
     showChartMsg('eloMsg',  'Vyber hráča pre zobrazenie grafu.');
@@ -916,18 +855,10 @@ async function loadChartData() {
   hideChartMsg('eloMsg');
   hideChartMsg('timeMsg');
 
-  // Určí filter pre dotazy — buď podľa player_id alebo user_id (pre trénerov/adminov)
-  const eloFilter   = chartUserIdOverride
-    ? `user_id=eq.${chartUserIdOverride}`
-    : `player_id=eq.${chartPlayerId}`;
-  const timeFilter  = chartUserIdOverride
-    ? `user_id=eq.${chartUserIdOverride}`
-    : `player_id=eq.${chartPlayerId}`;
-
   // ELO história
   try {
     const eloData = await sbFetch(
-      `elo_history?${eloFilter}&created_at=gte.${startISO}&select=category,elo_value,created_at&order=created_at.asc`
+      `elo_history?player_id=eq.${chartPlayerId}&created_at=gte.${startISO}&select=category,elo_value,created_at&order=created_at.asc`
     );
     if (!eloData || !eloData.length) {
       showChartMsg('eloMsg', 'Žiadne ELO dáta pre toto obdobie. Dáta sa zbierajú od ďalšieho tréningu.');
@@ -944,7 +875,7 @@ async function loadChartData() {
   // Tréningový čas
   try {
     const timeData = await sbFetch(
-      `training_log?${timeFilter}&created_at=gte.${startISO}&select=time_spent,created_at&order=created_at.asc`
+      `training_log?player_id=eq.${chartPlayerId}&created_at=gte.${startISO}&select=time_spent,created_at&order=created_at.asc`
     );
     if (!timeData || !timeData.length) {
       showChartMsg('timeMsg', 'Žiadne tréningové dáta pre toto obdobie.');
