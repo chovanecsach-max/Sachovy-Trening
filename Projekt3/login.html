@@ -286,6 +286,15 @@ async function login() {
     return;
   }
 
+  // Kontrola platnosti účtu (valid_to) — admin a hlavný tréner nemajú obmedzenie
+  if (profile.role === 'hrac' || profile.role === 'trener') {
+    if (profile.valid_to && new Date(profile.valid_to) < new Date()) {
+      await sb.auth.signOut();
+      setStatus('loginStatus', `Platnosť účtu vypršala ${new Date(profile.valid_to).toLocaleDateString('sk-SK')}. Kontaktujte trénera.`, 'error');
+      return;
+    }
+  }
+
   // Ulož do sessionStorage
   sessionStorage.setItem('user_id', data.user.id);
   sessionStorage.setItem('user_email', data.user.email);
