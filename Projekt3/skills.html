@@ -1425,12 +1425,27 @@ function loadCompleteNext() {
   loadCompletePosition();
 }
 
+function completeFenSolved(fen) {
+  // FEN je „vyriešený" ak všetky jeho zručnosti sú v solvedSkillIds
+  const entry = completeByFen.get(fen);
+  if (!entry) return true;
+  const ids = Object.values(entry.puzzlesByKey).map(p => p.id);
+  return ids.every(id => solvedSkillIds.has(id));
+}
+
 function loadCompletePosition() {
   if (!completeFens.length) { setStatus('Žiadne ďalšie pozície', 'info'); return; }
-  let pool = completePos
-    ? completeFens.filter(f => f !== completePos.fen)
-    : completeFens;
+
+  // Prednostne FEN-y, ktoré ešte nie sú úplne vyriešené (a nie sú aktuálne)
+  let pool = completeFens.filter(f =>
+    f !== (completePos ? completePos.fen : null) && !completeFenSolved(f)
+  );
+  // Ak sú všetky vyriešené, vyber zo všetkých (okrem aktuálnej)
+  if (!pool.length) {
+    pool = completeFens.filter(f => f !== (completePos ? completePos.fen : null));
+  }
   if (!pool.length) pool = completeFens;
+
   const fen = pool[Math.floor(Math.random() * pool.length)];
   completePos = completeByFen.get(fen);
   completeSkillIdx = -1;
