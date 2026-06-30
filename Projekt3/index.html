@@ -69,6 +69,17 @@ body {
 .stat-val { font-size: 24px; font-weight: 600; color: #d4a843; line-height: 1; }
 .stat-lbl { font-size: 11px; color: rgba(255,255,255,0.38); text-transform: uppercase; letter-spacing: 0.9px; margin-top: 5px; }
 
+/* Streak — plameň + počet */
+.streak-val { display: inline-flex; align-items: center; gap: 4px; }
+.streak-fire { font-size: 22px; line-height: 1; }
+.streak-fire.active { animation: flicker 1.4s ease-in-out infinite alternate; }
+@keyframes flicker {
+  0%   { filter: drop-shadow(0 0 3px #f97316) brightness(1); }
+  50%  { filter: drop-shadow(0 0 8px #fb923c) brightness(1.15); }
+  100% { filter: drop-shadow(0 0 4px #fbbf24) brightness(1.05); }
+}
+.streak-zero { color: rgba(255,255,255,0.25); font-size: 22px; line-height: 1; }
+
 /* ── Hlavný obsah ── */
 .main {
   max-width: 1000px;
@@ -262,6 +273,10 @@ body {
     <div class="stat-val" id="statPlayed">—</div>
     <div class="stat-lbl">Riešené</div>
   </div>
+  <div class="stat-item">
+    <div class="stat-val" id="statStreak">—</div>
+    <div class="stat-lbl">Séria dní</div>
+  </div>
 </div>
 
 <!-- Hlavný obsah -->
@@ -422,6 +437,9 @@ async function initPage() {
       document.getElementById('statAcc').textContent    = acc + '%';
       document.getElementById('statPlayed').textContent = played;
 
+      // Streak — denná séria nepretržitého tréningu
+      computeStreak(player.id);
+
       // Načítaj rebríčky — pošli meno hráča pre zvýraznenie
       const myName = `${player.name || ''} ${player.surname || ''}`.trim();
       loadLeaderboards(myName);
@@ -431,6 +449,68 @@ async function initPage() {
   } catch(e) {
     console.error('Chyba načítania štatistík:', e);
     loadLeaderboards(null);
+  }
+}
+
+async function computeStreak(playerId) {
+  const el = document.getElementById('statStreak');
+  if (!el) return;
+  try {
+    // Načítaj unikátne dni tréningu (posledných 365 dní stačí)
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - 365);
+    const logs = await sbFetch(
+      `training_log?player_id=eq.${playerId}` +
+      `&created_at=gte.${cutoff.toISOString()}` +
+      `&select=created_at&order=created_at.desc`
+    );
+
+    if (!logs || !logs.length) {
+      el.innerHTML = '<span class="streak-zero">🔥</span>';
+      el.nextElementSibling.textContent = 'Séria dní';
+      return;
+    }
+
+    // Zisti unikátne dátumy (v lokálnom čase používateľa) vo formáte YYYY-MM-DD
+    const days = [...new Set(
+      logs.map(l => new Date(l.created_at).toLocaleDateString('sv-SE'))
+    )].sort().reverse();  // sv-SE dáva formát YYYY-MM-DD, zostupne
+
+    // Počítaj streak spätne od dnes (alebo včera — hráč možno ešte dnes nehrál)
+    const today = new Date().toLocaleDateString('sv-SE');
+    const yesterday = new Date(Date.now() - 86400000).toLocaleDateString('sv-SE');
+
+    let streak = 0;
+    // Začni od dnes alebo včera
+    let cursor = days[0] === today ? today : (days[0] === yesterday ? yesterday : null);
+    if (!cursor) {
+      // Posledný tréning bol pred viac ako dňom — séria prerušená
+      el.innerHTML = '<span class="streak-zero">🔥</span>';
+      el.nextElementSibling.textContent = 'Séria dní';
+      return;
+    }
+
+    for (const day of days) {
+      if (day === cursor) {
+        streak++;
+        // Posuň cursor o 1 deň dozadu
+        const d = new Date(cursor);
+        d.setDate(d.getDate() - 1);
+        cursor = d.toLocaleDateString('sv-SE');
+      } else {
+        break;
+      }
+    }
+
+    const isActive = days[0] === today;
+    el.innerHTML =
+      `<span class="streak-val">` +
+      `<span class="streak-fire${isActive ? ' active' : ''}" title="${isActive ? 'Dnes si trénoval!' : 'Séria zo včera'}">🔥</span>` +
+      `<span>${streak}</span>` +
+      `</span>`;
+    el.nextElementSibling.textContent = streak === 1 ? 'Deň v sérii' : 'Dní v sérii';
+  } catch(e) {
+    console.error('Streak chyba:', e);
   }
 }
 
