@@ -1179,7 +1179,8 @@ function openAnalysis() {
   if (!current) return;
   const fen = current.fen || current.FEN || '';
   if (!fen) return;
-  // Lichess Analysis Board očakáva FEN s podtržníkmi namiesto medzier v URL ceste
+  // Lichess Analysis Board: lomky musia zostať ako '/', medzery ako '_'
+  // NESMIE sa použiť encodeURIComponent (ten enkóduje aj '/' ako '%2F')
   const fenForUrl = fen.trim().replace(/ /g, '_');
   window.open(`https://lichess.org/analysis/${fenForUrl}`, '_blank', 'noopener');
 }
