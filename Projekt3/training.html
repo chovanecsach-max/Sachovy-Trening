@@ -604,6 +604,7 @@ button:disabled {
           <button class="primary" id="nextPuzzleBtn" onclick="nextPuzzle()">Ďalšia úloha</button>
           <button class="accent" id="retryBtn" onclick="retryPuzzle()">Skús znova</button>
           <button class="accent" id="showSolutionBtn" onclick="showSolution()">Ukáž riešenie</button>
+          <button class="secondary" id="analysisBtn" onclick="openAnalysis()" style="display:none;" title="Otvor pozíciu na Lichess Analysis Board">🔍 Analyzovať</button>
           <button class="secondary" onclick="goHome()">Menu</button>
         </div>
 
@@ -1167,6 +1168,21 @@ function updateUiLocks() {
   document.getElementById('nextPuzzleBtn').disabled = isAnimatingSolution || pendingPromotion !== null;
   document.getElementById('retryBtn').disabled = isAnimatingSolution || pendingPromotion !== null;
   document.getElementById('showSolutionBtn').disabled = disabled || solved;
+  // Tlačidlo Analyzovať sa zobrazí len keď je úloha dokončená (vyriešená alebo ukázané riešenie)
+  const analysisBtn = document.getElementById('analysisBtn');
+  if (analysisBtn) {
+    analysisBtn.style.display = (solved || failed) ? '' : 'none';
+  }
+}
+
+function openAnalysis() {
+  if (!current) return;
+  // Použij pôvodný FEN úlohy (nie aktuálny stav po ťahoch)
+  const fen = current.fen || current.FEN || '';
+  if (!fen) return;
+  const encodedFen = encodeURIComponent(fen);
+  // Lichess Analysis Board — otvorí sa v novej záložke
+  window.open(`https://lichess.org/analysis/${encodedFen}`, '_blank', 'noopener');
 }
 
 function saveStats() {
