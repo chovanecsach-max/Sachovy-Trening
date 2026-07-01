@@ -1177,12 +1177,11 @@ function updateUiLocks() {
 
 function openAnalysis() {
   if (!current) return;
-  // Použij pôvodný FEN úlohy (nie aktuálny stav po ťahoch)
   const fen = current.fen || current.FEN || '';
   if (!fen) return;
-  const encodedFen = encodeURIComponent(fen);
-  // Lichess Analysis Board — otvorí sa v novej záložke
-  window.open(`https://lichess.org/analysis/${encodedFen}`, '_blank', 'noopener');
+  // Lichess Analysis Board očakáva FEN s podtržníkmi namiesto medzier v URL ceste
+  const fenForUrl = fen.trim().replace(/ /g, '_');
+  window.open(`https://lichess.org/analysis/${fenForUrl}`, '_blank', 'noopener');
 }
 
 function saveStats() {
