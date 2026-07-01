@@ -1125,6 +1125,30 @@ async function deleteUser(userId, displayName) {
 
   setUserStatus('Mažem používateľa...');
   try {
+    // 0. Zisti, či je tento používateľ trénerom iných hráčov (trener_id odkaz)
+    const trainedPlayers = await sbFetch(
+      `players?trener_id=eq.${userId}&select=id,name,surname`
+    );
+    if (trainedPlayers && trainedPlayers.length) {
+      const names = trainedPlayers.map(p => `${p.name || ''} ${p.surname || ''}`.trim()).join(', ');
+      const proceed = confirm(
+        `Používateľ "${displayName}" je nastavený ako tréner pre ${trainedPlayers.length} hráč(ov):\n` +
+        `${names}\n\n` +
+        `Ak budeš pokračovať, títo hráči zostanú BEZ TRÉNERA (trener_id sa vynuluje).\n` +
+        `Pokračovať?`
+      );
+      if (!proceed) {
+        setUserStatus('Mazanie zrušené — používateľ je priradený ako tréner.', 'info');
+        return;
+      }
+      // Odpoj hráčov od tohto trénera (nastav trener_id na NULL)
+      await sbFetch(`players?trener_id=eq.${userId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ trener_id: null })
+      });
+    }
+
     // 1. Vymaž training_log záznamy (cez player_id)
     const playerData = await sbFetch(`players?user_id=eq.${userId}&select=id&limit=1`);
     if (playerData && playerData.length) {
