@@ -17,16 +17,48 @@ async function addTrainingResult(playerId, puzzleId, result, timeSpent = 0) {
   }
 }
 
-async function getSolvedPuzzleIds(playerId) {
+const RETRY_AFTER_DAYS = 14;   // po tomto počte dní sa nevyriešená (loss) úloha vráti do výberu
+
+async function getExcludedPuzzleIds(playerId) {
   try {
+    // Zoberieme celú históriu (puzzle_id, result, created_at) zoradenú od najnovšej,
+    // aby sme pre každú úlohu vedeli určiť jej POSLEDNÝ výsledok a jeho dátum.
     const data = await sbFetch(
-      `training_log?player_id=eq.${playerId}&select=puzzle_id`
+      `training_log?player_id=eq.${playerId}&select=puzzle_id,result,created_at&order=created_at.desc`
     );
-    return data ? data.map(x => x.puzzle_id) : [];
+    if (!data) return [];
+
+    const lastByPuzzle = new Map();   // puzzle_id → { result, created_at } (len najnovší záznam)
+    for (const row of data) {
+      if (!lastByPuzzle.has(row.puzzle_id)) {
+        lastByPuzzle.set(row.puzzle_id, row);
+      }
+    }
+
+    const now = Date.now();
+    const cutoffMs = RETRY_AFTER_DAYS * 24 * 60 * 60 * 1000;
+    const excluded = [];
+
+    lastByPuzzle.forEach((row, puzzleId) => {
+      if (row.result === 'win') {
+        excluded.push(puzzleId);   // vyriešené — ostáva vylúčené natrvalo
+      } else {
+        // neúspešné (loss) — vylúčené len kým neuplynie RETRY_AFTER_DAYS
+        const age = now - new Date(row.created_at).getTime();
+        if (age < cutoffMs) excluded.push(puzzleId);
+      }
+    });
+
+    return excluded;
   } catch (e) {
-    console.error("Chyba pri načítaní vyriešených úloh:", e);
+    console.error("Chyba pri načítaní histórie úloh:", e);
     return [];
   }
+}
+
+// Zachovaný pôvodný názov pre spätnú kompatibilitu (ak sa používa inde)
+async function getSolvedPuzzleIds(playerId) {
+  return getExcludedPuzzleIds(playerId);
 }
 
 function getTrainingMode() {
@@ -35,7 +67,7 @@ function getTrainingMode() {
 }
 
 async function pickPuzzleForPlayer(player, puzzles) {
-  const solved = await getSolvedPuzzleIds(player.id);
+  const excluded = await getExcludedPuzzleIds(player.id);
   const mode = getTrainingMode();
 
   // Filtruj podľa kategórie
@@ -51,7 +83,7 @@ async function pickPuzzleForPlayer(player, puzzles) {
   // Použi správne ELO hráča podľa režimu
   const playerElo = getPlayerEloByMode(player, mode);
 
-  const unsolved = filtered.filter(p => !solved.includes(p.id));
+  const unsolved = filtered.filter(p => !excluded.includes(p.id));
 
   function filterByRange(pool, range) {
     return pool.filter(p => Math.abs(p.elo - playerElo) <= range);
