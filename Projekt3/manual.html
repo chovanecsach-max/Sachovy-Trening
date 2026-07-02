@@ -140,53 +140,107 @@
 <h2>5.1 Čo sú zručnosti</h2>
 <p>Sekcia Zručnosti trénuje schopnosť okamžite rozpoznávať taktické motívy a nachádzať forsírované ťahy na šachovnici za obidve strany. Na rozdiel od bežného tréningu sa tu nehľadá najlepší ťah — hľadáte <strong>všetky výskyty</strong> daného javu v pozícii.</p>
 <div class="box warn"><strong>Dôležité</strong>Pri zručnostiach hľadáte situácie za BIELEHO AJ ČIERNEHO. Nájdite všetky výskyty v pozícii, nielen pre jednu stranu.</div>
+<p>Existujú tri spôsoby zadávania riešenia:</p>
+<ul>
+  <li><strong>Ťahové zručnosti</strong> — kliknete na figúrku a potom na cieľové pole (presne ako keď ťaháte v partii).</li>
+  <li><strong>Jednoklikové zručnosti</strong> — kliknete priamo na jedno pole, bez výberu cieľa.</li>
+  <li><strong>Vidličky</strong> — klikáte postupne na všetky figúrky, ktoré tvoria jednu vidličku.</li>
+</ul>
+<p>Po správnom zadaní zostane na použitých poliach krížik (X), ktorý pripomína, čo ste už našli. Farba krížika ukazuje, koľkokrát sa dané pole objavilo v riešeniach: <strong>žltý</strong> = 1×, <strong>modrý</strong> = 2×, <strong>červený</strong> = 3× a viac.</p>
 
-<h2>5.2 Dostupné zručnosti</h2>
+<h2>5.2 Prehľad zručností</h2>
 <table>
   <tr><th>Zručnosť</th><th>Čo hľadáte</th><th>Ako zadávate</th><th>Príklad</th></tr>
   <tr><td>Šachy</td><td>Všetky legálne ťahy, ktoré dávajú šach súperovmu kráľovi</td><td>Kliknite figúrku → kliknite pole (ťah)</td><td>Vf1–f8+</td></tr>
   <tr><td>Brania</td><td>Všetky legálne ťahy, ktorými môžete zobrať súperovu figúrku</td><td>Kliknite figúrku → kliknite pole (ťah)</td><td>Sxd5</td></tr>
   <tr><td>Pešiakové prielomy</td><td>Postup pešiaka, po ktorom ho môže zobrať súperov pešiak</td><td>Kliknite pešiaka → kliknite cieľ (ťah)</td><td>e4–e5</td></tr>
   <tr><td>Priame napadnutia</td><td>Brania so ziskom materiálu (SEE > 0)</td><td>Kliknite figúrku → kliknite pole (ťah)</td><td>Jxe5 (nekryté)</td></tr>
-  <tr><td>Slabo pokryté figúrky</td><td>Figúrky, kde počet útočníkov ≥ počtu obrancov</td><td>Kliknite priamo na danú figúrku (pole)</td><td>e5 (2 útok., 1 obra.)</td></tr>
+  <tr><td>Slabo pokryté figúry</td><td>Figúry a pešiaci, na ktorých útočí rovnaký alebo väčší počet útočníkov ako obrancov</td><td>Kliknite priamo na danú figúru (pole)</td><td>e5 (2 útok., 1 obra.)</td></tr>
   <tr><td>Absolútne väzby</td><td>Figúrky absolútne viazané voči vlastnému kráľovi</td><td>Kliknite priamo na viazanú figúrku (pole)</td><td>Jc6 viazaný Vb1</td></tr>
   <tr><td>Relatívne väzby</td><td>Figúrky relatívne viazané voči cennejšej figúrke</td><td>Kliknite priamo na viazanú figúrku (pole)</td><td>Jf6 viazaný Df8</td></tr>
   <tr><td>Vidličky</td><td>Pozície, kde figúrka môže vidličkovať dve súperove figúrky</td><td>Kliknite všetky vidličkované figúrky jednej vidličky</td><td>Jd5 vidličkuje V+S</td></tr>
   <tr><td>Priame hrozby</td><td>Tiché ťahy (nie šach ani branie), ktoré hrozia ziskom materiálu</td><td>Kliknite figúrku → kliknite pole (ťah)</td><td>Sb3 hrozí Sxf7</td></tr>
 </table>
 
-<h2>5.3 Podrobné vysvetlenie zadávania</h2>
-<h3>Ťahové zručnosti (šachy, brania, prielomy, priame napadnutia, priame hrozby)</h3>
-<p>Zadávate ťah v dvoch kliknutiach:</p>
-<ul>
-  <li>Kliknite na figúrku, ktorú chcete ťahať — pole sa označí žltým X</li>
-  <li>Kliknite na cieľové pole — ťah sa vyhodnotí</li>
-</ul>
-<p>Ak je ťah správny, obe polia dostanú trvalý X (farebný podľa počtu použití):</p>
-<ul>
-  <li>Žltý X — pole použité 1× v riešeniach</li>
-  <li>Modrý X — pole použité 2×</li>
-  <li>Červený X — pole použité 3× a viac</li>
-</ul>
-<div class="box tip"><strong>Príklad</strong>Hľadáte šachy. Kliknite na Vf1 (veža na f1), potom na f8 (cieľové pole) → ak je to šach, ťah sa potvrdí.</div>
+<h2>5.3 Podrobný návod pre každú zručnosť</h2>
 
-<h3>Jednoklikové zručnosti (slabo pokryté figúrky, absolútne väzby, relatívne väzby)</h3>
-<p>Kliknete priamo na pole, kde stojí hľadaná figúrka — bez výberu cieľa.</p>
-<div class="box tip"><strong>Príklad</strong>Hľadáte slabo pokryté figúrky. Ak je na e5 čierny jazdec napadnutý dvakrát a bránený raz — kliknite priamo na e5.</div>
+<h3>1. Šachy</h3>
+<p><strong>Čo hľadáte:</strong> Všetky ťahy, ktoré dávajú šach súperovmu kráľovi — za bieleho aj za čierneho.</p>
+<p><strong>Ako zadáte riešenie:</strong></p>
+<ol>
+  <li>Kliknite na figúrku, ktorá môže dať šach.</li>
+  <li>Kliknite na pole, kam má ísť.</li>
+</ol>
+<div class="box tip"><strong>Príklad</strong>Veža stojí na f1 a môže ísť na f8, kde dá šach kráľovi na g8. Kliknite f1 → kliknite f8.</div>
 
-<h3>Vidličky</h3>
-<p>Vidličky majú skupinové zadávanie — jedna vidlička = skupina figúrok, ktoré sú vidličkované spoločne:</p>
-<ul>
-  <li>Kliknite na prvú vidličkovanú figúrku — pole sa označí X</li>
-  <li>Kliknite na druhú vidličkovanú figúrku (v tej istej vidličke) — skupina sa vyhodnotí</li>
-  <li>Ak je vidlička správna, obe polia dostanú trvalý X</li>
-  <li>Kliknite znova pre ďalšiu vidličku (ak existuje viac vidličiek v pozícii)</li>
-</ul>
-<div class="box tip"><strong>Príklad</strong>Jazdec na d5 vidličkuje vežu a8 a kráľa e7. Kliknite a8, potom e7 (alebo opačne) → vidlička sa potvrdí.</div>
-<div class="box warn"><strong>Upozornenie</strong>Jedno pole môže byť súčasťou viacerých vidličiek. V takom prípade ho musíte kliknúť pre každú vidličku zvlášť. Modrý alebo červený X signalizuje, že pole patrí do viacerých riešení.</div>
+<h3>2. Brania</h3>
+<p><strong>Čo hľadáte:</strong> Všetky legálne ťahy, ktorými môže niektorá figúrka zobrať súperovu figúrku — za bieleho aj za čierneho. Nezáleží na tom, či je branie výhodné — hľadáte úplne všetky možné brania.</p>
+<p><strong>Ako zadáte riešenie:</strong></p>
+<ol>
+  <li>Kliknite na figúrku, ktorá môže brať.</li>
+  <li>Kliknite na pole, kde stojí súperova figúrka.</li>
+</ol>
+<div class="box tip"><strong>Príklad</strong>Jazdec na f3 môže zobrať pešiaka na e5. Kliknite f3 → kliknite e5.</div>
+
+<h3>3. Pešiakové prielomy</h3>
+<p><strong>Čo hľadáte:</strong> Postup pešiaka o jedno (alebo pri prvom ťahu o dve) polia dopredu, po ktorom ho môže hneď zobrať súperov pešiak. Hľadáte za bieleho aj za čierneho.</p>
+<p><strong>Ako zadáte riešenie:</strong></p>
+<ol>
+  <li>Kliknite na pešiaka.</li>
+  <li>Kliknite na pole, kam postúpi.</li>
+</ol>
+<div class="box tip"><strong>Príklad</strong>Biely pešiak e4 postúpi na e5, kde ho môže zobrať čierny pešiak z d6 alebo f6. Kliknite e4 → kliknite e5.</div>
+<div class="box warn"><strong>Pozor</strong>Nehľadáte, či je prielom výhodný — len to, či po ňom súperov pešiak môže brať.</div>
+
+<h3>4. Priame materiálne napadnutia</h3>
+<p><strong>Čo hľadáte:</strong> Brania, ktoré <strong>získavajú materiál</strong> — teda branie, po ktorom súper nezíska naspäť rovnakú alebo väčšiu hodnotu. Ide o skutočne výhodné brania, nie len akékoľvek.</p>
+<p><strong>Ako zadáte riešenie:</strong></p>
+<ol>
+  <li>Kliknite na figúrku, ktorá berie.</li>
+  <li>Kliknite na pole súperovej figúrky.</li>
+</ol>
+<div class="box tip"><strong>Príklad</strong>Dáma môže zobrať nekrytého strelca. Kliknite na dámu → kliknite na strelca.</div>
+<p><em>Rozdiel oproti „Braniam":</em> tu hľadáte len tie brania, ktoré sú naozaj ziskové (súperova figúrka je nekrytá alebo nedostatočne bránená).</p>
+
+<h3>5. Slabo pokryté figúry</h3>
+<p><strong>Čo hľadáte:</strong> Figúry a pešiakov, na ktoré útočí rovnaký alebo väčší počet útočníkov ako obrancov. Hľadáte takéto figúry oboch farieb.</p>
+<p><strong>Ako zadáte riešenie:</strong> Len jeden klik — kliknite priamo na pole, kde stojí slabo pokrytá figúra. Cieľové pole nevyberáte.</p>
+<div class="box tip"><strong>Príklad</strong>Na e5 stojí čierny jazdec, ktorý je napadnutý dvakrát a bránený len raz. Kliknite priamo na e5.</div>
+
+<h3>6. Absolútne väzby</h3>
+<p><strong>Čo hľadáte:</strong> Figúrky, ktoré sa nemôžu pohnúť, pretože by odkryli útok na vlastného kráľa (figúrka je „pribitá" k obrane kráľa). Hľadáte za obe strany.</p>
+<p><strong>Ako zadáte riešenie:</strong> Len jeden klik — kliknite priamo na viazanú figúrku.</p>
+<div class="box tip"><strong>Príklad</strong>Čierny jazdec na c6 je viazaný, lebo za ním v tej istej línii stojí vlastný kráľ a súperova veža by ho po odchode jazdca napadla. Kliknite priamo na c6.</div>
+
+<h3>7. Relatívne väzby</h3>
+<p><strong>Čo hľadáte:</strong> Figúrky, ktoré sa síce môžu pohnúť bez porušenia pravidiel, ale ak by sa pohli, odkryli by útok na <strong>cennejšiu vlastnú figúrku</strong> (nie kráľa). Hľadáte za obe strany.</p>
+<p><strong>Ako zadáte riešenie:</strong> Len jeden klik — kliknite priamo na viazanú figúrku.</p>
+<div class="box tip"><strong>Príklad</strong>Jazdec na f6 je viazaný, lebo za ním stojí vlastná dáma na f8 a súperova veža by po odchode jazdca dámu napadla. Kliknite priamo na f6.</div>
+<p><em>Rozdiel oproti „Absolútnym väzbám":</em> tu ide o väzbu voči inej cennej figúrke, nie voči kráľu — takže sa figúrka <em>smie</em> pohnúť, len by to bolo nevýhodné.</p>
+
+<h3>8. Vidličky</h3>
+<p><strong>Čo hľadáte:</strong> Postavenia, kde jedna figúrka (po prípadnom prieťahu) napáda <strong>súčasne dve súperove figúrky</strong>. Hľadáte za obe strany.</p>
+<p><strong>Ako zadáte riešenie:</strong></p>
+<ol>
+  <li>Kliknite na <strong>prvú</strong> napadnutú figúrku (nie na tú, ktorá vidličkuje).</li>
+  <li>Kliknite na <strong>druhú</strong> napadnutú figúrku tej istej vidličky.</li>
+</ol>
+<p>Poradie kliknutia nezáleží. Keď označíte obe správne polia, vidlička sa potvrdí a obe polia dostanú trvalý krížik.</p>
+<div class="box tip"><strong>Príklad</strong>Jazdec na d5 napáda súčasne vežu na a8 aj kráľa na e7. Kliknite a8 → kliknite e7 (alebo naopak).</div>
+<div class="box warn"><strong>Upozornenia</strong>Klikáte na <em>napadnuté</em> figúrky, nie na tú, čo útočí. Ak je v pozícii viac vidličiek, riešite ich postupne. Jedno pole môže patriť do viacerých vidličiek naraz — vtedy ho musíte kliknúť zvlášť pre každú z nich (modrý alebo červený krížik to napovie). Ak kliknete na pole, ktoré nie je súčasťou žiadnej vidličky, úloha sa vyhodnotí ako chybná.</div>
+
+<h3>9. Priame materiálne hrozby</h3>
+<p><strong>Čo hľadáte:</strong> Tiché ťahy (teda nie šach ani branie), ktoré vytvárajú hrozbu získania materiálu v ďalšom ťahu. Hľadáte za obe strany.</p>
+<p><strong>Ako zadáte riešenie:</strong></p>
+<ol>
+  <li>Kliknite na figúrku, ktorá vytvára hrozbu.</li>
+  <li>Kliknite na pole, kam má ísť.</li>
+</ol>
+<div class="box tip"><strong>Príklad</strong>Strelec ustúpi z d5 na b3, odkiaľ v ďalšom ťahu hrozí zobrať nekrytého strelca na f7. Kliknite d5 → kliknite b3.</div>
+<div class="box warn"><strong>Pozor</strong>Ak by súper mohol vašu figúrku po tomto ťahu okamžite a výhodne zobrať, taký ťah sa nepočíta ako hrozba — hrozba musí byť bezpečná.</div>
 
 <h2>5.4 Komplexný tréning</h2>
-<p>Komplexný tréning (tlačidlo <strong>Komplexný tréning</strong> s modrým rámčekom) spája všetky zručnosti na jednej pozícii za sebou.</p>
+<p>Komplexný tréning (tlačidlo <strong>Komplexný tréning</strong> s modrým rámčekom) spája všetky zručnosti na jednej pozícii za sebou. Postup zadávania riešenia je pri každej zručnosti rovnaký, ako je uvedené vyššie — len po dokončení jednej zručnosti pokračujete ďalšou na tej istej pozícii.</p>
 <p>Priebeh tréningu:</p>
 <ul>
   <li>Načíta sa pozícia</li>
@@ -199,6 +253,7 @@
 <div class="box tip"><strong>Tip</strong>Nie každá pozícia obsahuje všetky zručnosti — preskočí sa tá, ktorá v danej pozícii neexistuje. Každá zručnosť sa hodnotí samostatne do príslušného ELO.</div>
 
 <h1 id="statistika">6. Štatistika</h1>
+
 <h2>6.1 Štatistická tabuľka</h2>
 <p>Kliknutím na <strong>Štatistika</strong> v hlavnom menu sa dostanete na stránku so štatistikami. Vyberte časové obdobie (od–do) a kliknite <strong>Načítať štatistiku</strong>. Zobrazí sa tabuľka s výsledkami:</p>
 <ul>
@@ -252,7 +307,7 @@
   <tr><td>Brania</td><td>1250 / 90s</td><td>Všetky legálne brania figúrok</td><td>Figúrka → cieľové pole (2 kliky)</td></tr>
   <tr><td>Pešiakové prielomy</td><td>1200 / 60s</td><td>Postup pešiaka, po ktorom ho berie súperov pešiak</td><td>Pešiak → cieľové pole (2 kliky)</td></tr>
   <tr><td>Priame napadnutia</td><td>1250 / 90s</td><td>Brania so ziskom materiálu (SEE > 0)</td><td>Figúrka → cieľové pole (2 kliky)</td></tr>
-  <tr><td>Slabo pokryté</td><td>1300 / 120s</td><td>Figúrky kde útočníci ≥ obrancovia</td><td>Klik priamo na figúrku (1 klik)</td></tr>
+  <tr><td>Slabo pokryté</td><td>1300 / 120s</td><td>Útočníci ≥ obrancovia</td><td>Klik priamo na figúrku (1 klik)</td></tr>
   <tr><td>Absolútne väzby</td><td>1250 / 90s</td><td>Figúrky absolútne viazané voči kráľovi</td><td>Klik priamo na viazanú figúrku (1 klik)</td></tr>
   <tr><td>Relatívne väzby</td><td>1400 / 360s</td><td>Figúrky relatívne viazané voči cennejšej figúrke</td><td>Klik priamo na viazanú figúrku (1 klik)</td></tr>
   <tr><td>Vidličky</td><td>1500 / 420s</td><td>Pozície kde figúrka vidličkuje dve súperove figúrky</td><td>Klikajte obe vidličkované figúrky (skupinový klik)</td></tr>
