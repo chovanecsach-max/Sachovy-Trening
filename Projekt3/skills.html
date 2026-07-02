@@ -1362,18 +1362,40 @@ async function loadPuzzles() {
 
 // ─── Výber úlohy ─────────────────────────────────────────────────────────────
 
-// Zoznam ID už vyriešených úloh (načíta sa raz pri štarte)
+// Zoznam ID úloh aktuálne vylúčených z výberu (vyriešené natrvalo + nedávno neúspešné)
 let solvedSkillIds = new Set();
+
+const SKILL_RETRY_AFTER_DAYS = 14;   // po tomto počte dní sa nevyriešená (loss) úloha vráti do výberu
 
 async function loadSolvedSkillIds() {
   if (!currentPlayer) return;
   try {
     const data = await sbFetch(
-      `training_log?player_id=eq.${currentPlayer.id}&select=puzzle_id`
+      `training_log?player_id=eq.${currentPlayer.id}&select=puzzle_id,result,created_at&order=created_at.desc`
     );
-    solvedSkillIds = new Set((data || []).map(x => x.puzzle_id));
+    const lastByPuzzle = new Map();
+    (data || []).forEach(row => {
+      if (!lastByPuzzle.has(row.puzzle_id)) {
+        lastByPuzzle.set(row.puzzle_id, row);
+      }
+    });
+
+    const now = Date.now();
+    const cutoffMs = SKILL_RETRY_AFTER_DAYS * 24 * 60 * 60 * 1000;
+    const excluded = new Set();
+
+    lastByPuzzle.forEach((row, puzzleId) => {
+      if (row.result === 'win') {
+        excluded.add(puzzleId);   // vyriešené — natrvalo vylúčené
+      } else {
+        const age = now - new Date(row.created_at).getTime();
+        if (age < cutoffMs) excluded.add(puzzleId);   // nedávno neúspešné — dočasne vylúčené
+      }
+    });
+
+    solvedSkillIds = excluded;
   } catch(e) {
-    console.error('Chyba načítania vyriešených úloh:', e);
+    console.error('Chyba načítania histórie úloh:', e);
   }
 }
 
@@ -1479,7 +1501,9 @@ function loadCompleteNext() {
 }
 
 function completeFenSolved(fen) {
-  // FEN je „vyriešený" ak všetky jeho zručnosti sú v solvedSkillIds
+  // FEN sa považuje za "vybavený" ak sú všetky jeho zručnosti buď vyriešené,
+  // alebo nedávno (< 14 dní) neúspešné — teda momentálne vylúčené z výberu.
+  // Po uplynutí 14 dní sa neúspešné zručnosti vrátia do hry a FEN sa znova stane kandidátom.
   const entry = completeByFen.get(fen);
   if (!entry) return true;
   const ids = Object.values(entry.puzzlesByKey).map(p => p.id);
