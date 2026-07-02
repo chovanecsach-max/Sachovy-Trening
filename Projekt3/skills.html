@@ -1300,8 +1300,21 @@ async function loadPuzzles() {
 
   // Komplexný sekvenčný režim — načíta zo skill_puzzles a zoskupí podľa FEN
   if (isCompleteMode()) {
-    const data = await sbFetch('skill_puzzles?order=id.asc&limit=2000');
-    if (!data || !data.length) throw new Error('Žiadne úlohy v skill_puzzles');
+    // Supabase má default limit 1000 na dopyt — pri 10 000+ záznamoch treba
+    // stiahnuť VŠETKY dávkovo, inak sa nenájdu prekrývajúce sa zručnosti
+    // (ID sú prideľované po blokoch podľa zručnosti, takže pri obmedzenom
+    // limite sa vôbec nedostaneme k neskorším zručnostiam ako vidličky).
+    let data = [];
+    let offset = 0;
+    const batchSize = 1000;
+    while (true) {
+      const batch = await sbFetch(`skill_puzzles?order=id.asc&limit=${batchSize}&offset=${offset}`);
+      if (!batch || !batch.length) break;
+      data = data.concat(batch);
+      if (batch.length < batchSize) break;
+      offset += batchSize;
+    }
+    if (!data.length) throw new Error('Žiadne úlohy v skill_puzzles');
     completeByFen = new Map();
     const skillKeys = new Set(COMPLETE_SKILLS.map(s => s.key));
     for (const p of data) {
@@ -1350,14 +1363,20 @@ async function loadPuzzles() {
     filter = "skill_type=eq.direct_attack";
   } else if (type === "direct_threat") {
     filter = "skill_type=eq.direct_threat";
-  } else if (type === "direct_threat") {
-    filter = "skill_type=eq.direct_threat";
   }
-  const query = filter
-    ? `skill_puzzles?${filter}&order=id.asc&limit=2000`
-    : "skill_puzzles?order=id.asc&limit=2000";
-  const data = await sbFetch(query);
-  if (!data || !data.length) throw new Error("Žiadne úlohy v databáze pre tento typ");
+  const baseQuery = filter ? `skill_puzzles?${filter}&order=id.asc` : "skill_puzzles?order=id.asc";
+  // Dávkové načítanie — jedna zručnosť môže mať viac ako 1000/2000 záznamov
+  let data = [];
+  let offset = 0;
+  const batchSize = 1000;
+  while (true) {
+    const batch = await sbFetch(`${baseQuery}&limit=${batchSize}&offset=${offset}`);
+    if (!batch || !batch.length) break;
+    data = data.concat(batch);
+    if (batch.length < batchSize) break;
+    offset += batchSize;
+  }
+  if (!data.length) throw new Error("Žiadne úlohy v databáze pre tento typ");
   return data;
 }
 
