@@ -1314,11 +1314,12 @@ async function loadPuzzles() {
         entry.puzzlesByKey[p.skill_type] = p;
       }
     }
-    // Ponechaj len FEN-y s aspoň 2 zručnosťami
+    // Ponechaj len FEN-y s aspoň 4 rôznymi zručnosťami
+    const MIN_COMPLETE_SKILLS = 4;
     completeFens = [...completeByFen.keys()].filter(
-      f => Object.keys(completeByFen.get(f).puzzlesByKey).length >= 2
+      f => Object.keys(completeByFen.get(f).puzzlesByKey).length >= MIN_COMPLETE_SKILLS
     );
-    if (!completeFens.length) throw new Error('Žiadne pozície s aspoň 2 zručnosťami v skill_puzzles');
+    if (!completeFens.length) throw new Error(`Žiadne pozície s aspoň ${MIN_COMPLETE_SKILLS} zručnosťami v skill_puzzles`);
     return [];
   }
 
