@@ -54,6 +54,31 @@ body {
 .logout-btn:hover { color: #d4a843; }
 
 /* ── Stats bar ── */
+.validity-banner {
+  padding: 10px 24px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+}
+.validity-banner.ok {
+  background: #14321f;
+  color: #7ed99a;
+}
+.validity-banner.warn {
+  background: #3a2f0d;
+  color: #f5c542;
+}
+.validity-banner.urgent {
+  background: #3a1414;
+  color: #ff7a7a;
+  animation: pulse-urgent 1.8s ease-in-out infinite;
+}
+@keyframes pulse-urgent {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.65; }
+}
+
 .stats-bar {
   background: #1a1d27;
   display: flex;
@@ -259,6 +284,9 @@ body {
   </div>
 </div>
 
+<!-- Banner platnosti prístupu — zobrazí sa len hráčom/trénerom -->
+<div class="validity-banner" id="validityBanner" style="display:none;"></div>
+
 <!-- Stats bar -->
 <div class="stats-bar">
   <div class="stat-item">
@@ -397,6 +425,9 @@ async function initPage() {
     document.getElementById('adminBtn').style.display = 'flex';
   }
 
+  // Platnosť prístupu — zobraz len hráčom a trénerom (admin/hlavný tréner majú neobmedzený prístup)
+  checkValidity(role);
+
   try {
     const player = await getCurrentPlayer();
     if (player) {
@@ -450,6 +481,56 @@ async function initPage() {
     console.error('Chyba načítania štatistík:', e);
     loadLeaderboards(null);
   }
+}
+
+async function checkValidity(role) {
+  // Admin a hlavný tréner majú neobmedzený prístup — banner sa im nezobrazuje
+  if (role === 'admin' || role === 'hlavny_trener') return;
+
+  const banner = document.getElementById('validityBanner');
+  const userId = sessionStorage.getItem('user_id');
+  if (!banner || !userId) return;
+
+  try {
+    const rows = await sbFetch(`profiles?id=eq.${userId}&select=valid_to&limit=1`);
+    const validTo = rows && rows[0] && rows[0].valid_to;
+    if (!validTo) return;   // bez nastavenej platnosti — nič nezobrazuj
+
+    const now = new Date();
+    const expiry = new Date(validTo);
+    const msPerDay = 24 * 60 * 60 * 1000;
+    // Zaokrúhli na celé dni (ceil, aby "dnes večer vyprší" ukázalo 1, nie 0)
+    const daysLeft = Math.ceil((expiry - now) / msPerDay);
+    const dateStr = expiry.toLocaleDateString('sk-SK');
+
+    let cls, text;
+    if (daysLeft <= 0) {
+      cls = 'urgent';
+      text = `⚠️ Platnosť prístupu vypršala ${dateStr}. Kontaktujte trénera pre predĺženie.`;
+    } else if (daysLeft <= 3) {
+      cls = 'urgent';
+      text = `⚠️ Platnosť prístupu vyprší už o ${daysLeft} ${daysLeft === 1 ? 'deň' : 'dni'} (${dateStr}). Kontaktujte trénera.`;
+    } else if (daysLeft <= 14) {
+      cls = 'warn';
+      text = `⏳ Platnosť prístupu: ešte ${daysLeft} ${daysWord(daysLeft)} (do ${dateStr}). Zvážte predĺženie u trénera.`;
+    } else {
+      cls = 'ok';
+      text = `✓ Platnosť prístupu: ešte ${daysLeft} ${daysWord(daysLeft)} (do ${dateStr}).`;
+    }
+
+    banner.className = 'validity-banner ' + cls;
+    banner.textContent = text;
+    banner.style.display = '';
+  } catch(e) {
+    console.error('Chyba pri kontrole platnosti:', e);
+  }
+}
+
+function daysWord(n) {
+  // Slovenské skloňovanie: 1 deň, 2-4 dni, 5+ dní
+  if (n === 1) return 'deň';
+  if (n >= 2 && n <= 4) return 'dni';
+  return 'dní';
 }
 
 async function computeStreak(playerId) {
