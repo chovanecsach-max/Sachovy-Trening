@@ -1304,11 +1304,14 @@ async function loadPuzzles() {
     // stiahnuť VŠETKY dávkovo, inak sa nenájdu prekrývajúce sa zručnosti
     // (ID sú prideľované po blokoch podľa zručnosti, takže pri obmedzenom
     // limite sa vôbec nedostaneme k neskorším zručnostiam ako vidličky).
+    // OPTIMALIZÁCIA: na zoskupenie stačia ľahké stĺpce (id, fen, skill_type)
+    // — plné puzzle (s riešeniami) sa doťahuje lenivo podľa ID až pri hraní.
+    // Šetrí to ~90 % objemu dát pri štarte komplexného režimu.
     let data = [];
     let offset = 0;
     const batchSize = 1000;
     while (true) {
-      const batch = await sbFetch(`skill_puzzles?order=id.asc&limit=${batchSize}&offset=${offset}`);
+      const batch = await sbFetch(`skill_puzzles?select=id,fen,skill_type&order=id.asc&limit=${batchSize}&offset=${offset}`);
       if (!batch || !batch.length) break;
       data = data.concat(batch);
       if (batch.length < batchSize) break;
@@ -1560,16 +1563,33 @@ function loadCompletePosition() {
   loadCompleteSkill();
 }
 
-function loadCompleteSkill() {
+let _completeLoadSeq = 0;   // ochrana proti pretekaniu pri rýchlom preklikávaní
+
+async function loadCompleteSkill() {
   const sk = COMPLETE_SKILLS[completeSkillIdx];
-  // Reálne puzzle zo skill_puzzles
-  const puzzle = completePos.puzzlesByKey[sk.key];
+  let puzzle = completePos.puzzlesByKey[sk.key];
   const found = COMPLETE_SKILLS.filter(s => completePos.puzzlesByKey[s.key]);
   const posInFound = found.findIndex(s => s.key === sk.key);
   // Nastav prompt a progress
   document.getElementById('promptText').textContent = sk.prompt;
   const el = document.getElementById('completeProgress');
   if (el) el.textContent = `Zručnosť ${posInFound + 1} / ${found.length}: ${sk.label}`;
+
+  // Lenivé dotiahnutie plného puzzle (zoznam obsahuje len id/fen/skill_type)
+  if (puzzle && puzzle.solutions === undefined) {
+    const mySeq = ++_completeLoadSeq;
+    try {
+      const rows = await sbFetch(`skill_puzzles?id=eq.${puzzle.id}&limit=1`);
+      if (mySeq !== _completeLoadSeq) return;   // medzitým sa načítala iná úloha
+      if (rows && rows.length) {
+        puzzle = rows[0];
+        completePos.puzzlesByKey[sk.key] = puzzle;   // cache — retry nefetchuje znova
+      }
+    } catch(e) {
+      setStatus('Chyba pri načítaní úlohy: ' + e.message, 'error');
+      return;
+    }
+  }
   loadPuzzle(puzzle);
 }
 
