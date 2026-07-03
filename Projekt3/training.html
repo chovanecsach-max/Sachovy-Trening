@@ -2151,17 +2151,14 @@ async function init() {
     localStorage.removeItem("adminPuzzleId");
     localStorage.removeItem("adminMode");
 
-    // Hľadaj v lokálnom poli
-    let puzzle = puzzles.find(p => Number(p.id) === Number(adminPuzzleId));
-
-    // Fallback — načítaj priamo zo Supabase
-    if (!puzzle) {
-      try {
-        const data = await sbFetch(`puzzles?id=eq.${adminPuzzleId}&limit=1`);
-        if (data && data.length) puzzle = data[0];
-      } catch(e) {
-        console.error("Chyba načítania admin puzzle:", e);
-      }
+    // Načítaj priamo zo Supabase — lokálne pole obsahuje len ľahké stĺpce
+    // (id, category, elo), admin náhľad potrebuje plný záznam s riešením
+    let puzzle = null;
+    try {
+      const data = await sbFetch(`puzzles?id=eq.${adminPuzzleId}&limit=1`);
+      if (data && data.length) puzzle = data[0];
+    } catch(e) {
+      console.error("Chyba načítania admin puzzle:", e);
     }
 
     if (puzzle) {
