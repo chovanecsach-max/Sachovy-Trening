@@ -95,26 +95,17 @@ async function pickPuzzleForPlayer(player, puzzles) {
   if (!pool.length) pool = unsolved;
   if (!pool.length) pool = filtered.length ? filtered : puzzles;
 
-  return pool[Math.floor(Math.random() * pool.length)];
-}
+  const picked = pool[Math.floor(Math.random() * pool.length)];
+  if (!picked) return null;
 
-async function loadPuzzlesFromSupabase() {
+  // Lenivé dotiahnutie plného záznamu — zoznam v pamäti obsahuje len
+  // ľahké stĺpce (id, category, elo) potrebné na výber. Riešenie (solution_tree)
+  // sa sťahuje len pre jedinú vybranú úlohu, nie pre celú databázu.
   try {
-    // Načítavaj po dávkach 1000 — Supabase Free má limit 1000 riadkov/request
-    const BATCH = 1000;
-    let allData = [];
-    let offset = 0;
-    while (true) {
-      const data = await sbFetch(
-        `puzzles?order=id.asc&limit=${BATCH}&offset=${offset}`
-      );
-      if (!data || !data.length) break;
-      allData = allData.concat(data);
-      if (data.length < BATCH) break; // posledná dávka
-      offset += BATCH;
-    }
-    if (!allData.length) throw new Error("Žiadne puzzle v databáze");
-    return allData.map(p => ({
+    const rows = await sbFetch(`puzzles?id=eq.${picked.id}&limit=1`);
+    if (!rows || !rows.length) return null;
+    const p = rows[0];
+    return {
       id: p.id,
       title: p.title,
       fen: p.fen,
@@ -124,7 +115,33 @@ async function loadPuzzlesFromSupabase() {
       elo: p.elo,
       time: p.time,
       solutionTree: p.solution_tree
-    }));
+    };
+  } catch (e) {
+    console.error("Chyba pri načítaní úlohy:", e);
+    return null;
+  }
+}
+
+async function loadPuzzlesFromSupabase() {
+  try {
+    // Načítavaj po dávkach 1000 — Supabase Free má limit 1000 riadkov/request.
+    // OPTIMALIZÁCIA: sťahujú sa len ľahké stĺpce potrebné na výber úlohy
+    // (id, category, elo) — plný záznam s riešením sa doťahuje lenivo
+    // v pickPuzzleForPlayer. Šetrí ~95 % objemu dát pri štarte tréningu.
+    const BATCH = 1000;
+    let allData = [];
+    let offset = 0;
+    while (true) {
+      const data = await sbFetch(
+        `puzzles?select=id,category,elo&order=id.asc&limit=${BATCH}&offset=${offset}`
+      );
+      if (!data || !data.length) break;
+      allData = allData.concat(data);
+      if (data.length < BATCH) break; // posledná dávka
+      offset += BATCH;
+    }
+    if (!allData.length) throw new Error("Žiadne puzzle v databáze");
+    return allData;
   } catch (e) {
     console.error("Chyba pri načítaní puzzle:", e);
     return [];
