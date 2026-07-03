@@ -518,7 +518,7 @@ const COMPLETE_SKILLS = [
   { key: 'checks',            label: 'Šachy',              prompt: 'Nájdi všetky šachy za bieleho aj čierneho' },
   { key: 'captures',          label: 'Brania',             prompt: 'Nájdi všetky brania za bieleho aj čierneho' },
   { key: 'pawn_breakthrough',  label: 'Pešiakové prielomy',prompt: 'Nájdi všetky pešiakové prielomy za bieleho aj čierneho' },
-  { key: 'direct_attack',     label: 'Priame napadnutia',  prompt: 'Nájdi všetky priame materiálne napadnutia (biele aj čierne)' },
+  { key: 'direct_attack',     label: 'Brania so ziskom',   prompt: 'Nájdi všetky brania so ziskom (biele aj čierne)' },
   { key: 'underdefended',     label: 'Slabo pokryté',      prompt: 'Nájdi všetky slabo pokryté figúrky (biele aj čierne)' },
   { key: 'pin',               label: 'Absolútne väzby',    prompt: 'Nájdi všetky absolútne viazané figúrky (biele aj čierne)' },
   { key: 'relative_pin',      label: 'Relatívne väzby',    prompt: 'Nájdi všetky relatívne viazané figúrky (biele aj čierne)' },
@@ -1019,7 +1019,7 @@ function getSkillTypeName() {
   if (current.skill_type === 'checks') return 'šachy';
   if (current.skill_type === 'checks_both') return 'šachy za obidve strany';
   if (current.skill_type === 'captures') return 'brania';
-  if (current.skill_type === 'direct_attack') return 'priame napadnutia';
+  if (current.skill_type === 'direct_attack') return 'brania so ziskom';
   if (current.skill_type === 'pawn_breakthrough') return 'pešiakové prielomy';
   if (current.skill_type === 'underdefended') return 'slabo pokryté figúrky';
   if (current.skill_type === 'pin') return 'viazané figúrky';
@@ -1033,7 +1033,7 @@ function getSkillTypeSingular() {
   if (current.skill_type === 'checks') return 'šach';
   if (current.skill_type === 'checks_both') return 'šach';
   if (current.skill_type === 'captures') return 'branie';
-  if (current.skill_type === 'direct_attack') return 'priame napadnutie';
+  if (current.skill_type === 'direct_attack') return 'branie so ziskom';
   if (current.skill_type === 'pawn_breakthrough') return 'pešiakový prielom';
   if (current.skill_type === 'underdefended') return 'slabo pokrytú figúrku';
   if (current.skill_type === 'pin') return 'viazanú figúrku';
@@ -1239,16 +1239,13 @@ async function loadLeaderboard() {
     'checks_both':       'Šachy za obidve strany',
     'captures':          'Brania',
     'checks_captures':   'Šachy a brania',
-    'direct_attack':     'Priame napadnutia',
+    'direct_attack':     'Brania so ziskom',
     'direct_threat':     'Priame hrozby',
     'pawn_breakthrough': 'Pešiakové prielomy',
     'underdefended':     'Slabo pokryté',
     'pin':               'Absolútne väzby',
     'relative_pin':      'Relatívne väzby',
     'fork':              'Vidličky',
-    'direct_attack':     'Priame napadnutia',
-    'direct_threat':     'Priame hrozby',
-    'direct_threat':     'Priama hrozba'
   };
   const type = getSkillsType();
   const label = skillNames[type] || 'Zručnosti';
@@ -1362,10 +1359,6 @@ async function loadPuzzles() {
     filter = "skill_type=eq.relative_pin";
   } else if (type === "fork") {
     filter = "skill_type=eq.fork";
-  } else if (type === "direct_attack") {
-    filter = "skill_type=eq.direct_attack";
-  } else if (type === "direct_threat") {
-    filter = "skill_type=eq.direct_threat";
   }
   const baseQuery = filter ? `skill_puzzles?${filter}&order=id.asc` : "skill_puzzles?order=id.asc";
   // Dávkové načítanie — jedna zručnosť môže mať viac ako 1000/2000 záznamov
@@ -1657,8 +1650,8 @@ async function init() {
     document.title = "Brania";
     document.getElementById("promptText").textContent = "Nájdi všetky brania za bieleho aj čierneho";
   } else if (type === "direct_attack") {
-    document.title = "Priame napadnutia";
-    document.getElementById("promptText").textContent = "Nájdi všetky priame napadnutia";
+    document.title = "Brania so ziskom";
+    document.getElementById("promptText").textContent = "Nájdi všetky brania so ziskom (biele aj čierne)";
   } else if (type === "pawn_breakthrough") {
     document.title = "Pešiakové prielomy";
     document.getElementById("promptText").textContent = "Nájdi všetky pešiakové prielomy za bieleho aj čierneho";
@@ -1674,9 +1667,6 @@ async function init() {
   } else if (type === "fork") {
     document.title = "Vidličkové postavenie";
     document.getElementById("promptText").textContent = "Nájdi všetky figúrky vo vidličkovom postavení (biele aj čierne)";
-  } else if (type === "direct_attack") {
-    document.title = "Priame napadnutia";
-    document.getElementById("promptText").textContent = "Nájdi všetky priame materiálne napadnutia (biele aj čierne)";
   } else if (type === "direct_threat") {
     document.title = "Priame hrozby";
     document.getElementById("promptText").textContent = "Nájdi všetky ťahy vytvárajúce priame materiálne hrozby (biele aj čierne)";
