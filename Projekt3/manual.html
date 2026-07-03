@@ -154,7 +154,7 @@
   <tr><td>Šachy</td><td>Všetky legálne ťahy, ktoré dávajú šach súperovmu kráľovi</td><td>Kliknite figúrku → kliknite pole (ťah)</td><td>Vf1–f8+</td></tr>
   <tr><td>Brania</td><td>Všetky legálne ťahy, ktorými môžete zobrať súperovu figúrku</td><td>Kliknite figúrku → kliknite pole (ťah)</td><td>Sxd5</td></tr>
   <tr><td>Pešiakové prielomy</td><td>Postup pešiaka, po ktorom ho môže zobrať súperov pešiak</td><td>Kliknite pešiaka → kliknite cieľ (ťah)</td><td>e4–e5</td></tr>
-  <tr><td>Priame napadnutia</td><td>Brania so ziskom materiálu (SEE > 0)</td><td>Kliknite figúrku → kliknite pole (ťah)</td><td>Jxe5 (nekryté)</td></tr>
+  <tr><td>Brania so ziskom</td><td>Skutočne výhodné brania (SEE > 0)</td><td>Kliknite figúrku → kliknite pole (ťah)</td><td>Jxe5 (nekryté)</td></tr>
   <tr><td>Slabo pokryté figúry</td><td>Figúry a pešiaci, na ktorých útočí rovnaký alebo väčší počet útočníkov ako obrancov</td><td>Kliknite priamo na danú figúru (pole)</td><td>e5 (2 útok., 1 obra.)</td></tr>
   <tr><td>Absolútne väzby</td><td>Figúrky absolútne viazané voči vlastnému kráľovi</td><td>Kliknite priamo na viazanú figúrku (pole)</td><td>Jc6 viazaný Vb1</td></tr>
   <tr><td>Relatívne väzby</td><td>Figúrky relatívne viazané voči cennejšej figúrke</td><td>Kliknite priamo na viazanú figúrku (pole)</td><td>Jf6 viazaný Df8</td></tr>
@@ -192,7 +192,7 @@
 <div class="box tip"><strong>Príklad</strong>Biely pešiak e4 postúpi na e5, kde ho môže zobrať čierny pešiak z d6 alebo f6. Kliknite e4 → kliknite e5.</div>
 <div class="box warn"><strong>Pozor</strong>Nehľadáte, či je prielom výhodný — len to, či po ňom súperov pešiak môže brať.</div>
 
-<h3>4. Priame materiálne napadnutia</h3>
+<h3>4. Brania so ziskom</h3>
 <p><strong>Čo hľadáte:</strong> Brania, ktoré <strong>získavajú materiál</strong> — teda branie, po ktorom súper nezíska naspäť rovnakú alebo väčšiu hodnotu. Ide o skutočne výhodné brania, nie len akékoľvek.</p>
 <p><strong>Ako zadáte riešenie:</strong></p>
 <ol>
@@ -200,7 +200,7 @@
   <li>Kliknite na pole súperovej figúrky.</li>
 </ol>
 <div class="box tip"><strong>Príklad</strong>Dáma môže zobrať nekrytého strelca. Kliknite na dámu → kliknite na strelca.</div>
-<p><em>Rozdiel oproti „Braniam":</em> tu hľadáte len tie brania, ktoré sú naozaj ziskové (súperova figúrka je nekrytá alebo nedostatočne bránená).</p>
+<p><em>Rozdiel oproti „Braniam":</em> tu hľadáte len tie brania, ktoré sú naozaj ziskové (súperova figúrka je nekrytá alebo nedostatočne bránená) — obyčajné „Brania" počítajú akékoľvek legálne branie, bez ohľadu na to, či sa oplatí.</p>
 
 <h3>5. Slabo pokryté figúry</h3>
 <p><strong>Čo hľadáte:</strong> Figúry a pešiakov, na ktoré útočí rovnaký alebo väčší počet útočníkov ako obrancov. Hľadáte takéto figúry oboch farieb.</p>
@@ -249,7 +249,7 @@
   <li>Po nájdení všetkých šachov kliknite Ďalšia úloha → zobrazí sa ďalšia zručnosť tej istej pozície</li>
   <li>Po prejdení všetkých zručností sa načíta nová pozícia</li>
 </ul>
-<p>Poradie zručností je pevné: Šachy → Brania → Pešiakové prielomy → Priame napadnutia → Slabo pokryté → Absolútne väzby → Relatívne väzby → Vidličky → Priame hrozby.</p>
+<p>Poradie zručností je pevné: Šachy → Brania → Pešiakové prielomy → Brania so ziskom → Slabo pokryté → Absolútne väzby → Relatívne väzby → Vidličky → Priame hrozby.</p>
 <div class="box tip"><strong>Tip</strong>Nie každá pozícia obsahuje všetky zručnosti — preskočí sa tá, ktorá v danej pozícii neexistuje. Každá zručnosť sa hodnotí samostatne do príslušného ELO.</div>
 
 <h1 id="statistika">6. Štatistika</h1>
@@ -306,7 +306,7 @@
   <tr><td>Šachy</td><td>1200 / 60s</td><td>Všetky legálne ťahy dávajúce šach súperovi</td><td>Figúrka → cieľové pole (2 kliky)</td></tr>
   <tr><td>Brania</td><td>1250 / 90s</td><td>Všetky legálne brania figúrok</td><td>Figúrka → cieľové pole (2 kliky)</td></tr>
   <tr><td>Pešiakové prielomy</td><td>1200 / 60s</td><td>Postup pešiaka, po ktorom ho berie súperov pešiak</td><td>Pešiak → cieľové pole (2 kliky)</td></tr>
-  <tr><td>Priame napadnutia</td><td>1250 / 90s</td><td>Brania so ziskom materiálu (SEE > 0)</td><td>Figúrka → cieľové pole (2 kliky)</td></tr>
+  <tr><td>Brania so ziskom</td><td>1250 / 90s</td><td>Skutočne výhodné brania (SEE > 0)</td><td>Figúrka → cieľové pole (2 kliky)</td></tr>
   <tr><td>Slabo pokryté</td><td>1300 / 120s</td><td>Útočníci ≥ obrancovia</td><td>Klik priamo na figúrku (1 klik)</td></tr>
   <tr><td>Absolútne väzby</td><td>1250 / 90s</td><td>Figúrky absolútne viazané voči kráľovi</td><td>Klik priamo na viazanú figúrku (1 klik)</td></tr>
   <tr><td>Relatívne väzby</td><td>1400 / 360s</td><td>Figúrky relatívne viazané voči cennejšej figúrke</td><td>Klik priamo na viazanú figúrku (1 klik)</td></tr>
