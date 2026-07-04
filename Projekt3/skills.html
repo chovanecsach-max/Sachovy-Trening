@@ -505,10 +505,6 @@ let flipped = false;
 let pendingPromotion = null;
 let solutions = [];       // všetky správne ťahy
 let foundMoves = [];      // už nájdené ťahy
-// Vidličky (skill_type === 'fork'): riešenie je zoznam skupín polí
-let forkGroups = [];      // [{sq:[...], by:"..."}]
-let forkSel = [];         // aktuálny rozrobený výber polí (jedna vidlička)
-let forkFound = [];       // indexy už nájdených skupín
 // Komplexný sekvenčný režim
 let completeByFen = new Map(); // fen → { fen, puzzlesByKey: {key→puzzle} }
 let completeFens = [];         // pole unikátnych FEN-ov (náhodný výber)
@@ -522,7 +518,7 @@ const COMPLETE_SKILLS = [
   { key: 'underdefended',     label: 'Slabo pokryté',      prompt: 'Nájdi všetky slabo pokryté figúrky (biele aj čierne)' },
   { key: 'pin',               label: 'Absolútne väzby',    prompt: 'Nájdi všetky absolútne viazané figúrky (biele aj čierne)' },
   { key: 'relative_pin',      label: 'Relatívne väzby',    prompt: 'Nájdi všetky relatívne viazané figúrky (biele aj čierne)' },
-  { key: 'fork',              label: 'Vidličky',           prompt: 'Nájdi všetky figúrky vo vidličkovom postavení (biele aj čierne)' },
+  { key: 'fork',              label: 'Vidličky',           prompt: 'Nájdi všetky ťahy, ktoré vytvoria vidličku (biele aj čierne)' },
   { key: 'direct_threat',     label: 'Priame hrozby',      prompt: 'Nájdi všetky ťahy vytvárajúce priame materiálne hrozby (biele aj čierne)' },
 ];
 let puzzleDone = false;
@@ -765,20 +761,12 @@ function render() {
     // Rozrobený výber (selected) — zvýrazni rámčekom
     if (selected === bi) d.classList.add('selected');
 
-    if (current && current.skill_type === 'fork') {
-      const foundSquares = new Set();
-      forkFound.forEach(idx => forkGroups[idx].sq.forEach(s => foundSquares.add(s)));
-      const nm = name(bi);
-      if (forkSel.includes(nm)) d.classList.add('selected');
-      else if (foundSquares.has(nm)) d.classList.add('found-move');
-    } else {
-      foundMoves.forEach(move => {
-        const fi = sqToIndex(move.substring(0,2));
-        const ti = sqToIndex(move.substring(2,4));
-        if (bi === fi) d.classList.add('found-move');
-        if (bi === ti) d.classList.add('found-move-to');
-      });
-    }
+    foundMoves.forEach(move => {
+      const fi = sqToIndex(move.substring(0,2));
+      const ti = sqToIndex(move.substring(2,4));
+      if (bi === fi) d.classList.add('found-move');
+      if (bi === ti) d.classList.add('found-move-to');
+    });
 
     // Figúrka — aktualizuj existujúci <img> namiesto jeho zničenia a znovuvytvorenia,
     // aby prehliadač nemusel obrázok znova dekódovať (hlavná príčina bliknutia)
@@ -808,7 +796,7 @@ function render() {
 
     // X na rozrobenom výbere aj na dokončených označeniach (ostáva do novej úlohy)
     const nm = name(bi);
-    if (selected === bi || forkSel.includes(nm)) {
+    if (selected === bi) {
       drawX(d);   // rozrobený výber — vždy žltá
     } else if (xMarked.has(nm)) {
       // Dokončené označenie — farba podľa počtu použití
@@ -835,13 +823,6 @@ function click(i) {
   if (puzzleDone) return;
 
   const skillType = getSkillsType();
-
-  // Vidličky — hráč kliká na ohrozené figúrky; keď označí celú skupinu, je nájdená.
-  if (skillType === 'fork') {
-    if (!board[i]) return setStatus('Klikni na figúrku', 'info');
-    handleForkClick(name(i));
-    return;
-  }
 
   // Pre underdefended a pin — hráč kliká priamo na figúrku (jednoklik).
   // Za obidve strany: dovolíme kliknúť na figúrku ktorejkoľvek farby.
@@ -885,81 +866,6 @@ function click(i) {
 
   const attempted = name(selected) + name(i);
   handleMoveAttempt(attempted);
-}
-
-function handleForkClick(sq) {
-  // Je toto pole vôbec súčasťou nejakej vidličkovej skupiny?
-  const inAnyGroup = forkGroups.some(g => g.sq.includes(sq));
-  if (!inAnyGroup) {
-    if (!puzzleFailed) {
-      puzzleFailed = true;
-      everFailed = true;
-      stopTimer();
-      recordResult('loss');
-    }
-    setStatus('Toto pole nie je vo vidličkovom postavení. Skús znova alebo ukáž riešenie.', 'error');
-    return;
-  }
-
-  const isUnfound = (idx) => !forkFound.includes(idx);
-
-  // skús pole pridať do rozrobeného výberu
-  const candidate = forkSel.includes(sq) ? forkSel.slice() : forkSel.concat([sq]);
-  const fits = forkGroups.some((g, idx) =>
-    isUnfound(idx) && candidate.every(s => g.sq.includes(s)));
-
-  if (!fits) {
-    // pole nepasuje k rozrobenej vidličke → začni novú vidličku týmto poľom
-    const startsNew = forkGroups.some((g, idx) => isUnfound(idx) && g.sq.includes(sq));
-    if (startsNew) {
-      markPlayed();
-      forkSel = [sq];
-      render();
-      setStatus('Začal si novú vidličku: ' + sq + '. Doplň zvyšok.', 'info');
-    } else {
-      setStatus('Túto vidličku si už našiel.', 'warning');
-    }
-    return;
-  }
-
-  markPlayed();
-  forkSel = candidate;
-
-  // zodpovedá výber presne niektorej nenájdenej skupine?
-  let completedIdx = -1;
-  forkGroups.forEach((g, idx) => {
-    if (completedIdx !== -1) return;
-    if (isUnfound(idx) && g.sq.length === forkSel.length && g.sq.every(s => forkSel.includes(s))) {
-      completedIdx = idx;
-    }
-  });
-
-  if (completedIdx === -1) {
-    render();
-    setStatus('Označené: ' + forkSel.join('') + '. Doplň zvyšok vidličky.', 'info');
-    return;
-  }
-
-  forkFound.push(completedIdx);
-  forkGroups[completedIdx].sq.forEach(s => xInc(s));
-  forkSel = [];
-  render();
-  updateRemainingUI();
-  updateFoundMovesUI();
-
-  const g = forkGroups[completedIdx];
-  if (forkFound.length === forkGroups.length) {
-    puzzleDone = true;
-    stopTimer();
-    markSolved();
-    recordResult('win');
-    if (current) solvedSkillIds.add(current.id);
-    playSound('win');
-    setStatus('🎉 Výborne! Našiel si všetky vidličkové postavenia!', 'success');
-  } else {
-    playSound('win');
-    setStatus('Vidlička nájdená: ' + g.sq.join('') + ' (' + g.by + '). Hľadaj ďalšiu.', 'success');
-  }
 }
 
 function handleMoveAttempt(attempted) {
@@ -1024,7 +930,7 @@ function getSkillTypeName() {
   if (current.skill_type === 'underdefended') return 'slabo pokryté figúrky';
   if (current.skill_type === 'pin') return 'viazané figúrky';
   if (current.skill_type === 'relative_pin') return 'relatívne viazané figúrky';
-  if (current.skill_type === 'fork') return 'figúrky vo vidličkovom postavení';
+  if (current.skill_type === 'fork') return 'vidličky';
   return 'ťahy';
 }
 
@@ -1038,16 +944,15 @@ function getSkillTypeSingular() {
   if (current.skill_type === 'underdefended') return 'slabo pokrytú figúrku';
   if (current.skill_type === 'pin') return 'viazanú figúrku';
   if (current.skill_type === 'relative_pin') return 'relatívne viazanú figúrku';
-  if (current.skill_type === 'fork') return 'figúrku vo vidličkovom postavení';
+  if (current.skill_type === 'fork') return 'vidličku';
   return 'ťah';
 }
 
 // ─── Počítadlo a nájdené ťahy ─────────────────────────────────────────────────
 
 function updateRemainingUI() {
-  const isFork = current && current.skill_type === 'fork';
-  const total = isFork ? forkGroups.length : solutions.length;
-  const found = isFork ? forkFound.length : foundMoves.length;
+  const total = solutions.length;
+  const found = foundMoves.length;
   const remaining = total - found;
   const box = document.getElementById('remainingBox');
   const count = document.getElementById('remainingCount');
@@ -1060,23 +965,13 @@ function updateRemainingUI() {
     label.textContent = 'Všetky nájdené!';
   } else {
     box.className = 'remaining-box';
-    label.textContent = isFork ? 'Zostáva vidličiek' : 'Zostáva nájsť';
+    label.textContent = 'Zostáva nájsť';
   }
 }
 
 function updateFoundMovesUI() {
   const el = document.getElementById('foundMoves');
   el.innerHTML = '';
-  if (current && current.skill_type === 'fork') {
-    forkFound.forEach(idx => {
-      const g = forkGroups[idx];
-      const badge = document.createElement('span');
-      badge.className = 'found-move-badge';
-      badge.textContent = g.sq.join('') + ' (' + g.by + ')';
-      el.appendChild(badge);
-    });
-    return;
-  }
   foundMoves.forEach(move => {
     const badge = document.createElement('span');
     badge.className = 'found-move-badge';
@@ -1097,16 +992,6 @@ function showSolution() {
   puzzleFailed = true;
 
   // Ukáž všetky riešenia
-  if (current && current.skill_type === 'fork') {
-    forkFound = forkGroups.map((_, idx) => idx);
-    forkSel = [];
-    render();
-    updateRemainingUI();
-    updateFoundMovesUI();
-    const txt = forkGroups.map(g => g.sq.join('') + ' (' + g.by + ')').join(', ');
-    setStatus('Riešenie: ' + txt, 'warning');
-    return;
-  }
   foundMoves = [...solutions];
   render();
   updateRemainingUI();
@@ -1115,13 +1000,6 @@ function showSolution() {
 }
 
 function showAllSolutionsOnBoard() {
-  if (current && current.skill_type === 'fork') {
-    forkFound = forkGroups.map((_, idx) => idx);
-    forkSel = [];
-    render();
-    updateFoundMovesUI();
-    return;
-  }
   foundMoves = [...solutions];
   render();
   updateFoundMovesUI();
@@ -1450,14 +1328,6 @@ function loadPuzzle(puzzle) {
   current = puzzle;
   solutions = Array.isArray(puzzle.solutions) ? puzzle.solutions : [];
   foundMoves = [];
-  // Vidličky: riešenie je zoznam skupín
-  if (puzzle.skill_type === 'fork') {
-    forkGroups = Array.isArray(puzzle.solutions) ? puzzle.solutions : [];
-  } else {
-    forkGroups = [];
-  }
-  forkSel = [];
-  forkFound = [];
   xMarked = new Map();
   puzzleDone = false;
   puzzleFailed = false;
@@ -1665,8 +1535,8 @@ async function init() {
     document.title = "Relatívne väzby";
     document.getElementById("promptText").textContent = "Nájdi všetky relatívne viazané figúrky (biele aj čierne)";
   } else if (type === "fork") {
-    document.title = "Vidličkové postavenie";
-    document.getElementById("promptText").textContent = "Nájdi všetky figúrky vo vidličkovom postavení (biele aj čierne)";
+    document.title = "Vidličky";
+    document.getElementById("promptText").textContent = "Nájdi všetky ťahy, ktoré vytvoria vidličku (biele aj čierne)";
   } else if (type === "direct_threat") {
     document.title = "Priame hrozby";
     document.getElementById("promptText").textContent = "Nájdi všetky ťahy vytvárajúce priame materiálne hrozby (biele aj čierne)";
