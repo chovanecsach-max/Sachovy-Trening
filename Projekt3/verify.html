@@ -91,7 +91,14 @@ const SUPABASE_URL     = "https://wdjsilryllqksdtmaehy.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_45gFQhgPScrDjDCVC0B4Iw_q6uZKf9m";
 
 const { createClient } = supabase;
-const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// detectSessionInUrl vypnuté — overenie riadime sami cez verifyOtp(),
+// nespoliehame sa na to, že Supabase klient sám rozparsuje URL fragment
+// (starý spôsob cez {{ .ConfirmationURL }} to robil automaticky, nový
+// spôsob cez token_hash je pod našou kontrolou a nie je krehký voči
+// mailovým skenerom, ktoré odkaz "predklikajú" ešte pred používateľom).
+const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: { detectSessionInUrl: false }
+});
 const SUPABASE_KEY = SUPABASE_ANON_KEY;
 
 function setStatus(text, type) {
@@ -181,32 +188,70 @@ async function createProfileAndPlayer(user) {
   showSuccess();
 }
 
-// Spracuj potvrdenie emailu
-sb.auth.onAuthStateChange(async (event, session) => {
-  if (event === 'SIGNED_IN' && session) {
-    setStatus('Vytváram účet...', 'info');
-    try {
-      await createProfileAndPlayer(session.user);
-    } catch(e) {
-      showError('Neočakávaná chyba: ' + e.message);
-    }
-  } else if (event === 'USER_UPDATED' && session) {
-    // Niektoré verzie Supabase posielajú USER_UPDATED pri potvrdení
-    setStatus('Vytváram účet...', 'info');
-    try {
-      await createProfileAndPlayer(session.user);
-    } catch(e) {
-      showError('Neočakávaná chyba: ' + e.message);
-    }
-  }
-});
+async function verifyFromQueryParams() {
+  const params = new URLSearchParams(window.location.search);
+  const token_hash = params.get('token_hash');
+  const type = params.get('type');
 
-// Timeout — ak do 8 sekúnd nepríde event, odkaz je neplatný
-setTimeout(() => {
-  if (document.getElementById('loadingBox').style.display !== 'none') {
-    showError('Odkaz na overenie je neplatný alebo vypršal. Skús sa zaregistrovať znova.');
+  if (!token_hash || !type) {
+    return false; // žiadne nové-štýlové parametre v URL
   }
-}, 8000);
+
+  setStatus('Overujem odkaz...', 'info');
+  const { data, error } = await sb.auth.verifyOtp({ token_hash, type });
+
+  if (error) {
+    showError(
+      error.message && error.message.toLowerCase().includes('expired')
+        ? 'Odkaz na overenie vypršal. Skús sa zaregistrovať znova.'
+        : 'Odkaz na overenie je neplatný. Skús sa zaregistrovať znova.'
+    );
+    return true;
+  }
+
+  const user = data?.user || data?.session?.user;
+  if (!user) {
+    showError('Overenie neprinieslo očakávané dáta. Skús sa zaregistrovať znova.');
+    return true;
+  }
+
+  setStatus('Vytváram účet...', 'info');
+  try {
+    await createProfileAndPlayer(user);
+  } catch (e) {
+    showError('Neočakávaná chyba: ' + e.message);
+  }
+  return true;
+}
+
+// Záložný spôsob pre staršie odkazy (implicitný flow cez URL fragment),
+// pre prípad, že by niekde ešte kolovala pošta so starou šablónou.
+function fallbackToAuthStateListener() {
+  sb.auth.onAuthStateChange(async (event, session) => {
+    if ((event === 'SIGNED_IN' || event === 'USER_UPDATED') && session) {
+      setStatus('Vytváram účet...', 'info');
+      try {
+        await createProfileAndPlayer(session.user);
+      } catch (e) {
+        showError('Neočakávaná chyba: ' + e.message);
+      }
+    }
+  });
+
+  // Timeout — ak do 8 sekúnd nepríde event, odkaz je neplatný
+  setTimeout(() => {
+    if (document.getElementById('loadingBox').style.display !== 'none') {
+      showError('Odkaz na overenie je neplatný alebo vypršal. Skús sa zaregistrovať znova.');
+    }
+  }, 8000);
+}
+
+(async () => {
+  const handled = await verifyFromQueryParams();
+  if (!handled) {
+    fallbackToAuthStateListener();
+  }
+})();
 </script>
 </body>
 </html>
