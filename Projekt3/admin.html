@@ -423,6 +423,54 @@ button {
     <button class="secondary" style="margin-left:auto;" onclick="goHome()">← Menu</button>
   </div>
 
+  <!-- Ručná registrácia hráča (bez potvrdzovacieho mailu) -->
+  <div class="card" style="margin-bottom:16px;">
+    <h2>➕ Ručne zaregistrovať hráča</h2>
+    <div class="tip" style="margin-top:-6px;margin-bottom:10px;">
+      Vytvorí hráča s rovno POTVRDENÝM emailom — nečaká sa na potvrdzovací mail. Použi, keď niekomu nefunguje bežná registrácia.
+    </div>
+    <div class="edit-grid">
+      <div class="edit-field">
+        <label>Meno</label>
+        <input type="text" id="mrName" placeholder="Meno">
+      </div>
+      <div class="edit-field">
+        <label>Priezvisko</label>
+        <input type="text" id="mrSurname" placeholder="Priezvisko">
+      </div>
+      <div class="edit-field">
+        <label>Prezývka *</label>
+        <input type="text" id="mrNick" placeholder="Prezývka">
+      </div>
+      <div class="edit-field">
+        <label>Email *</label>
+        <input type="email" id="mrEmail" placeholder="hrac@email.sk">
+      </div>
+      <div class="edit-field">
+        <label>Heslo * (min. 6 znakov)</label>
+        <input type="text" id="mrPassword" placeholder="Heslo pre hráča">
+      </div>
+      <div class="edit-field">
+        <label>Vstupné ELO (nepovinné)</label>
+        <input type="number" id="mrElo" placeholder="1000–3000, prázdne = 1000">
+      </div>
+      <div class="edit-field">
+        <label>Tréner (nepovinné)</label>
+        <select id="mrTrener">
+          <option value="">— bez trénera —</option>
+        </select>
+      </div>
+      <div class="edit-field">
+        <label>Admin heslo *</label>
+        <input type="password" id="mrAdminSecret" placeholder="Heslo pre túto funkciu">
+      </div>
+    </div>
+    <div class="actions">
+      <button class="success" onclick="manualRegisterPlayer()">➕ Zaregistrovať hráča</button>
+    </div>
+    <div id="mrStatus" class="status" style="display:none;"></div>
+  </div>
+
   <div id="userStatus" class="status">Klikni na Načítať používateľov.</div>
 
   <div id="userList" style="margin-top:12px; display:grid; gap:8px;"></div>
@@ -913,11 +961,99 @@ async function loadUsers() {
     (players || []).forEach(p => { if (p.user_id) playerMap[p.user_id] = p.trener_id; });
 
     renderUserList(playerMap);
+    populateTrenerSelect('mrTrener');
     setUserStatus(`Načítaných ${allUsers.length} používateľov`, 'success');
   } catch(e) {
     setUserStatus('Chyba: ' + e.message, 'error');
   }
 }
+
+// ─── Ručná registrácia hráča (cez Edge Function, s rovno potvrdeným emailom) ──
+
+const ADMIN_FUNCTION_URL = `${SUPABASE_URL}/functions/v1/admin-create-player`;
+
+function populateTrenerSelect(selectId, excludeId) {
+  const sel = document.getElementById(selectId);
+  if (!sel) return;
+  const current = sel.value;
+  sel.innerHTML = '<option value="">— bez trénera —</option>';
+  allTreners.forEach(t => {
+    if (t.id === excludeId) return;
+    const opt = document.createElement('option');
+    opt.value = t.id;
+    opt.textContent = t.nick_name || `${t.name || ''} ${t.surname || ''}`.trim();
+    sel.appendChild(opt);
+  });
+  if (current) sel.value = current;
+}
+
+function setMrStatus(text, type) {
+  const el = document.getElementById('mrStatus');
+  el.style.display = 'block';
+  el.textContent = text;
+  el.className = 'status' + (type ? ' ' + type : '');
+}
+
+async function manualRegisterPlayer() {
+  const name       = document.getElementById('mrName').value.trim();
+  const surname    = document.getElementById('mrSurname').value.trim();
+  const nick       = document.getElementById('mrNick').value.trim();
+  const email      = document.getElementById('mrEmail').value.trim();
+  const password   = document.getElementById('mrPassword').value;
+  const trenerId   = document.getElementById('mrTrener').value || null;
+  const eloRaw     = document.getElementById('mrElo').value;
+  const baseElo    = eloRaw ? Number(eloRaw) : 1000;
+  const adminSecret= document.getElementById('mrAdminSecret').value;
+
+  if (!nick)       return setMrStatus('Prezývka je povinná.', 'error');
+  if (!email || !email.includes('@')) return setMrStatus('Zadaj platný email.', 'error');
+  if (!password || password.length < 6) return setMrStatus('Heslo musí mať aspoň 6 znakov.', 'error');
+  if (!adminSecret) return setMrStatus('Zadaj admin heslo (nastavené v Edge Function).', 'error');
+
+  setMrStatus('Registrujem...', '');
+  try {
+    const res = await fetch(ADMIN_FUNCTION_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${SUPABASE_KEY}`
+      },
+      body: JSON.stringify({
+        email, password, name, surname, nick_name: nick,
+        trener_id: trenerId, base_elo: baseElo, admin_secret: adminSecret
+      })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setMrStatus('Chyba: ' + (data.error || `HTTP ${res.status}`), 'error');
+      return;
+    }
+
+    setMrStatus(`✅ Hráč ${data.email} bol zaregistrovaný a rovno potvrdený.`, 'success');
+    // Vyčisti formulár (okrem admin hesla — nech ho netreba opisovať zakaždým)
+    document.getElementById('mrName').value = '';
+    document.getElementById('mrSurname').value = '';
+    document.getElementById('mrNick').value = '';
+    document.getElementById('mrEmail').value = '';
+    document.getElementById('mrPassword').value = '';
+    document.getElementById('mrElo').value = '';
+    sessionStorage.setItem('mrAdminSecret', adminSecret);
+
+    await loadUsers();
+  } catch(e) {
+    setMrStatus('Chyba siete: ' + e.message, 'error');
+  }
+}
+
+// Admin heslo si v rámci jednej relácie prehliadača pamätaj (nemusí sa opisovať)
+document.addEventListener('DOMContentLoaded', () => {
+  const saved = sessionStorage.getItem('mrAdminSecret');
+  if (saved) {
+    const el = document.getElementById('mrAdminSecret');
+    if (el) el.value = saved;
+  }
+});
 
 function validityBadge(u) {
   if (!u.valid_to) return '<span style="font-size:11px;color:#94a3b8;">bez platnosti</span>';
