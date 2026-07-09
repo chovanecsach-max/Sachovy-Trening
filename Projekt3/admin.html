@@ -537,6 +537,17 @@ button {
         </div>
       </div>
 
+      <!-- Zmena hesla (cez Edge Function, nepotrebuje mail) -->
+      <div style="margin-top:14px;padding:12px;background:#fff7ed;border:1px solid #fdba74;border-radius:10px;">
+        <div style="font-size:13px;font-weight:bold;margin-bottom:8px;color:#c2410c;">🔑 Zmeniť heslo</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+          <input type="text" id="uNewPassword" placeholder="Nové heslo (min. 6 znakov)" style="flex:1;min-width:160px;margin:0;">
+          <input type="password" id="uPwAdminSecret" placeholder="Admin heslo" style="flex:1;min-width:120px;margin:0;">
+          <button class="admin" style="flex:none;padding:6px 14px;font-size:13px;margin-top:0;" onclick="resetUserPassword()">Zmeniť heslo</button>
+        </div>
+        <div id="uPwStatus" class="status" style="display:none;margin-top:8px;"></div>
+      </div>
+
       <div class="actions">
         <button class="success" onclick="saveUser()">💾 Uložiť zmeny</button>
         <button class="secondary" onclick="closeUserEdit()">Zavrieť</button>
@@ -1046,12 +1057,64 @@ async function manualRegisterPlayer() {
   }
 }
 
+// ─── Zmena hesla existujúcemu hráčovi (cez tú istú Edge Function) ────────────
+
+function setPwStatus(text, type) {
+  const el = document.getElementById('uPwStatus');
+  el.style.display = 'block';
+  el.textContent = text;
+  el.className = 'status' + (type ? ' ' + type : '');
+}
+
+async function resetUserPassword() {
+  if (!selectedUser) return;
+  const newPassword = document.getElementById('uNewPassword').value;
+  const adminSecret = document.getElementById('uPwAdminSecret').value;
+
+  if (!newPassword || newPassword.length < 6) {
+    return setPwStatus('Nové heslo musí mať aspoň 6 znakov.', 'error');
+  }
+  if (!adminSecret) {
+    return setPwStatus('Zadaj admin heslo.', 'error');
+  }
+
+  setPwStatus('Mením heslo...', '');
+  try {
+    const res = await fetch(ADMIN_FUNCTION_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${SUPABASE_KEY}`
+      },
+      body: JSON.stringify({
+        action: 'reset_password',
+        user_id: selectedUser.id,
+        new_password: newPassword,
+        admin_secret: adminSecret
+      })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setPwStatus('Chyba: ' + (data.error || `HTTP ${res.status}`), 'error');
+      return;
+    }
+    setPwStatus(`✅ Heslo pre ${selectedUser.email} bolo zmenené.`, 'success');
+    document.getElementById('uNewPassword').value = '';
+    sessionStorage.setItem('mrAdminSecret', adminSecret);
+  } catch(e) {
+    setPwStatus('Chyba siete: ' + e.message, 'error');
+  }
+}
+
 // Admin heslo si v rámci jednej relácie prehliadača pamätaj (nemusí sa opisovať)
 document.addEventListener('DOMContentLoaded', () => {
   const saved = sessionStorage.getItem('mrAdminSecret');
   if (saved) {
-    const el = document.getElementById('mrAdminSecret');
-    if (el) el.value = saved;
+    const el1 = document.getElementById('mrAdminSecret');
+    if (el1) el1.value = saved;
+    const el2 = document.getElementById('uPwAdminSecret');
+    if (el2) el2.value = saved;
   }
 });
 
@@ -1124,6 +1187,10 @@ async function openUserEdit(userId) {
   document.getElementById('uEditSurname').value        = selectedUser.surname || '';
   document.getElementById('uEditNick').value           = selectedUser.nick_name || '';
   document.getElementById('uEditRole').value           = selectedUser.role || 'hrac';
+
+  // Vyčisti zmenu hesla po predošlom hráčovi
+  document.getElementById('uNewPassword').value = '';
+  document.getElementById('uPwStatus').style.display = 'none';
 
   // Naplň dropdown trénerov
   const sel = document.getElementById('uEditTrener');
