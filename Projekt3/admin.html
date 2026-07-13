@@ -221,6 +221,10 @@ button {
 
 <body oncontextmenu="return false;">
 <div class="app">
+  <div style="display:flex;align-items:center;justify-content:flex-end;gap:10px;margin-bottom:4px;">
+    <span id="adminWho" style="font-size:13px;color:#475569;"></span>
+    <button class="secondary" style="padding:5px 12px;font-size:12px;margin:0;width:auto;" onclick="logout()">Odhlásiť sa</button>
+  </div>
   <h1>Administrácia úloh</h1>
 
   <!-- Záložky -->
@@ -557,20 +561,49 @@ button {
 </div>
 
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/auth.js"></script>
 <script>
-const SUPABASE_URL = "https://wdjsilryllqksdtmaehy.supabase.co";
-const SUPABASE_KEY = "sb_publishable_45gFQhgPScrDjDCVC0B4Iw_q6uZKf9m";
+// SUPABASE_URL a SUPABASE_KEY poskytuje js/auth.js (nedeklarovať znova!)
 
 let puzzles = [];
 let selectedPuzzle = null;
 
+// ─── Prihlasovacia brána ─────────────────────────────────────────────────────
+// Admin panel je prístupný LEN prihlásenému administrátorovi. Všetky
+// požiadavky odchádzajú s jeho tokenom — vďaka tomu môžu RLS pravidlá
+// v databáze rozlíšiť admina od kohokoľvek iného s verejným kľúčom.
+let adminGateOk = false;
+
+async function adminGate() {
+  await refreshSession();
+  if (!isLoggedIn() || !isAdmin()) {
+    alert('Administrácia je prístupná len prihlásenému administrátorovi.');
+    location.href = 'login.html';
+    return false;
+  }
+  adminGateOk = true;
+  const who = document.getElementById('adminWho');
+  if (who) {
+    const u = getCurrentUser();
+    who.textContent = '👤 ' + (u.nick || u.email);
+  }
+  return true;
+}
+
+async function getAccessToken() {
+  const { data } = await sbClient.auth.getSession();
+  return data.session?.access_token || SUPABASE_KEY;
+}
+
 async function sbFetch(path, options = {}) {
   const url = `${SUPABASE_URL}/rest/v1/${path}`;
+  const token = await getAccessToken();
   const res = await fetch(url, {
     ...options,
     headers: {
       "apikey": SUPABASE_KEY,
-      "Authorization": `Bearer ${SUPABASE_KEY}`,
+      "Authorization": `Bearer ${token}`,
       "Content-Type": "application/json",
       "Prefer": options.prefer || "",
       ...(options.headers || {})
@@ -1108,7 +1141,11 @@ async function resetUserPassword() {
 }
 
 // Admin heslo si v rámci jednej relácie prehliadača pamätaj (nemusí sa opisovať)
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+  // Najprv prihlasovacia brána — bez prihláseného admina sa panel nespustí
+  const ok = await adminGate();
+  if (!ok) return;
+
   const saved = sessionStorage.getItem('mrAdminSecret');
   if (saved) {
     const el1 = document.getElementById('mrAdminSecret');
