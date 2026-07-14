@@ -105,3 +105,58 @@ async function refreshSession() {
     return false;
   }
 }
+
+
+// ─── Automatické hlásenie chýb do tabuľky error_log ─────────────────────────
+// Každá neočakávaná JS chyba na ktorejkoľvek stránke sa potichu zapíše do
+// databázy (stránka, správa, stack, prehliadač, prípadne prihlásený user).
+// Admin ich vidí v Table Editore alebo cez SQL. Hlásenie samo nikdy nesmie
+// spôsobiť ďalšiu chybu ani spomaliť stránku — všetko je v try/catch a
+// obmedzené na max. 5 hlásení na jedno načítanie stránky.
+(function () {
+  let reportedCount = 0;
+
+  async function reportError(message, stack) {
+    try {
+      if (reportedCount >= 5) return;
+      reportedCount++;
+
+      let token = SUPABASE_KEY;
+      try {
+        const { data } = await sbClient.auth.getSession();
+        if (data?.session?.access_token) token = data.session.access_token;
+      } catch (e) {}
+
+      let userId = null;
+      try {
+        userId = sessionStorage.getItem('user_id') || null;
+      } catch (e) {}
+
+      await fetch(`${SUPABASE_URL}/rest/v1/error_log`, {
+        method: 'POST',
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=minimal'
+        },
+        body: JSON.stringify({
+          user_id: userId,
+          page: (location.pathname || '').slice(0, 200),
+          message: String(message || 'neznáma chyba').slice(0, 2000),
+          stack: String(stack || '').slice(0, 4000),
+          user_agent: (navigator.userAgent || '').slice(0, 300)
+        })
+      });
+    } catch (e) { /* hlásenie chýb nesmie nikdy samo zlyhať nahlas */ }
+  }
+
+  window.addEventListener('error', function (ev) {
+    reportError(ev.message, ev.error && ev.error.stack);
+  });
+
+  window.addEventListener('unhandledrejection', function (ev) {
+    const r = ev.reason;
+    reportError(r && r.message ? r.message : String(r), r && r.stack);
+  });
+})();
