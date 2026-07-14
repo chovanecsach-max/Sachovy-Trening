@@ -1361,7 +1361,7 @@ function closeUserEdit() {
 }
 
 async function deleteUser(userId, displayName) {
-  if (!confirm(`Naozaj chceš ÚPLNE vymazať používateľa "${displayName}"?\n\nVymažú sa:\n• Záznamy o tréningu\n• Hráčsky záznam\n• Profil\n\nTáto akcia je NEVRATNÁ.`)) return;
+  if (!confirm(`Naozaj chceš ÚPLNE vymazať používateľa "${displayName}"?\n\nVymažú sa:\n• Záznamy o tréningu a ELO história\n• Hráčsky záznam\n• Profil\n• Prihlasovací účet (email sa uvoľní pre novú registráciu)\n\nTáto akcia je NEVRATNÁ.`)) return;
 
   setUserStatus('Mažem používateľa...');
   try {
@@ -1389,19 +1389,39 @@ async function deleteUser(userId, displayName) {
       });
     }
 
-    // 1. Vymaž training_log záznamy (cez player_id)
-    const playerData = await sbFetch(`players?user_id=eq.${userId}&select=id&limit=1`);
-    if (playerData && playerData.length) {
-      const playerId = playerData[0].id;
-      await sbFetch(`training_log?player_id=eq.${playerId}`, { method: 'DELETE' });
-      // 2. Vymaž player záznam
-      await sbFetch(`players?id=eq.${playerId}`, { method: 'DELETE' });
+    // Kompletné zmazanie cez Edge Function — vrátane prihlasovacieho účtu
+    // (auth.users), ktorý sa z prehliadača zmazať nedá. Bez tohto kroku by
+    // ostal "duch" účtu blokujúci opätovnú registráciu na ten istý email.
+    let adminSecret = sessionStorage.getItem('mrAdminSecret') || '';
+    if (!adminSecret) {
+      adminSecret = prompt('Zadaj admin heslo (rovnaké ako pri ručnej registrácii):') || '';
+      if (!adminSecret) {
+        setUserStatus('Mazanie zrušené — nebolo zadané admin heslo.', 'info');
+        return;
+      }
     }
 
-    // 3. Vymaž profil
-    await sbFetch(`profiles?id=eq.${userId}`, { method: 'DELETE' });
+    const res = await fetch(ADMIN_FUNCTION_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${await getAccessToken()}`
+      },
+      body: JSON.stringify({
+        action: 'delete_user',
+        user_id: userId,
+        admin_secret: adminSecret
+      })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setUserStatus('Chyba pri mazaní: ' + (data.error || `HTTP ${res.status}`), 'error');
+      return;
+    }
+    sessionStorage.setItem('mrAdminSecret', adminSecret);
 
-    setUserStatus(`✅ Používateľ "${displayName}" bol úplne vymazaný.`, 'success');
+    setUserStatus(`✅ Používateľ "${displayName}" bol úplne vymazaný (vrátane prihlasovacieho účtu).`, 'success');
     await loadUsers();
   } catch(e) {
     setUserStatus('Chyba pri mazaní: ' + e.message, 'error');
