@@ -8,7 +8,11 @@ async function sbFetch(path, options = {}) {
   // inak fall-back na anon kľúč (pre verejné dotazy)
   let authToken = SUPABASE_KEY;
   try {
-    const { data } = await sb.auth.getSession();
+    // POZOR: klient sa vola sbClient (definovany v auth.js), nie sb.
+    // Povodne tu bolo sb.auth.getSession() - objekt sb ale na strankach
+    // neexistuje, ReferenceError sa ticho odchytil a vsetky poziadavky
+    // odchadzali s verejnym klucom namiesto tokenu prihlaseneho hraca.
+    const { data } = await sbClient.auth.getSession();
     if (data?.session?.access_token) authToken = data.session.access_token;
   } catch(e) {}
   const res = await fetch(url, {
