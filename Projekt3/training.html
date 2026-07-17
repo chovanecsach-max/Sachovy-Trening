@@ -720,7 +720,11 @@ let dragState = {
   active: false,
   fromIndex: null,
   piece: '',
-  startedFromSquare: false
+  startedFromSquare: false,
+  moved: false,          // pohol sa kurzor/prst od stlačenia? (rozlišuje ťuk od ťahania)
+  startX: 0,
+  startY: 0,
+  prevSelected: null     // čo bolo vybrané pred stlačením (pre správanie ťuku)
 };
 
 let solutionRoot = [];
@@ -1270,7 +1274,9 @@ function clearDragState() {
   dragState.active = false;
   dragState.fromIndex = null;
   dragState.piece = '';
-  dragState.startedFromSquare = false;
+  dragState.moved = false;
+  // startedFromSquare sa tu ZÁMERNE nenuluje — musí prežiť do click eventu,
+  // ktorý nasleduje po mouseup, aby ho stihol potlačiť (spotrebuje ho click()).
 
   const dragPiece = document.getElementById('dragPiece');
   dragPiece.style.display = 'none';
@@ -1289,18 +1295,18 @@ function startDrag(event, boardIndex) {
   dragState.active = true;
   dragState.fromIndex = boardIndex;
   dragState.piece = board[boardIndex];
-  dragState.startedFromSquare = true;
+  dragState.startedFromSquare = false;   // nastaví sa až pri reálnom pohybe/pustení
+  dragState.moved = false;
+  dragState.startX = event.clientX;
+  dragState.startY = event.clientY;
+  dragState.prevSelected = selected;
 
+  // Výber a legálne ciele zvýrazni hneď pri stlačení (funguje pre klik aj ťahanie).
+  // Plávajúca figúrka a status "Ťahaj..." sa zobrazia až keď sa kurzor/prst
+  // naozaj pohne — pri obyčajnom ťuku/kliku by len rušili.
   selected = boardIndex;
   legalTargets = getLegalTargets(boardIndex);
-
-  const dragPiece = document.getElementById('dragPiece');
-  dragPiece.innerHTML = `<img src="${getPieceImagePath(dragState.piece)}" alt="">`;
-  dragPiece.style.display = 'block';
-  updateDragPiece(event.clientX, event.clientY);
-
   renderClasses(); // bez flash
-  setStatus('Ťahaj figúrku na cieľové pole', 'info');
 }
 
 function boardIndexFromPoint(clientX, clientY) {
@@ -1429,11 +1435,58 @@ function handleMoveAttempt(fromIndex, targetIndex) {
 
 document.addEventListener('mousemove', (event) => {
   if (!dragState.active) return;
+
+  // Prvý reálny pohyb (> 6 px) premení stlačenie na ťahanie
+  if (!dragState.moved) {
+    const dx = event.clientX - dragState.startX;
+    const dy = event.clientY - dragState.startY;
+    if (dx * dx + dy * dy < 36) return;
+
+    dragState.moved = true;
+    dragState.startedFromSquare = true;   // následný click po pustení sa potlačí
+
+    const dragPiece = document.getElementById('dragPiece');
+    dragPiece.innerHTML = `<img src="${getPieceImagePath(dragState.piece)}" alt="">`;
+    dragPiece.style.display = 'block';
+    setStatus('Ťahaj figúrku na cieľové pole', 'info');
+  }
+
   updateDragPiece(event.clientX, event.clientY);
 });
 
 document.addEventListener('mouseup', (event) => {
   if (!dragState.active) return;
+
+  // ŤUK / KLIK bez pohybu: nechová sa ako ťahanie, ale ako výber.
+  // (Na dotykových zariadeniach prehliadač simuluje mousedown+mouseup+click
+  // pri každom ťuku — bez tohto rozlíšenia by ťuk výber vzápätí zrušil.)
+  if (!dragState.moved) {
+    const fromIndex = dragState.fromIndex;
+    const prevSelected = dragState.prevSelected;
+
+    dragState.active = false;
+    dragState.startedFromSquare = true;   // potlač click, výber riešime tu
+
+    const dragPiece = document.getElementById('dragPiece');
+    dragPiece.style.display = 'none';
+    dragPiece.innerHTML = '';
+
+    if (prevSelected === fromIndex) {
+      // ťuk na už vybranú figúrku = zrušenie výberu
+      selected = null;
+      legalTargets = [];
+      renderClasses();
+      setStatus('Výber zrušený', 'info');
+    } else {
+      selected = fromIndex;
+      legalTargets = getLegalTargets(fromIndex);
+      renderClasses();
+      setStatus('Vybraná figúrka: ' + name(fromIndex), 'info');
+    }
+    return;
+  }
+
+  // Skutočné ťahanie: pusti figúrku na cieľové pole
   const targetIndex = boardIndexFromPoint(event.clientX, event.clientY);
   finishDrop(targetIndex);
 });
@@ -1863,11 +1916,13 @@ function finishPromotionChoice(chosenPiece, fromIndex, toIndexTarget) {
 }
 
 function click(i) {
-  if (!current || solved || failed || pendingPromotion || isAnimatingSolution) return;
+  // Spotrebuj poistku ako prvé — inak by po ťahaní ukončenom počas
+  // premeny/promócie mohla prežiť a potlačiť neskorší nevinný klik.
   if (dragState.startedFromSquare) {
     dragState.startedFromSquare = false;
     return;
   }
+  if (!current || solved || failed || pendingPromotion || isAnimatingSolution) return;
 
   if (selected === null) {
     if (!board[i]) return setStatus('Vyber figúrku', 'info');
