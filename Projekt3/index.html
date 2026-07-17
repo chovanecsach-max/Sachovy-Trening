@@ -269,6 +269,38 @@ body {
   font-size: 12px;
   font-style: italic;
 }
+
+/* ─── Mobil a tablet ──────────────────────────────────────────────────────── */
+@media (max-width: 780px) {
+  body { overflow-x: hidden; }
+
+  .header { padding: 10px 14px; flex-wrap: wrap; gap: 8px; }
+  .logo-text { font-size: 18px; }
+  .logo-icon svg { width: 38px; height: 38px; }
+
+  .main { padding: 14px 12px 24px; }
+
+  /* Hlavne menu: 4 stlpce (2 rady) */
+  .nav-row { grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .nav-btn { padding: 14px 6px; font-size: 12px; gap: 8px; min-height: 88px;
+             touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+  .nav-icon { width: 40px; height: 40px; font-size: 19px; }
+
+  /* Podmenu zrucnosti: 5 stlpcov (2 rady) */
+  .submenu { grid-template-columns: repeat(5, 1fr); gap: 8px; padding: 10px; }
+  .sub-btn { padding: 12px 4px; font-size: 11px; gap: 6px; min-height: 74px;
+             touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+  .sub-icon { width: 32px; height: 32px; font-size: 15px; }
+
+  /* Rebricky pod seba (2 stlpce na tablete) */
+  .leaderboards { grid-template-columns: 1fr 1fr; gap: 10px; }
+}
+
+@media (max-width: 560px) {
+  .nav-row { grid-template-columns: repeat(4, 1fr); }
+  .submenu { grid-template-columns: repeat(4, 1fr); }
+  .leaderboards { grid-template-columns: 1fr; }
+}
 </style>
 </head>
 <body oncontextmenu="return false;">
