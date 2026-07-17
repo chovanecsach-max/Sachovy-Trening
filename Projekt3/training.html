@@ -114,6 +114,8 @@ h1 {
   position: relative;
   box-sizing: border-box;
   user-select: none;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .square.drag-origin {
@@ -481,66 +483,57 @@ button:disabled {
   gap: 8px;
 }
 
+/* ─── Mobil a tablet ──────────────────────────────────────────────────────── */
 @media (max-width: 780px) {
-  .layout {
-    grid-template-columns: 1fr;
-  }
+  body { overflow-x: hidden; padding: 6px; }
+  .app { padding: 8px; }
 
-  .board {
-    width: min(100%, 82vw);
-  }
+  h1 { font-size: 20px; margin-bottom: 8px; }
 
+  .layout { grid-template-columns: 1fr; gap: 10px; }
+
+  /* Šachovnica ostáva HORE */
+  .board { width: min(100%, 96vw); border-width: 5px; }
+  .board-prompt { font-size: 17px; margin-bottom: 6px; }
+
+  /* Indikátor na ťahu do rohu, nech netrčí mimo displeja */
   .turn-indicator {
-    right: -16px;
-    bottom: 48px;
+    right: 2px;
+    top: 0;
+    bottom: auto;
+    width: 16px;
+    height: 16px;
   }
 
-  .right-column {
-    order: -1;
-  }
+  /* Panel: 1. stavová hláška, 2. tlačidlá, 3. info o úlohe */
+  .panel-card { display: flex; flex-direction: column; }
+  .status    { order: 1; }
+  .buttons   { order: 2; margin-top: 10px; }
+  .meta-grid { order: 3; margin-top: 10px; margin-bottom: 0; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
+
+  .meta-box { padding: 6px; }
+  .meta-label { font-size: 10px; }
+  .meta-value { font-size: 12px; }
+  .meta-value .badge { font-size: 11px; padding: 3px 6px; }
+
+  .buttons { grid-template-columns: 1fr 1fr; }
+  button { min-height: 46px; font-size: 15px; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+
+  .status { font-size: 15px; padding: 12px 12px; }
+  .stats-grid { grid-template-columns: repeat(3, 1fr); }
+
+  /* Modálne okná (nastavenie tréningu, premena) na výšku, jeden stĺpec */
+  .session-grid, .session-actions { grid-template-columns: 1fr; }
+  .promotion-modal, .session-modal { min-width: 280px; max-width: 94vw; }
 }
 
-@media (max-width: 700px) {
-  body {
-    padding: 6px;
-  }
-
-  .app {
-    padding: 8px;
-  }
-
-  h1 {
-    font-size: 20px;
-    margin-bottom: 8px;
-  }
-
-  .meta-grid,
-  .session-grid,
-  .session-actions,
-  .buttons,
-  .stats-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .promotion-modal {
-    min-width: 280px;
-  }
-
-  .session-modal {
-    min-width: 280px;
-  }
-
-  .board-prompt {
-    font-size: 18px;
-    margin-bottom: 8px;
-  }
-
-  .turn-indicator {
-    right: -12px;
-    bottom: 38px;
-    width: 18px;
-    height: 18px;
-  }
+/* Malé telefóny */
+@media (max-width: 420px) {
+  .app { padding: 6px; }
+  .board-prompt { font-size: 15px; }
+  .board { width: 100%; border-width: 4px; }
+  .promotion-option { width: 58px; height: 58px; }
+  .promotion-modal { padding: 14px; }
 }
 </style>
 </head>
