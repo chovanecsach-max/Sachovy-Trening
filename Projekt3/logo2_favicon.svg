@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Šachový tréning – favicon">
+  <rect x="0" y="0" width="64" height="64" rx="12" fill="#16304F"/>
+
+  <!-- tri stúpajúce schody -->
+  <rect x="7"  y="40" width="16" height="16" fill="#F5B301"/>
+  <rect x="24" y="40" width="16" height="16" fill="#FFF8E7"/>
+  <rect x="24" y="23" width="16" height="16" fill="#F5B301"/>
+  <rect x="41" y="40" width="16" height="16" fill="#F5B301"/>
+  <rect x="41" y="23" width="16" height="16" fill="#FFF8E7"/>
+
+  <!-- koruna namiesto najvyššieho pola -->
+  <path d="M41,22 L57,22 L55.5,9 L51.5,15 L49,7 L46.5,15 L42.5,9 Z" fill="#F5B301"/>
+  <rect x="41" y="21" width="16" height="3.4" rx="1.7" fill="#E08E00"/>
+  <circle cx="49" cy="17.5" r="1.7" fill="#FF6B57"/>
+</svg>
