@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Šachový tréning</title>
+<link rel="icon" type="image/svg+xml" href="logo2_favicon.svg">
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -23,7 +24,8 @@ body {
 }
 
 .logo { display: flex; align-items: center; gap: 12px; }
-.logo-icon { font-size: 32px; line-height: 1; }
+.logo-icon { line-height: 0; }
+.logo-icon svg { display: block; border-radius: 9px; }
 .logo-text { font-size: 22px; font-weight: 600; color: #d4a843; letter-spacing: 0.4px; }
 
 .user-chip {
@@ -274,7 +276,27 @@ body {
 <!-- Header — celá šírka -->
 <div class="header">
   <div class="logo">
-    <div class="logo-icon">♟</div>
+    <div class="logo-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="46" height="46" role="img" aria-label="Logo Šachový tréning">
+      <rect x="0" y="0" width="200" height="200" rx="34" fill="#16304F"/>
+      <rect x="32"  y="130" width="36" height="36" fill="#F5B301"/>
+      <rect x="70"  y="130" width="36" height="36" fill="#FFF8E7"/>
+      <rect x="70"  y="92"  width="36" height="36" fill="#F5B301"/>
+      <rect x="108" y="130" width="36" height="36" fill="#F5B301"/>
+      <rect x="108" y="92"  width="36" height="36" fill="#FFF8E7"/>
+      <rect x="108" y="54"  width="36" height="36" fill="#F5B301"/>
+      <circle cx="50" cy="100" r="9" fill="#FFF8E7"/>
+      <path d="M44.5,108 C44,115 41.5,122 39.5,126 L60.5,126 C58.5,122 56,115 55.5,108 Z" fill="#FFF8E7"/>
+      <rect x="37" y="125" width="26" height="6.5" rx="3.2" fill="#D9CBAA"/>
+      <circle cx="46.7" cy="98.3" r="1.5" fill="#1F3A5F"/>
+      <circle cx="53.3" cy="98.3" r="1.5" fill="#1F3A5F"/>
+      <path d="M46.7,102.3 Q50,105.2 53.3,102.3" stroke="#1F3A5F" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+      <path d="M62,88 Q94,40 114,36" stroke="#7FD1E8" stroke-width="3.2" stroke-linecap="round" stroke-dasharray="1 9" fill="none"/>
+      <path d="M108,44 L144,44 L140,22 L132.5,33 L126,18 L119.5,33 L112,22 Z" fill="#F5B301"/>
+      <rect x="108" y="44" width="36" height="5.5" rx="2.7" fill="#E08E00"/>
+      <circle cx="126" cy="38" r="2.8" fill="#FF6B57"/>
+      <path d="M156,22 l2.8,6.4 6.4,2.8 -6.4,2.8 -2.8,6.4 -2.8,-6.4 -6.4,-2.8 6.4,-2.8 Z" fill="#FFF8E7"/>
+      <path d="M96,18 l2,4.6 4.6,2 -4.6,2 -2,4.6 -2,-4.6 -4.6,-2 4.6,-2 Z" fill="#7FD1E8"/>
+    </svg></div>
     <div class="logo-text">Šachový tréning</div>
   </div>
   <div class="user-chip">
