@@ -47,7 +47,9 @@ h1 {
 
 .tab {
   flex: 1;
-  padding: 10px;
+  padding: 12px 10px;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
   text-align: center;
   cursor: pointer;
   font-size: 15px;
@@ -81,10 +83,10 @@ h1 {
 
 .field input, .field select {
   width: 100%;
-  padding: 10px 12px;
+  padding: 11px 12px;
   border: 1px solid #d1d5db;
   border-radius: 10px;
-  font-size: 14px;
+  font-size: 16px; /* pod 16px iOS Safari pri fokuse automaticky zoomuje */
   background: white;
 }
 
@@ -102,13 +104,16 @@ h1 {
 
 button {
   width: 100%;
-  padding: 12px;
+  padding: 13px;
   border: none;
   border-radius: 10px;
   cursor: pointer;
-  font-size: 15px;
+  font-size: 16px;
   font-weight: bold;
   margin-top: 6px;
+  min-height: 48px;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .btn-primary { background: #111827; color: white; }
@@ -135,6 +140,14 @@ button {
 
 /* Skrytý element */
 .hidden { display: none !important; }
+
+/* ─── Malé telefóny ───────────────────────────────────────────────────────── */
+@media (max-width: 420px) {
+  body { align-items: flex-start; padding-top: 12px; }
+  .container { padding: 20px 16px; }
+  h1 { font-size: 24px; }
+  .row { grid-template-columns: 1fr; gap: 0; }
+}
 </style>
 </head>
 <body>
