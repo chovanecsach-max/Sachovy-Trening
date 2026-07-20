@@ -216,6 +216,35 @@ button {
   .actions { flex-direction: column; }
   .actions button { width: 100%; }
 }
+
+/* ── Vizuálny editor riešenia ── */
+#solutionEditor { margin-top: 14px; padding: 14px; background:#f8fafc; border:1px solid #e2e8f0; border-radius: 12px; }
+.ed-layout { display:flex; gap:16px; flex-wrap:wrap; align-items:flex-start; }
+#edBoard { display:grid; grid-template-columns:repeat(8,1fr); grid-template-rows:repeat(8,1fr); width:min(400px, 92vw); aspect-ratio:1/1; border:5px solid #5b4636; border-radius:8px; overflow:hidden; }
+.ed-sq { position:relative; display:flex; align-items:center; justify-content:center; cursor:pointer; user-select:none; touch-action:manipulation; -webkit-tap-highlight-color:transparent; }
+.ed-sq img { width:84%; height:84%; pointer-events:none; }
+.ed-light { background:#f0d9b5; } .ed-dark { background:#b58863; }
+.ed-sel { outline:3px solid #2563eb; outline-offset:-3px; }
+.ed-last { box-shadow: inset 0 0 0 100px rgba(245,179,1,0.30); }
+.ed-dot::after { content:''; position:absolute; width:26%; height:26%; border-radius:50%; background:rgba(37,99,235,0.45); }
+.ed-cap::after { content:''; position:absolute; inset:6%; border:4px solid rgba(220,38,38,0.55); border-radius:50%; }
+.ed-side { flex:1 1 260px; min-width:240px; }
+.ed-list { max-height:360px; overflow-y:auto; display:flex; flex-direction:column; gap:6px; padding:6px; background:white; border:1px solid #e2e8f0; border-radius:10px; }
+.ed-level { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+.ed-num { font-size:12px; color:#64748b; min-width:36px; font-weight:bold; }
+.ed-chip { padding:6px 10px; border-radius:8px; border:1px solid #cbd5e1; background:white; cursor:pointer; font-size:14px; font-weight:600; color:#1f2937; margin-top:0; min-height:0; }
+.ed-chip:hover { border-color:#94a3b8; background:#f8fafc; }
+.ed-chip.ed-on { background:#fff7e0; border-color:#d4a843; color:#7a5c12; }
+.ed-chip.ed-ahead { opacity:.55; }
+.ed-end { font-size:12px; color:#16a34a; font-weight:bold; }
+.ed-hint { margin-top:8px; font-size:13px; color:#475569; }
+.ed-actions { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
+.ed-actions button { margin-top:0; width:auto; }
+#edPromo { position:fixed; inset:0; background:rgba(0,0,0,.5); display:none; align-items:center; justify-content:center; z-index:200; }
+#edPromo.open { display:flex; }
+.ed-promo-box { background:white; border-radius:14px; padding:18px; display:flex; gap:10px; }
+.ed-promo-box img { width:64px; height:64px; cursor:pointer; border:2px solid #d1d5db; border-radius:10px; padding:6px; background:white; }
+.ed-promo-box img:hover { border-color:#2563eb; }
 </style>
 </head>
 
@@ -328,6 +357,32 @@ button {
         <div class="edit-field" style="grid-column: span 2;">
           <label>Riešenie (JSON — solutionTree)</label>
           <textarea id="editSolutionTree" placeholder='napr. [{"move":"e2e4","next":[]}]'></textarea>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button class="admin" type="button" onclick="edToggleEditor()">♟ Vizuálny editor riešenia</button>
+      </div>
+
+      <div id="solutionEditor" class="hidden">
+        <div class="ed-layout">
+          <div>
+            <div id="edBoard"></div>
+            <div id="edHint" class="ed-hint"></div>
+          </div>
+          <div class="ed-side">
+            <div class="ed-list" id="edMoveList"></div>
+            <div class="ed-actions">
+              <button class="secondary" type="button" onclick="edToStart()">⏮ Začiatok</button>
+              <button class="secondary" type="button" onclick="edStepBack()">◀ Späť</button>
+              <button class="danger" type="button" onclick="edDeleteBranch()">🗑 Vymazať vetvu</button>
+            </div>
+            <div class="ed-actions">
+              <button class="success" type="button" onclick="savePuzzle()">💾 Uložiť zmeny</button>
+              <button class="secondary" type="button" onclick="edToggleEditor()">✖ Zavrieť editor</button>
+            </div>
+            <div class="tip" style="margin-top:8px;">Klikaním na ťahy sa pohybuješ riešením. Nový ťah (alternatívu) pridáš jednoducho tak, že ho <b>zahráš na šachovnici</b> — ťuk na figúrku, ťuk na cieľové pole. Zmeny sa zapíšu do JSON poľa vyššie a uložia tlačidlom Uložiť zmeny.</div>
+          </div>
         </div>
       </div>
 
@@ -629,6 +684,7 @@ function normalizeFenBoardOnly(fen) {
 
 function showPuzzle(puzzle) {
   selectedPuzzle = puzzle;
+  if (typeof edCloseEditor === 'function') edCloseEditor();
   document.getElementById("resultBox").classList.remove("hidden");
 
   document.getElementById("resId").textContent = puzzle.id ?? "-";
@@ -1427,6 +1483,653 @@ async function deleteUser(userId, displayName) {
     setUserStatus('Chyba pri mazaní: ' + e.message, 'error');
   }
 }
+
+// ═══ VIZUÁLNY EDITOR RIEŠENIA — šachové jadro (prevzaté z training.html) ═══
+const files = ['a','b','c','d','e','f','g','h'];
+let board = [];
+let meta = {};
+
+function cloneMeta(m) {
+  return {
+    activeColor: m.activeColor,
+    castling: m.castling,
+    enPassant: m.enPassant,
+    halfmove: m.halfmove,
+    fullmove: m.fullmove
+  };
+}
+
+function parseFen(fen) {
+  const parts = fen.trim().split(/\s+/);
+  const rows = parts[0].split('/');
+  const b = [];
+
+  rows.forEach(r => {
+    for (const c of r) {
+      if (!isNaN(c)) {
+        for (let i = 0; i < Number(c); i++) b.push('');
+      } else {
+        b.push(c);
+      }
+    }
+  });
+
+  return {
+    board: b,
+    meta: {
+      activeColor: parts[1] || 'w',
+      castling: parts[2] || '-',
+      enPassant: parts[3] || '-',
+      halfmove: parts[4] || '0',
+      fullmove: parts[5] || '1'
+    }
+  };
+}
+
+function name(i) {
+  return files[i % 8] + (8 - Math.floor(i / 8));
+}
+
+function sqToIndex(sq) {
+  return files.indexOf(sq[0]) + 8 * (8 - Number(sq[1]));
+}
+
+function idx(m) {
+  return {
+    from: files.indexOf(m[0]) + 8 * (8 - Number(m[1])),
+    to: files.indexOf(m[2]) + 8 * (8 - Number(m[3])),
+    promotion: m.length >= 5 ? m[4] : ''
+  };
+}
+
+function isWhitePiece(p) {
+  return p && p === p.toUpperCase();
+}
+
+function pieceColor(p) {
+  if (!p) return '';
+  return isWhitePiece(p) ? 'w' : 'b';
+}
+
+function rowOf(i) { return Math.floor(i / 8); }
+function colOf(i) { return i % 8; }
+function toIndex(r, c) { return r * 8 + c; }
+
+function inside(r, c) {
+  return r >= 0 && r < 8 && c >= 0 && c < 8;
+}
+
+function removeCastlingRight(castling, ch) {
+  const result = castling.replace(ch, '');
+  return result === '' ? '-' : result;
+}
+
+function findKingIndex(b, color) {
+  const target = color === 'w' ? 'K' : 'k';
+  return b.findIndex(p => p === target);
+}
+
+function isPathClear(b, fromRow, fromCol, toRow, toCol) {
+  const rowStep = Math.sign(toRow - fromRow);
+  const colStep = Math.sign(toCol - fromCol);
+
+  let r = fromRow + rowStep;
+  let c = fromCol + colStep;
+
+  while (r !== toRow || c !== toCol) {
+    if (b[toIndex(r, c)]) return false;
+    r += rowStep;
+    c += colStep;
+  }
+  return true;
+}
+
+function isSquareAttacked(b, squareIndex, byColor) {
+  const row = rowOf(squareIndex);
+  const col = colOf(squareIndex);
+
+  const pawnSymbol = byColor === 'w' ? 'P' : 'p';
+  const pawnDirs = byColor === 'w' ? [[1, -1], [1, 1]] : [[-1, -1], [-1, 1]];
+
+  for (const [dr, dc] of pawnDirs) {
+    const r = row + dr;
+    const c = col + dc;
+    if (inside(r, c) && b[toIndex(r, c)] === pawnSymbol) return true;
+  }
+
+  const knightSymbol = byColor === 'w' ? 'N' : 'n';
+  const knightMoves = [[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]];
+  for (const [dr, dc] of knightMoves) {
+    const r = row + dr;
+    const c = col + dc;
+    if (inside(r, c) && b[toIndex(r, c)] === knightSymbol) return true;
+  }
+
+  const kingSymbol = byColor === 'w' ? 'K' : 'k';
+  for (let dr = -1; dr <= 1; dr++) {
+    for (let dc = -1; dc <= 1; dc++) {
+      if (dr === 0 && dc === 0) continue;
+      const r = row + dr;
+      const c = col + dc;
+      if (inside(r, c) && b[toIndex(r, c)] === kingSymbol) return true;
+    }
+  }
+
+  const bishopAttackers = byColor === 'w' ? ['B', 'Q'] : ['b', 'q'];
+  const rookAttackers = byColor === 'w' ? ['R', 'Q'] : ['r', 'q'];
+  const diagDirs = [[-1,-1],[-1,1],[1,-1],[1,1]];
+  const straightDirs = [[-1,0],[1,0],[0,-1],[0,1]];
+
+  for (const [dr, dc] of diagDirs) {
+    let r = row + dr, c = col + dc;
+    while (inside(r, c)) {
+      const p = b[toIndex(r, c)];
+      if (p) {
+        if (bishopAttackers.includes(p)) return true;
+        break;
+      }
+      r += dr; c += dc;
+    }
+  }
+
+  for (const [dr, dc] of straightDirs) {
+    let r = row + dr, c = col + dc;
+    while (inside(r, c)) {
+      const p = b[toIndex(r, c)];
+      if (p) {
+        if (rookAttackers.includes(p)) return true;
+        break;
+      }
+      r += dr; c += dc;
+    }
+  }
+
+  return false;
+}
+
+function isKingInCheck(b, color) {
+  const kingIndex = findKingIndex(b, color);
+  if (kingIndex === -1) return false;
+  const attacker = color === 'w' ? 'b' : 'w';
+  return isSquareAttacked(b, kingIndex, attacker);
+}
+
+function applyPromotionPiece(piece, promotionChar) {
+  if (!promotionChar) return piece;
+  if (piece === 'P') return promotionChar.toUpperCase();
+  if (piece === 'p') return promotionChar.toLowerCase();
+  return piece;
+}
+
+function applyMoveToState(b, m, fromIndex, toIndexTarget, promotionChar = '') {
+  const newBoard = [...b];
+  const newMeta = cloneMeta(m);
+
+  const piece = newBoard[fromIndex];
+  const target = newBoard[toIndexTarget];
+  const fromRow = rowOf(fromIndex);
+  const fromCol = colOf(fromIndex);
+  const toRow = rowOf(toIndexTarget);
+  const toCol = colOf(toIndexTarget);
+
+  newBoard[toIndexTarget] = piece;
+  newBoard[fromIndex] = '';
+
+  if ((piece === 'P' && toRow === 0) || (piece === 'p' && toRow === 7)) {
+    newBoard[toIndexTarget] = applyPromotionPiece(piece, promotionChar || 'q');
+  }
+
+  if (piece === 'P' || piece === 'p') {
+    if (m.enPassant !== '-' && toIndexTarget === sqToIndex(m.enPassant) && !target && fromCol !== toCol) {
+      const capturedPawnRow = piece === 'P' ? toRow + 1 : toRow - 1;
+      newBoard[toIndex(capturedPawnRow, toCol)] = '';
+    }
+  }
+
+  if (piece === 'K' && Math.abs(toCol - fromCol) === 2) {
+    if (toCol === 6) {
+      newBoard[toIndex(7, 5)] = 'R';
+      newBoard[toIndex(7, 7)] = '';
+    } else if (toCol === 2) {
+      newBoard[toIndex(7, 3)] = 'R';
+      newBoard[toIndex(7, 0)] = '';
+    }
+  }
+
+  if (piece === 'k' && Math.abs(toCol - fromCol) === 2) {
+    if (toCol === 6) {
+      newBoard[toIndex(0, 5)] = 'r';
+      newBoard[toIndex(0, 7)] = '';
+    } else if (toCol === 2) {
+      newBoard[toIndex(0, 3)] = 'r';
+      newBoard[toIndex(0, 0)] = '';
+    }
+  }
+
+  if (piece === 'K') {
+    newMeta.castling = removeCastlingRight(newMeta.castling, 'K');
+    newMeta.castling = removeCastlingRight(newMeta.castling, 'Q');
+  }
+  if (piece === 'k') {
+    newMeta.castling = removeCastlingRight(newMeta.castling, 'k');
+    newMeta.castling = removeCastlingRight(newMeta.castling, 'q');
+  }
+
+  if (fromIndex === toIndex(7,0) || toIndexTarget === toIndex(7,0)) newMeta.castling = removeCastlingRight(newMeta.castling, 'Q');
+  if (fromIndex === toIndex(7,7) || toIndexTarget === toIndex(7,7)) newMeta.castling = removeCastlingRight(newMeta.castling, 'K');
+  if (fromIndex === toIndex(0,0) || toIndexTarget === toIndex(0,0)) newMeta.castling = removeCastlingRight(newMeta.castling, 'q');
+  if (fromIndex === toIndex(0,7) || toIndexTarget === toIndex(0,7)) newMeta.castling = removeCastlingRight(newMeta.castling, 'k');
+
+  if ((piece === 'P' || piece === 'p') && Math.abs(toRow - fromRow) === 2) {
+    const midRow = (fromRow + toRow) / 2;
+    newMeta.enPassant = name(toIndex(midRow, fromCol));
+  } else {
+    newMeta.enPassant = '-';
+  }
+
+  newMeta.activeColor = m.activeColor === 'w' ? 'b' : 'w';
+  return { board: newBoard, meta: newMeta };
+}
+
+function isPseudoLegalMove(fromIndex, toIndexTarget) {
+  if (fromIndex === toIndexTarget) return false;
+
+  const piece = board[fromIndex];
+  const target = board[toIndexTarget];
+  if (!piece) return false;
+
+  const movingColor = pieceColor(piece);
+  if (movingColor !== meta.activeColor) return false;
+  if (target && pieceColor(target) === movingColor) return false;
+
+  const fromRow = rowOf(fromIndex);
+  const fromCol = colOf(fromIndex);
+  const toRow = rowOf(toIndexTarget);
+  const toCol = colOf(toIndexTarget);
+
+  const rowDiff = toRow - fromRow;
+  const colDiff = toCol - fromCol;
+  const absRow = Math.abs(rowDiff);
+  const absCol = Math.abs(colDiff);
+  const lower = piece.toLowerCase();
+
+  if (lower === 'p') {
+    const dir = piece === 'P' ? -1 : 1;
+    const startRow = piece === 'P' ? 6 : 1;
+    const enPassantIndex = meta.enPassant !== '-' ? sqToIndex(meta.enPassant) : -1;
+
+    if (colDiff === 0 && rowDiff === dir && !target) return true;
+
+    if (colDiff === 0 && rowDiff === 2 * dir && fromRow === startRow && !target) {
+      const mid = toIndex(fromRow + dir, fromCol);
+      return !board[mid];
+    }
+
+    if (absCol === 1 && rowDiff === dir) {
+      if (target && pieceColor(target) !== movingColor) return true;
+      if (!target && toIndexTarget === enPassantIndex) return true;
+    }
+    return false;
+  }
+
+  if (lower === 'n') return (absRow === 2 && absCol === 1) || (absRow === 1 && absCol === 2);
+  if (lower === 'b') return absRow === absCol && isPathClear(board, fromRow, fromCol, toRow, toCol);
+  if (lower === 'r') return (fromRow === toRow || fromCol === toCol) && isPathClear(board, fromRow, fromCol, toRow, toCol);
+  if (lower === 'q') {
+    const diagonal = absRow === absCol;
+    const straight = fromRow === toRow || fromCol === toCol;
+    return (diagonal || straight) && isPathClear(board, fromRow, fromCol, toRow, toCol);
+  }
+
+  if (lower === 'k') {
+    if (absRow <= 1 && absCol <= 1) return true;
+
+    if (piece === 'K' && fromRow === 7 && fromCol === 4 && toRow === 7 && toCol === 6) {
+      return meta.castling.includes('K')
+        && !board[toIndex(7,5)] && !board[toIndex(7,6)]
+        && !isKingInCheck(board, 'w')
+        && !isSquareAttacked(board, toIndex(7,5), 'b')
+        && !isSquareAttacked(board, toIndex(7,6), 'b');
+    }
+
+    if (piece === 'K' && fromRow === 7 && fromCol === 4 && toRow === 7 && toCol === 2) {
+      return meta.castling.includes('Q')
+        && !board[toIndex(7,1)] && !board[toIndex(7,2)] && !board[toIndex(7,3)]
+        && !isKingInCheck(board, 'w')
+        && !isSquareAttacked(board, toIndex(7,3), 'b')
+        && !isSquareAttacked(board, toIndex(7,2), 'b');
+    }
+
+    if (piece === 'k' && fromRow === 0 && fromCol === 4 && toRow === 0 && toCol === 6) {
+      return meta.castling.includes('k')
+        && !board[toIndex(0,5)] && !board[toIndex(0,6)]
+        && !isKingInCheck(board, 'b')
+        && !isSquareAttacked(board, toIndex(0,5), 'w')
+        && !isSquareAttacked(board, toIndex(0,6), 'w');
+    }
+
+    if (piece === 'k' && fromRow === 0 && fromCol === 4 && toRow === 0 && toCol === 2) {
+      return meta.castling.includes('q')
+        && !board[toIndex(0,1)] && !board[toIndex(0,2)] && !board[toIndex(0,3)]
+        && !isKingInCheck(board, 'b')
+        && !isSquareAttacked(board, toIndex(0,3), 'w')
+        && !isSquareAttacked(board, toIndex(0,2), 'w');
+    }
+  }
+
+  return false;
+}
+
+function isLegalMove(fromIndex, toIndexTarget, promotionChar = '') {
+  if (!isPseudoLegalMove(fromIndex, toIndexTarget)) return false;
+
+  const piece = board[fromIndex];
+  const color = pieceColor(piece);
+  const state = applyMoveToState(board, meta, fromIndex, toIndexTarget, promotionChar);
+  return !isKingInCheck(state.board, color);
+}
+
+function isPromotionMove(fromIndex, toIndexTarget) {
+  const piece = board[fromIndex];
+  if (!piece) return false;
+  const targetRow = rowOf(toIndexTarget);
+  return (piece === 'P' && targetRow === 0) || (piece === 'p' && targetRow === 7);
+}
+
+function getLegalTargets(fromIndex) {
+  const result = [];
+  for (let target = 0; target < 64; target++) {
+    if (target === fromIndex) continue;
+
+    if (isPromotionMove(fromIndex, target)) {
+      let legalPromotion = false;
+      for (const promo of ['q', 'r', 'b', 'n']) {
+        if (isLegalMove(fromIndex, target, promo)) {
+          legalPromotion = true;
+          break;
+        }
+      }
+      if (legalPromotion) {
+        result.push({
+          index: target,
+          capture: !!board[target] || (board[fromIndex].toLowerCase() === 'p' && meta.enPassant !== '-' && target === sqToIndex(meta.enPassant) && colOf(fromIndex) !== colOf(target))
+        });
+      }
+    } else {
+      if (isLegalMove(fromIndex, target)) {
+        result.push({
+          index: target,
+          capture: !!board[target]
+        });
+      }
+    }
+  }
+  return result;
+}
+
+function getPieceImagePath(pieceChar) {
+  const color = isWhitePiece(pieceChar) ? 'w' : 'b';
+  const piece = pieceChar.toUpperCase();
+  return `img/Pieces/${color}${piece}.svg`;
+}
+
+function getPromotionImagePath(isWhite, code) {
+  const color = isWhite ? 'w' : 'b';
+  return `img/Pieces/${color}${code.toUpperCase()}.svg`;
+}
+
+
+
+// ═══ VIZUÁLNY EDITOR RIEŠENIA — logika ═══
+const SK_PIECE = { k:'K', q:'D', r:'V', b:'S', n:'J', p:'' };
+
+let edTree = [];
+let edPath = [];
+let edStartFen = '';
+let edSelected = null;
+let edLegal = [];
+let edPendingPromo = null;
+let edLastMove = null;
+
+function edToggleEditor() {
+  const box = document.getElementById('solutionEditor');
+  if (!box.classList.contains('hidden')) { box.classList.add('hidden'); return; }
+  if (!selectedPuzzle) { setStatus('Najprv nájdi úlohu', 'error'); return; }
+  let tree;
+  try {
+    tree = JSON.parse(document.getElementById('editSolutionTree').value || '[]');
+    if (!Array.isArray(tree)) throw new Error('koreň musí byť zoznam');
+  } catch(e) {
+    setStatus('Riešenie (JSON) sa nedá načítať: ' + e.message, 'error');
+    return;
+  }
+  edTree = tree;
+  edStartFen = selectedPuzzle.fen;
+  edPath = [];
+  edSelected = null; edLegal = [];
+  box.classList.remove('hidden');
+  edRefresh();
+}
+
+function edCloseEditor() {
+  document.getElementById('solutionEditor').classList.add('hidden');
+  document.getElementById('edPromo').classList.remove('open');
+  edPendingPromo = null;
+}
+
+function edNodesAt(path) {
+  let level = edTree; const nodes = [];
+  for (const i of path) {
+    const n = level[i];
+    if (!n) break;
+    nodes.push(n);
+    if (!Array.isArray(n.next)) n.next = [];
+    level = n.next;
+  }
+  return nodes;
+}
+
+function edChildren() {
+  if (edPath.length === 0) return edTree;
+  const nodes = edNodesAt(edPath);
+  const last = nodes[nodes.length - 1];
+  if (!Array.isArray(last.next)) last.next = [];
+  return last.next;
+}
+
+function edReplay() {
+  const parsed = parseFen(edStartFen);
+  board = parsed.board; meta = parsed.meta;
+  edLastMove = null;
+  for (const n of edNodesAt(edPath)) {
+    const m = idx(n.move);
+    const applied = applyMoveToState(board, meta, m.from, m.to, m.promotion);
+    board = applied.board; meta = applied.meta;
+    edLastMove = m;
+  }
+}
+
+function edFindKing(b, color) {
+  const kingChar = color === 'w' ? 'K' : 'k';
+  for (let i = 0; i < 64; i++) if (b[i] === kingChar) return i;
+  return -1;
+}
+
+// Popis ťahu v pozícii (wb, wm): napr. "Vb4×b2+", "e2–e4", "e7–e8=D"
+function edMoveLabel(wb, wm, uci) {
+  const m = idx(uci);
+  const piece = wb[m.from] || '';
+  const letter = SK_PIECE[piece.toLowerCase()] ?? '';
+  const isPawn = piece.toLowerCase() === 'p';
+  const capture = !!wb[m.to] || (isPawn && colOf(m.from) !== colOf(m.to));
+  let text = letter + name(m.from) + (capture ? '×' : '–') + name(m.to);
+  if (m.promotion) text += '=' + (SK_PIECE[m.promotion.toLowerCase()] || m.promotion.toUpperCase());
+  const applied = applyMoveToState(wb, wm, m.from, m.to, m.promotion);
+  const oppColor = applied.meta.activeColor;
+  const kingIdx = edFindKing(applied.board, oppColor);
+  if (kingIdx >= 0 && isSquareAttacked(applied.board, kingIdx, wm.activeColor)) text += '+';
+  return text;
+}
+
+function edGoto(level, branchIndex) {
+  edPath = edPath.slice(0, level);
+  edPath.push(branchIndex);
+  edSelected = null; edLegal = [];
+  edRefresh();
+}
+
+function edToStart() { edPath = []; edSelected = null; edLegal = []; edRefresh(); }
+function edStepBack() { edPath.pop(); edSelected = null; edLegal = []; edRefresh(); }
+
+function edDeleteBranch() {
+  if (edPath.length === 0) { setStatus('Nie je vybraný žiadny ťah na vymazanie', 'error'); return; }
+  const nodes = edNodesAt(edPath);
+  const last = nodes[nodes.length - 1];
+  const parentChildren = edPath.length === 1 ? edTree : nodes[nodes.length - 2].next;
+  const countSub = (n) => 1 + (n.next || []).reduce((s, x) => s + countSub(x), 0);
+  const total = countSub(last);
+  if (!confirm(`Vymazať aktuálny ťah (${last.move}) a všetko, čo po ňom nasleduje?\nSpolu ${total} ťah(ov). Zmena sa prejaví až po Uložiť zmeny.`)) return;
+  parentChildren.splice(edPath[edPath.length - 1], 1);
+  edPath.pop();
+  edSelected = null; edLegal = [];
+  edSyncTextarea();
+  edRefresh();
+}
+
+function edSyncTextarea() {
+  document.getElementById('editSolutionTree').value = JSON.stringify(edTree, null, 2);
+}
+
+function edSquareClick(i) {
+  const p = board[i];
+  if (edSelected !== null && edLegal.some(t => t.index === i)) {
+    edTryMove(edSelected, i);
+    return;
+  }
+  if (p && pieceColor(p) === meta.activeColor) {
+    if (edSelected === i) { edSelected = null; edLegal = []; }
+    else { edSelected = i; edLegal = getLegalTargets(i); }
+  } else {
+    edSelected = null; edLegal = [];
+  }
+  edRenderBoard();
+}
+
+function edTryMove(from, to) {
+  if (isPromotionMove(from, to)) {
+    edPendingPromo = { from, to };
+    const box = document.getElementById('edPromoBox');
+    const isWhite = meta.activeColor === 'w';
+    box.innerHTML = ['q','r','b','n'].map(code =>
+      `<img src="${getPromotionImagePath(isWhite, code)}" alt="${code}" onclick="edCommitPromo('${code}')">`
+    ).join('');
+    document.getElementById('edPromo').classList.add('open');
+    return;
+  }
+  edCommitMove(from, to, '');
+}
+
+function edCommitPromo(code) {
+  document.getElementById('edPromo').classList.remove('open');
+  if (!edPendingPromo) return;
+  const { from, to } = edPendingPromo;
+  edPendingPromo = null;
+  edCommitMove(from, to, code);
+}
+
+function edCommitMove(from, to, promo) {
+  const uci = name(from) + name(to) + (promo || '');
+  const children = edChildren();
+  let ci = children.findIndex(n => n.move === uci);
+  if (ci === -1) {
+    children.push({ move: uci, next: [] });
+    ci = children.length - 1;
+    edSyncTextarea();
+  }
+  edPath.push(ci);
+  edSelected = null; edLegal = [];
+  edRefresh();
+}
+
+function edRenderBoard() {
+  const el = document.getElementById('edBoard');
+  el.innerHTML = '';
+  for (let i = 0; i < 64; i++) {
+    const sq = document.createElement('div');
+    const light = (rowOf(i) + colOf(i)) % 2 === 0;
+    sq.className = 'ed-sq ' + (light ? 'ed-light' : 'ed-dark');
+    if (edLastMove && (i === edLastMove.from || i === edLastMove.to)) sq.classList.add('ed-last');
+    if (edSelected === i) sq.classList.add('ed-sel');
+    const target = edLegal.find(t => t.index === i);
+    if (target) sq.classList.add(target.capture ? 'ed-cap' : 'ed-dot');
+    if (board[i]) {
+      const img = document.createElement('img');
+      img.src = getPieceImagePath(board[i]);
+      img.alt = board[i];
+      sq.appendChild(img);
+    }
+    sq.onclick = () => edSquareClick(i);
+    el.appendChild(sq);
+  }
+}
+
+function edRenderList() {
+  const el = document.getElementById('edMoveList');
+  el.innerHTML = '';
+  const parsed = parseFen(edStartFen);
+  let wb = parsed.board, wm = parsed.meta;
+  let fullmove = parseInt(wm.fullmove, 10) || 1;
+  let level = edTree;
+
+  for (let k = 0; k <= edPath.length; k++) {
+    const isAhead = (k === edPath.length);
+    if (!level.length) {
+      if (isAhead) {
+        const row = document.createElement('div');
+        row.className = 'ed-level';
+        row.innerHTML = '<span class="ed-end">✔ koniec vetvy riešenia — ďalší ťah pridáš zahraním na šachovnici</span>';
+        el.appendChild(row);
+      }
+      break;
+    }
+    const row = document.createElement('div');
+    row.className = 'ed-level';
+    const num = document.createElement('span');
+    num.className = 'ed-num';
+    num.textContent = wm.activeColor === 'w' ? (fullmove + '.') : (fullmove + '…');
+    row.appendChild(num);
+
+    level.forEach((n, j) => {
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = 'ed-chip' + (isAhead ? ' ed-ahead' : (j === edPath[k] ? ' ed-on' : ''));
+      chip.textContent = edMoveLabel(wb, wm, n.move);
+      chip.onclick = () => edGoto(k, j);
+      row.appendChild(chip);
+    });
+    el.appendChild(row);
+
+    if (isAhead) break;
+    const chosen = level[edPath[k]];
+    if (!chosen) break;
+    const m = idx(chosen.move);
+    const applied = applyMoveToState(wb, wm, m.from, m.to, m.promotion);
+    if (wm.activeColor === 'b') fullmove++;
+    wb = applied.board; wm = applied.meta;
+    level = Array.isArray(chosen.next) ? chosen.next : [];
+  }
+}
+
+function edRefresh() {
+  edReplay();
+  edRenderBoard();
+  edRenderList();
+  const hint = document.getElementById('edHint');
+  hint.textContent = (meta.activeColor === 'w' ? 'Na ťahu: biely' : 'Na ťahu: čierny')
+    + ' — ťuk na figúrku a ťuk na cieľové pole pridá/prejde ťah';
+}
+
 </script>
+<div id="edPromo"><div class="ed-promo-box" id="edPromoBox"></div></div>
 </body>
 </html>
