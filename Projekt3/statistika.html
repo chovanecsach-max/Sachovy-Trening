@@ -355,6 +355,24 @@ tr:hover td { background: #eff6ff; }
 <script>
 // ─── Kontext prihláseného používateľa ───────────────────────────────────────
 const USER_ROLE         = sessionStorage.getItem('user_role') || '';
+// ── Stránkované načítanie: Supabase vracia max. 1000 riadkov na dotaz.
+// Bez stránkovania by sa väčšie obdobia/viac hráčov ticho orezali a
+// štatistika by vyzerala "zamrznutá" (presne nahlásený problém).
+async function sbFetchAll(query) {
+  const PAGE = 1000;
+  let all = [];
+  let offset = 0;
+  while (true) {
+    const sep = query.includes('?') ? '&' : '?';
+    const batch = await sbFetch(`${query}${sep}limit=${PAGE}&offset=${offset}`);
+    if (!batch || !batch.length) break;
+    all = all.concat(batch);
+    if (batch.length < PAGE) break;
+    offset += PAGE;
+  }
+  return all;
+}
+
 const USER_ID           = sessionStorage.getItem('user_id') || '';
 const USER_NICK         = sessionStorage.getItem('user_nick') || sessionStorage.getItem('user_name') || '';
 const IS_ADMIN          = USER_ROLE === 'admin';
@@ -526,8 +544,8 @@ async function loadStats() {
 
     if (realPlayers.length) {
       const idsParam = `(${realPlayers.map(p => p.id).join(',')})`;
-      const logs = await sbFetch(
-        `training_log?player_id=in.${idsParam}&created_at=gte.${dateFromFull}&created_at=lte.${dateToFull}&select=player_id,result,time_spent`
+      const logs = await sbFetchAll(
+        `training_log?player_id=in.${idsParam}&created_at=gte.${dateFromFull}&created_at=lte.${dateToFull}&select=player_id,result,time_spent&order=id.asc`
       );
       (logs || []).forEach(log => {
         const pid = log.player_id;
@@ -715,8 +733,8 @@ async function exportPgn() {
     const dateToFull   = dateTo   + 'T23:59:59';
 
     // Načítaj všetky chybné záznamy za obdobie (vrátane puzzle_id)
-    const logs = await sbFetch(
-      `training_log?player_id=eq.${playerId}&result=eq.loss&created_at=gte.${dateFromFull}&created_at=lte.${dateToFull}&select=puzzle_id,created_at&order=created_at.asc`
+    const logs = await sbFetchAll(
+      `training_log?player_id=eq.${playerId}&result=eq.loss&created_at=gte.${dateFromFull}&created_at=lte.${dateToFull}&select=puzzle_id,created_at&order=created_at.asc,id.asc`
     );
 
     if (!logs || !logs.length) {
@@ -918,8 +936,8 @@ async function loadChartData() {
 
   // ELO história
   try {
-    const eloData = await sbFetch(
-      `elo_history?${eloFilter}&created_at=gte.${startISO}&select=category,elo_value,created_at&order=created_at.asc`
+    const eloData = await sbFetchAll(
+      `elo_history?${eloFilter}&created_at=gte.${startISO}&select=category,elo_value,created_at&order=created_at.asc,id.asc`
     );
     if (!eloData || !eloData.length) {
       showChartMsg('eloMsg', 'Žiadne ELO dáta pre toto obdobie. Dáta sa zbierajú od ďalšieho tréningu.');
@@ -935,8 +953,8 @@ async function loadChartData() {
 
   // Tréningový čas
   try {
-    const timeData = await sbFetch(
-      `training_log?${timeFilter}&created_at=gte.${startISO}&select=time_spent,created_at&order=created_at.asc`
+    const timeData = await sbFetchAll(
+      `training_log?${timeFilter}&created_at=gte.${startISO}&select=time_spent,created_at&order=created_at.asc,id.asc`
     );
     if (!timeData || !timeData.length) {
       showChartMsg('timeMsg', 'Žiadne tréningové dáta pre toto obdobie.');
