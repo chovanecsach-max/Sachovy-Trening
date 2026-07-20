@@ -913,11 +913,23 @@ let selectedSkill = null;
 async function loadSkillsByType() {
   const type = document.getElementById('skillTypeFilter').value;
   try {
-    const query = type
-      ? `skill_puzzles?skill_type=eq.${type}&order=id.asc&limit=500`
-      : 'skill_puzzles?order=id.asc&limit=500';
-    const data = await sbFetch(query);
-    skillPuzzles = data || [];
+    // Supabase vracia max. 1000 riadkov na dotaz — načítavame po dávkach,
+    // aby zoznam nikdy ticho neodrezal novšie úlohy (rovnaká pasca,
+    // aká sa prejavila v štatistike).
+    const base = type
+      ? `skill_puzzles?skill_type=eq.${type}&order=id.asc`
+      : 'skill_puzzles?order=id.asc';
+    const BATCH = 1000;
+    let all = [];
+    let offset = 0;
+    while (true) {
+      const batch = await sbFetch(`${base}&limit=${BATCH}&offset=${offset}`);
+      if (!batch || !batch.length) break;
+      all = all.concat(batch);
+      if (batch.length < BATCH) break;
+      offset += BATCH;
+    }
+    skillPuzzles = all;
     renderSkillList();
     setStatus(`Načítaných ${skillPuzzles.length} úloh zručností`, 'success');
   } catch(e) {
