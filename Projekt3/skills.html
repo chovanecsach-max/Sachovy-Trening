@@ -624,8 +624,61 @@ function updatePlayerUI() {
   if (!currentPlayer) return;
   document.getElementById('playerName').textContent =
     currentPlayer.name + (currentPlayer.surname ? ' ' + currentPlayer.surname : '');
+  const field = activeEloField();
   document.getElementById('playerElo').textContent =
-    (currentPlayer.elo_zrucnosti || 1500) + ' (Z)';
+    (currentPlayer[field] || 1500) + ' (' + activeEloTag() + ')';
+}
+
+// ─── ELO podľa trénovanej zručnosti ──────────────────────────────────────────
+// V komplexnom tréningu sa používa spoločné elo_zrucnosti (ako doteraz),
+// pri jednotlivých zručnostiach ich vlastné ELO (elo_fork, elo_pin, …).
+
+const SKILL_LABELS = {
+  'checks':            'Šachy',
+  'checks_both':       'Šachy za obidve strany',
+  'captures':          'Brania',
+  'checks_captures':   'Šachy a brania',
+  'direct_attack':     'Brania so ziskom',
+  'direct_threat':     'Priame hrozby',
+  'pawn_breakthrough': 'Pešiakové prielomy',
+  'underdefended':     'Slabo pokryté',
+  'pin':               'Absolútne väzby',
+  'relative_pin':      'Relatívne väzby',
+  'fork':              'Vidličky',
+};
+
+const SKILL_SHORT = {
+  'checks':            'Šachy',
+  'captures':          'Brania',
+  'pawn_breakthrough': 'Prielomy',
+  'direct_attack':     'Brania so ziskom',
+  'direct_threat':     'Hrozby',
+  'underdefended':     'Slabo pokryté',
+  'pin':               'Abs. väzby',
+  'relative_pin':      'Rel. väzby',
+  'fork':              'Vidličky',
+};
+
+// Typ zručnosti z URL — na rozdiel od getSkillsType() sa v komplexnom
+// režime NEprepína na aktuálnu zručnosť (tam platí spoločné ELO).
+function urlSkillType() {
+  return new URLSearchParams(window.location.search).get('type') || '';
+}
+
+function activeEloField() {
+  if (isCompleteMode()) return 'elo_zrucnosti';
+  return getSkillEloField(urlSkillType());   // z player.js
+}
+
+function activeEloCategory() {
+  if (isCompleteMode()) return 'zrucnosti';
+  const t = urlSkillType();
+  return SKILL_ELO_TYPES.includes(t) ? t : 'zrucnosti';
+}
+
+function activeEloTag() {
+  if (isCompleteMode()) return 'K';          // komplexný tréning
+  return SKILL_SHORT[urlSkillType()] || 'Z';
 }
 
 function updateTimerUI() {
@@ -1118,12 +1171,14 @@ async function recordResult(result) {
     console.error("Chyba pri zápise logu:", e);
   }
 
-  // Aktualizuj ELO zručností, total_time a štatistiky
+  // Aktualizuj ELO (vlastné pre danú zručnosť, v komplexnom režime spoločné),
+  // total_time a štatistiky
   try {
     const players = await sbFetch(`players?id=eq.${currentPlayer.id}&limit=1`);
     if (players && players.length) {
       const player = players[0];
-      const currentElo = Number(player.elo_zrucnosti || 1500);
+      const eloField = activeEloField();
+      const currentElo = Number(player[eloField] || 1500);
       const puzzleElo = Number(current.elo || 1200);
       const diff = puzzleElo - currentElo;
       let change = result === 'win' ? 10 + diff / 50 : -(10 - diff / 50);
@@ -1132,7 +1187,7 @@ async function recordResult(result) {
       const newElo = Math.max(100, Math.round(currentElo + change));
 
       const updates = {
-        elo_zrucnosti: newElo,
+        [eloField]: newElo,
         played: Number(player.played || 0) + 1,
         total_time: Number(player.total_time || 0) + usedTime
       };
@@ -1144,11 +1199,11 @@ async function recordResult(result) {
         method: 'PATCH',
         body: JSON.stringify(updates)
       });
-      currentPlayer.elo_zrucnosti = newElo;
+      currentPlayer[eloField] = newElo;
       // Zaloguj ELO do histórie pre grafy (len ak sa ELO zmenilo)
-      if (change !== 0) await logEloHistory(currentPlayer.id, 'zrucnosti', newElo);
+      if (change !== 0) await logEloHistory(currentPlayer.id, activeEloCategory(), newElo);
       // Obnov zobrazenie ELO v UI
-      document.getElementById('playerElo').textContent = newElo + ' (Z)';
+      document.getElementById('playerElo').textContent = newElo + ' (' + activeEloTag() + ')';
     }
   } catch(e) {
     console.error("Chyba pri aktualizácii ELO zručností:", e);
@@ -1175,35 +1230,26 @@ function isCompleteMode() {
 // ─── Rebríček Top 10 ─────────────────────────────────────────────────────────
 
 async function loadLeaderboard() {
-  const skillNames = {
-    'checks':            'Šachy',
-    'checks_both':       'Šachy za obidve strany',
-    'captures':          'Brania',
-    'checks_captures':   'Šachy a brania',
-    'direct_attack':     'Brania so ziskom',
-    'direct_threat':     'Priame hrozby',
-    'pawn_breakthrough': 'Pešiakové prielomy',
-    'underdefended':     'Slabo pokryté',
-    'pin':               'Absolútne väzby',
-    'relative_pin':      'Relatívne väzby',
-    'fork':              'Vidličky',
-  };
   const type = getSkillsType();
-  const label = skillNames[type] || 'Zručnosti';
+  const label = isCompleteMode()
+    ? 'Komplexný tréning'
+    : (SKILL_LABELS[type] || 'Zručnosti');
   document.querySelector('#leaderboardCard h3').textContent = `🏆 Top 10 — ${label}`;
 
+  const eloField = activeEloField();
   try {
     const data = await sbFetch(
-      `players?select=name,surname,elo_zrucnosti&order=elo_zrucnosti.desc&limit=10`
+      `players?select=name,surname,${eloField}&order=${eloField}.desc&limit=10`
     );
-    renderLeaderboard(data || []);
+    renderLeaderboard(data || [], eloField);
   } catch(e) {
     document.getElementById('leaderboardList').innerHTML =
       '<div style="color:#94a3b8;font-size:13px;">Chyba načítania</div>';
   }
 }
 
-function renderLeaderboard(players) {
+function renderLeaderboard(players, eloField) {
+  const field = eloField || activeEloField();
   const el = document.getElementById('leaderboardList');
   if (!players.length) {
     el.innerHTML = '<div style="color:#94a3b8;font-size:13px;font-style:italic;">Žiadni hráči</div>';
@@ -1216,7 +1262,7 @@ function renderLeaderboard(players) {
 
   el.innerHTML = players.map((p, i) => {
     const nick = `${p.name || ''} ${p.surname || ''}`.trim() || '?';
-    const elo  = p.elo_zrucnosti || 1500;
+    const elo  = p[field] || 1500;
     const isMe = myNick && nick === myNick;
     const rank = medals[i] || `${i + 1}.`;
     return `
@@ -1359,8 +1405,8 @@ async function loadSolvedSkillIds() {
 function pickPuzzle() {
   if (!puzzles.length) return null;
 
-  // Vyber ELO hráča
-  const playerElo = Number(currentPlayer?.elo_zrucnosti || 1500);
+  // Vyber ELO hráča — vlastné ELO danej zručnosti (v komplexnom režime spoločné)
+  const playerElo = Number(currentPlayer?.[activeEloField()] || 1500);
 
   // Prednostne nevyriešené úlohy
   let pool = puzzles.filter(p =>
