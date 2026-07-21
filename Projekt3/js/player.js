@@ -35,11 +35,25 @@ async function sbFetch(path, options = {}) {
 
 // ─── ELO podľa režimu ───────────────────────────────────────────────────────
 
+// Zručnosti, ktoré majú v tabuľke players vlastný ELO stĺpec (elo_<typ>).
+// Musí sedieť s hodnotami skill_type v tabuľke skill_puzzles.
+const SKILL_ELO_TYPES = [
+  'checks', 'captures', 'pawn_breakthrough', 'direct_attack',
+  'underdefended', 'pin', 'relative_pin', 'fork', 'direct_threat'
+];
+
+// Názov ELO stĺpca pre konkrétnu zručnosť; neznáme typy (napr. staršie
+// kombinované 'checks_captures') spadnú na spoločné elo_zrucnosti.
+function getSkillEloField(skillType) {
+  return SKILL_ELO_TYPES.includes(skillType) ? 'elo_' + skillType : 'elo_zrucnosti';
+}
+
 function getEloField(mode) {
   if (mode === "taktika")   return "elo_taktika";
   if (mode === "strategia") return "elo_strategia";
   if (mode === "koncovka")  return "elo_koncovka";
   if (mode === "zrucnosti") return "elo_zrucnosti";
+  if (SKILL_ELO_TYPES.includes(mode)) return "elo_" + mode;
   return "elo";
 }
 
@@ -53,6 +67,7 @@ function getEloCategory(mode) {
   if (mode === "strategia") return "strategia";
   if (mode === "koncovka") return "koncovka";
   if (mode === "zrucnosti") return "zrucnosti";
+  if (SKILL_ELO_TYPES.includes(mode)) return mode;   // vlastná kategória zručnosti
   return "mix";
 }
 
