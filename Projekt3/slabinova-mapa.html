@@ -65,6 +65,23 @@ table.map td.cell { text-align: center; padding: 8px 5px; border-radius: 5px; }
 table.map tr.avg-row td { border-top: 2px solid #e5e7eb; }
 table.map td.avg-name { padding-top: 9px; font-weight: bold; color: #111827; white-space: nowrap; }
 table.map .col-sep { border-left: 2px solid #e5e7eb; }
+
+/* ── Fáza 2: zoraďovanie + detail ── */
+table.map th.sortable { cursor: pointer; user-select: none; }
+table.map th.sortable:hover { color: #1e3a5f; }
+table.map th.sorted { color: #1d4ed8; }
+table.map td.name { cursor: pointer; }
+table.map td.name:hover { text-decoration: underline; }
+table.map td.name .tw { color: #94a3b8; font-size: 11px; margin-right: 2px; }
+table.map td.name.open { font-weight: bold; }
+tr.detail-row > td { background: #f8fafc; border-radius: 8px; padding: 12px 14px; }
+.detail-head { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+.detail-title { font-weight: bold; font-size: 13px; color: #111827; }
+.detail-chart-wrap { position: relative; height: 300px; }
+.detail-msg { text-align: center; color: #64748b; font-size: 13px; padding: 24px; }
+.period { display: inline-flex; gap: 5px; }
+.period button { padding: 5px 10px; border: 1px solid #cbd5e1; border-radius: 16px; background: white; color: #475569; font-size: 12px; font-weight: bold; }
+.period button.active { background: #1e3a5f; color: white; border-color: #1e3a5f; }
 </style>
 </head>
 
@@ -136,6 +153,28 @@ const SKILL_COLS = [
   { field: 'elo_direct_threat',     label: 'Hrozby',        full: 'Priame hrozby' },
 ];
 
+// Kategórie v elo_history (activeEloCategory v skills.html) + farby čiar
+const SKILL_CATS = [
+  { key: 'checks',            label: 'Šachy',           color: '#ef4444' },
+  { key: 'captures',          label: 'Brania',          color: '#f59e0b' },
+  { key: 'pawn_breakthrough', label: 'Prielomy',        color: '#84cc16' },
+  { key: 'direct_attack',     label: 'Brania so ziskom',color: '#10b981' },
+  { key: 'underdefended',     label: 'Slabo pokryté',   color: '#06b6d4' },
+  { key: 'pin',               label: 'Abs. väzby',      color: '#3b82f6' },
+  { key: 'relative_pin',      label: 'Rel. väzby',      color: '#6366f1' },
+  { key: 'fork',              label: 'Vidličky',        color: '#a855f7' },
+  { key: 'direct_threat',     label: 'Hrozby',          color: '#ec4899' }
+];
+
+// Stav mapy (zoraďovanie + rozbalený detail)
+let mapPlayers = [];
+let mapColAvg  = [];
+let sortField  = null;    // 'name' | elo_<zručnosť> | 'avg'
+let sortDir    = 'asc';
+let openPlayerId    = null;
+let detailDays      = 90;
+let detailChartInst = null;
+
 // ─── Stránkované načítanie (Supabase vracia max. 1000 riadkov) ──────────────
 async function sbFetchAll(query) {
   const PAGE = 1000;
@@ -206,8 +245,6 @@ function mean(arr) {
 
 function renderMap(players) {
   const table   = document.getElementById('mapTable');
-  const head     = document.getElementById('mapHead');
-  const body     = document.getElementById('mapBody');
   const legend   = document.getElementById('mapLegend');
   const focusEl  = document.getElementById('focusLine');
 
@@ -219,44 +256,199 @@ function renderMap(players) {
     return;
   }
 
-  // Hlavička: Hráč | 9 zručností | Priemer
-  let h = '<tr><th class="name-h">Hráč</th>';
-  SKILL_COLS.forEach(c => { h += `<th title="${c.full}">${c.label}</th>`; });
-  h += '<th class="col-sep">Priemer</th></tr>';
-  head.innerHTML = h;
+  mapPlayers = players;
+  collapseDetail();
 
-  // Riadky hráčov
-  let b = '';
-  players.forEach(p => {
-    const vals = skillValues(p);
-    const name = `${p.surname || ''} ${p.name || ''}`.trim() || '(bez mena)';
-    b += `<tr><td class="name">${name}</td>`;
-    vals.forEach(v => { b += cellHtml(v); });
-    b += cellHtml(mean(vals), { bold: true, sep: true });
-    b += '</tr>';
-  });
+  // Priemer stĺpca (nezávislý od zoradenia) — pre pätu aj záver
+  mapColAvg = SKILL_COLS.map(c => mean(players.map(p => Number(p[c.field] ?? 1200))));
 
-  // Riadok priemeru skupiny
-  const colAvg = SKILL_COLS.map((c, i) => mean(players.map(p => Number(p[c.field] ?? 1200))));
-  const overall = mean(colAvg);
-  b += '<tr class="avg-row"><td class="avg-name">Priemer skupiny</td>';
-  colAvg.forEach(v => { b += cellHtml(v, { bold: true }); });
-  b += cellHtml(overall, { bold: true, sep: true });
-  b += '</tr>';
-  body.innerHTML = b;
+  renderHead();
+  renderRows();
 
   table.style.display = '';
   legend.style.display = 'flex';
 
   // Záver: dve najslabšie zručnosti skupiny
   const ranked = SKILL_COLS
-    .map((c, i) => ({ label: c.full, avg: colAvg[i] }))
+    .map((c, i) => ({ label: c.full, avg: mapColAvg[i] }))
     .sort((a, b2) => a.avg - b2.avg);
   const worst = ranked.slice(0, 2).map(r => `${r.label} (${Math.round(r.avg)})`).join(', ');
   focusEl.innerHTML = `🎯 <strong>Na čo zamerať tréning:</strong> ${worst} — najnižší priemer v skupine.`;
   focusEl.style.display = 'block';
 
-  setStatus(`Skupina: ${players.length} ${players.length === 1 ? 'hráč' : (players.length < 5 ? 'hráči' : 'hráčov')}.`);
+  const n = players.length;
+  setStatus(`Skupina: ${n} ${n === 1 ? 'hráč' : (n < 5 ? 'hráči' : 'hráčov')}.`);
+}
+
+// ─── Hlavička so zoraditeľnými stĺpcami ──────────────────────────────────────
+function sortTh(field, label, cls, title) {
+  const active = sortField === field;
+  const arrow  = active ? (sortDir === 'asc' ? ' ▲' : ' ▼') : '';
+  const t = title ? ` title="${title}"` : '';
+  const c = 'sortable' + (cls ? ' ' + cls : '') + (active ? ' sorted' : '');
+  return `<th class="${c}" data-sort="${field}"${t}>${label}${arrow}</th>`;
+}
+function renderHead() {
+  let h = '<tr>' + sortTh('name', 'Hráč', 'name-h');
+  SKILL_COLS.forEach(c => { h += sortTh(c.field, c.label, '', c.full); });
+  h += sortTh('avg', 'Priemer', 'col-sep') + '</tr>';
+  document.getElementById('mapHead').innerHTML = h;
+}
+
+// ─── Riadky (zoradené) + rozbalený detail + päta ─────────────────────────────
+function renderRows() {
+  const rows = mapPlayers.slice();
+  if (sortField) {
+    const dir = sortDir === 'asc' ? 1 : -1;
+    rows.sort((a, b) => {
+      if (sortField === 'name') {
+        const na = `${a.surname || ''} ${a.name || ''}`.trim().toLowerCase();
+        const nb = `${b.surname || ''} ${b.name || ''}`.trim().toLowerCase();
+        return na.localeCompare(nb, 'sk') * dir;
+      }
+      const va = (sortField === 'avg') ? mean(skillValues(a)) : Number(a[sortField] ?? 1200);
+      const vb = (sortField === 'avg') ? mean(skillValues(b)) : Number(b[sortField] ?? 1200);
+      return (va - vb) * dir;
+    });
+  }
+
+  const colspan = SKILL_COLS.length + 2;
+  let b = '';
+  rows.forEach(p => {
+    const vals = skillValues(p);
+    const nm = `${p.surname || ''} ${p.name || ''}`.trim() || '(bez mena)';
+    const isOpen = (p.id === openPlayerId);
+    b += `<tr><td class="name${isOpen ? ' open' : ''}" onclick="toggleDetail(${JSON.stringify(p.id)})"><span class="tw">${isOpen ? '▾' : '▸'}</span>${nm}</td>`;
+    vals.forEach(v => { b += cellHtml(v); });
+    b += cellHtml(mean(vals), { bold: true, sep: true });
+    b += '</tr>';
+    if (isOpen) {
+      b += `<tr class="detail-row"><td colspan="${colspan}">
+        <div class="detail-head">
+          <span class="detail-title">Progres zručností — ${nm}</span>
+          <div class="period" id="detailPeriod">
+            <button data-days="30">30 dní</button>
+            <button data-days="90">90 dní</button>
+            <button data-days="365">Rok</button>
+          </div>
+        </div>
+        <div class="detail-chart-wrap"><canvas id="detailChart" role="img" aria-label="Graf progresu ELO zručností hráča">Progres ELO zručností</canvas></div>
+        <div id="detailMsg" class="detail-msg" style="display:none;"></div>
+      </td></tr>`;
+    }
+  });
+
+  // Priemer skupiny
+  b += '<tr class="avg-row"><td class="avg-name">Priemer skupiny</td>';
+  mapColAvg.forEach(v => { b += cellHtml(v, { bold: true }); });
+  b += cellHtml(mean(mapColAvg), { bold: true, sep: true });
+  b += '</tr>';
+  document.getElementById('mapBody').innerHTML = b;
+
+  // Handlery period tlačidiel v otvorenom detaile
+  const per = document.getElementById('detailPeriod');
+  if (per) {
+    per.querySelectorAll('button').forEach(btn => {
+      btn.classList.toggle('active', Number(btn.dataset.days) === detailDays);
+      btn.addEventListener('click', () => {
+        detailDays = Number(btn.dataset.days);
+        per.querySelectorAll('button').forEach(x => x.classList.toggle('active', x === btn));
+        loadDetailChart(openPlayerId, detailDays);
+      });
+    });
+  }
+}
+
+// ─── Rozbalenie / zabalenie detailu hráča ────────────────────────────────────
+function collapseDetail() {
+  openPlayerId = null;
+  if (detailChartInst) { detailChartInst.destroy(); detailChartInst = null; }
+}
+function toggleDetail(pid) {
+  if (openPlayerId === pid) {
+    collapseDetail();
+    renderRows();
+    return;
+  }
+  collapseDetail();
+  openPlayerId = pid;
+  detailDays = 90;
+  renderRows();
+  loadDetailChart(pid, detailDays);
+}
+
+// ─── Načítanie a vykreslenie grafu zručností v detaile ───────────────────────
+function showDetailMsg(t) { const m = document.getElementById('detailMsg'); if (m) { m.textContent = t; m.style.display = ''; } }
+function hideDetailMsg()  { const m = document.getElementById('detailMsg'); if (m) m.style.display = 'none'; }
+
+async function loadDetailChart(pid, days) {
+  const canvas = document.getElementById('detailChart');
+  if (!canvas) return;
+  if (typeof Chart === 'undefined') { showDetailMsg('Načítavam graf...'); return; }
+  showDetailMsg('Načítavam...');
+  try {
+    const start = new Date();
+    start.setDate(start.getDate() - days);
+    const data = await sbFetchAll(
+      `elo_history?player_id=eq.${pid}&created_at=gte.${start.toISOString()}&select=category,elo_value,created_at&order=created_at.asc,id.asc`
+    );
+    renderSkillLineChart(data, days);
+  } catch(e) {
+    showDetailMsg('Chyba pri načítaní grafu: ' + e.message);
+  }
+}
+
+function formatDateLabel(iso) {
+  const d = new Date(iso);
+  return `${d.getDate()}.${d.getMonth() + 1}.`;
+}
+
+function renderSkillLineChart(data, days) {
+  const skillKeys = new Set(SKILL_CATS.map(c => c.key));
+  const skillData = (data || []).filter(d => skillKeys.has(d.category));
+  if (detailChartInst) { detailChartInst.destroy(); detailChartInst = null; }
+  const existing = Chart.getChart('detailChart'); if (existing) existing.destroy();
+
+  if (!skillData.length) {
+    showDetailMsg('Zatiaľ žiadne dáta pre jednotlivé zručnosti v tomto období.');
+    return;
+  }
+  hideDetailMsg();
+
+  const allDates = [...new Set(skillData.map(d => d.created_at.substring(0, 10)))].sort();
+  const labels = allDates.map(formatDateLabel);
+  const datasets = SKILL_CATS.map(c => {
+    const byDay = {};
+    skillData.filter(d => d.category === c.key).forEach(d => { byDay[d.created_at.substring(0, 10)] = d.elo_value; });
+    return {
+      label: c.label,
+      data: allDates.map(d => byDay[d] ?? null),
+      borderColor: c.color, backgroundColor: c.color + '18',
+      tension: 0.3, pointRadius: days <= 30 ? 3 : 2, pointHoverRadius: 5,
+      fill: false, spanGaps: true
+    };
+  });
+
+  const skip = days > 30;
+  detailChartInst = new Chart(document.getElementById('detailChart').getContext('2d'), {
+    type: 'line',
+    data: { labels, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: true, position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } },
+        tooltip: {
+          backgroundColor: '#1e293b', titleColor: '#f1f5f9', bodyColor: '#cbd5e1', padding: 10, borderWidth: 0,
+          callbacks: { title: items => allDates[items[0].dataIndex] || '', label: ct => ` ${ct.dataset.label}: ${ct.parsed.y}` }
+        }
+      },
+      scales: {
+        x: { ticks: { color: '#94a3b8', font: { size: 11 }, maxRotation: 45, autoSkip: skip, maxTicksLimit: skip ? 13 : 31 }, grid: { color: '#e2e8f0' } },
+        y: { ticks: { color: '#94a3b8', font: { size: 11 } }, grid: { color: '#e2e8f0' } }
+      }
+    }
+  });
 }
 
 // ─── Načítanie a obnovenie ───────────────────────────────────────────────────
@@ -295,6 +487,18 @@ async function init() {
   }
   banner.style.display = '';
 
+  // Zoraďovanie klikom na hlavičku stĺpca (delegované — hlavička sa prekresľuje)
+  document.getElementById('mapHead').addEventListener('click', e => {
+    const th = e.target.closest('th.sortable');
+    if (!th) return;
+    const f = th.dataset.sort;
+    if (sortField === f) sortDir = (sortDir === 'asc' ? 'desc' : 'asc');
+    else { sortField = f; sortDir = 'asc'; }   // zručnosti/priemer: najslabší hore; meno: A→Z
+    collapseDetail();
+    renderHead();
+    renderRows();
+  });
+
   // Výber skupiny — len pre admina / hlavného trénera
   if (IS_ADMIN || IS_HLAVNY_TRENER) {
     document.getElementById('filterCard').style.display = '';
@@ -318,5 +522,7 @@ async function init() {
 
 init();
 </script>
+<!-- Chart.js pre graf progresu zručností v detaile hráča -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 </body>
 </html>
