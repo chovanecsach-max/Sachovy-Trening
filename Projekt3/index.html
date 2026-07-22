@@ -493,28 +493,17 @@ async function initPage() {
       let eloVal, eloLabel;
 
       if (lastMode === 'taktika') {
-        eloVal = player.elo_taktika || 1500; eloLabel = 'ELO Taktika';
+        eloVal = player.elo_taktika || 1000; eloLabel = 'ELO Taktika';
       } else if (lastMode === 'strategia') {
-        eloVal = player.elo_strategia || 1500; eloLabel = 'ELO Stratégia';
+        eloVal = player.elo_strategia || 1000; eloLabel = 'ELO Stratégia';
       } else if (lastMode === 'koncovka') {
-        eloVal = player.elo_koncovka || 1500; eloLabel = 'ELO Koncovka';
+        eloVal = player.elo_koncovka || 1000; eloLabel = 'ELO Koncovka';
       } else if (lastMode.startsWith('skill_')) {
-        eloVal = player.elo_zrucnosti || 1500;
-        const skillNames = {
-          'skill_checks':            'ELO Šachy',
-          'skill_captures':          'ELO Brania',
-          'skill_checks_captures':   'ELO Šachy/Brania',
-          'skill_direct_attack':     'ELO Brania so ziskom',
-          'skill_pawn_breakthrough': 'ELO Pešiak. priel.',
-          'skill_underdefended':     'ELO Slabo pokryté',
-          'skill_pin':               'ELO Abs. väzby',
-          'skill_relative_pin':      'ELO Rel. väzby',
-          'skill_fork':              'ELO Vidličky',
-          'skill_direct_threat':     'ELO Priama hrozba'
-        };
-        eloLabel = skillNames[lastMode] || 'ELO Zručnosti';
+        // Zo zručností ukazujeme na menu vždy ELO komplexného tréningu (elo_zrucnosti).
+        // Jednotlivé zručnosti majú vlastné ELO — to nájdeš v štatistike, nie tu.
+        eloVal = player.elo_zrucnosti || 1000; eloLabel = 'ELO Zručnosti';
       } else {
-        eloVal = player.elo || 1500; eloLabel = 'ELO Mix';
+        eloVal = player.elo || 1000; eloLabel = 'ELO Mix';
       }
 
       document.getElementById('statElo').textContent    = eloVal;
@@ -697,7 +686,7 @@ async function loadLeaderboards(myName) {
 
   LB_CATEGORIES.forEach(cat => {
     const sorted = [...players]
-      .sort((a, b) => (b[cat.field] || 1500) - (a[cat.field] || 1500))
+      .sort((a, b) => (b[cat.field] || 1000) - (a[cat.field] || 1000))
       .slice(0, 10);
 
     const el = document.getElementById('lb-' + cat.id);
@@ -708,7 +697,7 @@ async function loadLeaderboards(myName) {
 
     el.innerHTML = sorted.map((p, i) => {
       const name = `${p.name || ''} ${p.surname || ''}`.trim() || '?';
-      const elo  = p[cat.field] || 1500;
+      const elo  = p[cat.field] || 1000;
       const isMe = myName && name === myName;
       const rank = MEDALS[i] || `${i + 1}.`;
       return `<div class="lb-row${isMe ? ' me' : ''}">
