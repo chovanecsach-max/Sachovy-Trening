@@ -107,6 +107,29 @@ function setStatus(text, type) {
   el.className = 'status ' + type;
 }
 
+// Vlastné logovanie do error_log (verify.html nenačítava auth.js,
+// takže globálny hlásič tu nebeží). Best-effort, nikdy nezhodí stránku.
+async function logVerifyError(message, context) {
+  try {
+    await fetch(`${SUPABASE_URL}/rest/v1/error_log`, {
+      method: 'POST',
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${SUPABASE_KEY}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=minimal'
+      },
+      body: JSON.stringify({
+        user_id: null,
+        page: (location.pathname || '').slice(0, 200),
+        message: ('[verify] ' + (context ? context + ': ' : '') + String(message || '')).slice(0, 2000),
+        stack: '',
+        user_agent: (navigator.userAgent || '').slice(0, 300)
+      })
+    });
+  } catch (e) { /* logovanie nesmie samo zlyhať nahlas */ }
+}
+
 function showSuccess() {
   document.getElementById('loadingBox').style.display = 'none';
   document.getElementById('successBox').style.display = 'block';
@@ -161,6 +184,7 @@ async function createProfileAndPlayer(user) {
   });
   if (!profileRes.ok) {
     const err = await profileRes.text();
+    logVerifyError(err, 'profiles insert');
     showError('Chyba pri vytváraní profilu: ' + err);
     return;
   }
@@ -181,6 +205,7 @@ async function createProfileAndPlayer(user) {
   });
   if (!playerRes.ok) {
     const err = await playerRes.text();
+    logVerifyError(err, 'players insert');
     showError('Profil vytvorený, ale chyba pri vytváraní hráča: ' + err);
     return;
   }
@@ -201,11 +226,14 @@ async function verifyFromQueryParams() {
   const { data, error } = await sb.auth.verifyOtp({ token_hash, type });
 
   if (error) {
+    logVerifyError(error.message || 'verifyOtp error', 'verifyOtp');
+    const m = (error.message || '').toLowerCase();
     showError(
-      error.message && error.message.toLowerCase().includes('expired')
-        ? 'Odkaz na overenie vypršal. Skús sa zaregistrovať znova.'
+      m.includes('expired')
+        ? 'Odkaz na overenie vypršal alebo už bol použitý. Skús sa zaregistrovať znova.'
         : 'Odkaz na overenie je neplatný. Skús sa zaregistrovať znova.'
     );
+    setStatus('Detail: ' + (error.message || 'neznáma chyba'), 'error');
     return true;
   }
 
