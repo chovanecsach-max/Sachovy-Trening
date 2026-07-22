@@ -390,6 +390,10 @@ body {
       <div class="nav-icon i-stat">📊</div>
       Štatistika
     </button>
+    <button class="nav-btn" id="mapBtn" onclick="goSlabiny()" style="display:none;">
+      <div class="nav-icon i-stat">🎯</div>
+      Slabiny
+    </button>
     <button class="nav-btn" onclick="goManual()">
       <div class="nav-icon i-stat">📖</div>
       Manuál
@@ -477,6 +481,9 @@ async function initPage() {
 
   if (role === 'admin') {
     document.getElementById('adminBtn').style.display = 'flex';
+  }
+  if (role === 'trener' || role === 'hlavny_trener' || role === 'admin') {
+    document.getElementById('mapBtn').style.display = 'flex';
   }
 
   // Platnosť prístupu — zobraz len hráčom a trénerom (admin/hlavný tréner majú neobmedzený prístup)
@@ -643,6 +650,7 @@ initPage();
 function goTraining(mode) { location.href = "training.html?mode=" + mode; }
 function goAdmin()         { location.href = "admin.html"; }
 function goStats()         { location.href = "statistika.html"; }
+function goSlabiny()       { location.href = "slabinova-mapa.html"; }
 function goSkills(type)    { location.href = "skills.html?type=" + type; }
 function goManual()        { location.href = "manual.html"; }
 
