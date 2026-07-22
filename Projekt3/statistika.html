@@ -662,11 +662,11 @@ async function loadStats() {
         dateTo,
         totalTime:    Number(p.total_time || 0),
         periodTime:   log.timeSpent,
-        eloTaktika:   p.elo_taktika   ?? 1500,
-        eloStrategia: p.elo_strategia ?? 1500,
-        eloKoncovka:  p.elo_koncovka  ?? 1500,
-        eloMix:       p.elo           ?? 1500,
-        eloZrucnosti: p.elo_zrucnosti ?? 1500,
+        eloTaktika:   p.elo_taktika   ?? 1000,
+        eloStrategia: p.elo_strategia ?? 1000,
+        eloKoncovka:  p.elo_koncovka  ?? 1000,
+        eloMix:       p.elo           ?? 1000,
+        eloZrucnosti: p.elo_zrucnosti ?? 1000,
         // 9 zručností — default 1200 (ako v DB pre elo_<zručnosť>)
         skills: SKILL_COLS.reduce((o, c) => { o[c.field] = p[c.field] ?? 1200; return o; }, {})
       };
