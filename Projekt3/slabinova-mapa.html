@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Slabinová mapa</title>
+<style>
+body {
+  font-family: Arial, sans-serif;
+  background: #f4f4f6;
+  margin: 0;
+  padding: 12px;
+  color: #111827;
+}
+.app {
+  max-width: 1100px;
+  margin: 0 auto;
+  background: white;
+  border-radius: 14px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+  padding: 20px;
+}
+h1 { margin: 0 0 6px 0; text-align: center; font-size: 26px; }
+.subtitle { text-align: center; color: #475569; margin: 0 0 20px 0; }
+
+.role-banner { padding: 10px 14px; border-radius: 10px; margin-bottom: 16px; font-size: 14px; text-align: center; }
+.role-banner.trener        { background: #f0fdf4; border: 1px solid #86efac; color: #166534; }
+.role-banner.hlavny_trener { background: #faf5ff; border: 1px solid #d8b4fe; color: #6b21a8; }
+.role-banner.admin         { background: #fff7ed; border: 1px solid #fdba74; color: #c2410c; }
+
+.filter-card { border: 1px solid #d1d5db; border-radius: 12px; padding: 14px; margin-bottom: 16px; background: #f8fafc; }
+.filter-row { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; }
+.filter-field { display: flex; flex-direction: column; gap: 4px; }
+.filter-field label { font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: bold; }
+
+select {
+  padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 8px;
+  font-size: 14px; background: white; min-width: 220px;
+}
+button { padding: 10px 16px; border: none; border-radius: 10px; cursor: pointer; font-size: 14px; }
+.secondary { background: #e5e7eb; color: #111827; }
+
+.status { margin: 12px 0; padding: 10px; border-radius: 10px; border: 1px solid #d1d5db; background: #f8fafc; color: #334155; font-size: 14px; }
+.status.error { background: #fef2f2; border-color: #fca5a5; color: #b91c1c; }
+
+/* ── Záver: na čo zamerať tréning ── */
+.focus-line {
+  margin: 4px 0 14px; padding: 12px 14px; border-radius: 10px;
+  background: #eff6ff; border: 1px solid #bfdbfe; color: #1e3a5f;
+  font-size: 14px; display: none;
+}
+.focus-line strong { color: #1d4ed8; }
+
+/* ── Legenda ── */
+.map-legend { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; font-size: 12px; color: #64748b; margin: 6px 0 10px; }
+.map-legend .box { width: 13px; height: 13px; border-radius: 3px; display: inline-block; vertical-align: -2px; margin-right: 5px; }
+
+/* ── Mriežka ── */
+.map-wrap { overflow-x: auto; margin-top: 6px; }
+table.map { border-collapse: separate; border-spacing: 3px; font-size: 12px; width: 100%; min-width: 660px; }
+table.map th { padding: 4px 3px; color: #64748b; font-weight: bold; font-size: 11px; line-height: 1.2; vertical-align: bottom; text-align: center; }
+table.map th.name-h { text-align: left; padding-left: 8px; }
+table.map td.name { padding: 7px 8px; white-space: nowrap; color: #111827; }
+table.map td.cell { text-align: center; padding: 8px 5px; border-radius: 5px; }
+table.map tr.avg-row td { border-top: 2px solid #e5e7eb; }
+table.map td.avg-name { padding-top: 9px; font-weight: bold; color: #111827; white-space: nowrap; }
+table.map .col-sep { border-left: 2px solid #e5e7eb; }
+</style>
+</head>
+
+<body oncontextmenu="return false;">
+<div class="app">
+  <h1>Slabinová mapa</h1>
+  <p class="subtitle">Prehľad ELO zručností naprieč skupinou — kde je skupina slabá a na čo zamerať tréning.</p>
+
+  <div id="roleBanner" class="role-banner" style="display:none;"></div>
+
+  <div class="filter-card" id="filterCard" style="display:none;">
+    <div class="filter-row">
+      <div class="filter-field">
+        <label>Skupina (tréner)</label>
+        <select id="trenerSelect">
+          <option value="all">Všetci hráči</option>
+        </select>
+      </div>
+      <button class="secondary" onclick="goHome()">Späť do menu</button>
+    </div>
+  </div>
+
+  <div id="status" class="status">Načítavam...</div>
+
+  <div id="focusLine" class="focus-line"></div>
+
+  <div class="map-legend" id="mapLegend" style="display:none;">
+    <span><span class="box" style="background:#fef2f2;border:1px solid #fca5a5;"></span>slabé (&lt; 1350)</span>
+    <span><span class="box" style="background:#fff7ed;border:1px solid #fdba74;"></span>stredné (1350–1650)</span>
+    <span><span class="box" style="background:#f0fdf4;border:1px solid #86efac;"></span>silné (&gt; 1650)</span>
+    <span><span class="box" style="border:1px dashed #cbd5e1;"></span>zatiaľ netrénované</span>
+  </div>
+
+  <div class="map-wrap">
+    <table class="map" id="mapTable" style="display:none;">
+      <thead id="mapHead"></thead>
+      <tbody id="mapBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/auth.js"></script>
+<script src="js/player.js"></script>
+<script>
+// ─── Kontext prihláseného používateľa ───────────────────────────────────────
+const USER_ROLE        = sessionStorage.getItem('user_role') || '';
+const USER_ID          = sessionStorage.getItem('user_id') || '';
+const USER_NICK        = sessionStorage.getItem('user_nick') || sessionStorage.getItem('user_name') || '';
+const IS_ADMIN         = USER_ROLE === 'admin';
+const IS_TRENER        = USER_ROLE === 'trener';
+const IS_HLAVNY_TRENER = USER_ROLE === 'hlavny_trener';
+const IS_HRAC          = USER_ROLE === 'hrac';
+
+// Prahy pre farebné pásma (ľahko upraviteľné)
+const WEAK   = 1350;   // pod = slabé (červené)
+const STRONG = 1650;   // nad = silné (zelené); medzi = stredné (oranžové)
+
+// 9 zručností — rovnaké poradie a názvy ako v štatistike
+const SKILL_COLS = [
+  { field: 'elo_checks',            label: 'Šachy',         full: 'Šachy' },
+  { field: 'elo_captures',          label: 'Brania',        full: 'Brania' },
+  { field: 'elo_pawn_breakthrough', label: 'Prielomy',      full: 'Pešiakové prielomy' },
+  { field: 'elo_direct_attack',     label: 'Br. so ziskom', full: 'Brania so ziskom' },
+  { field: 'elo_underdefended',     label: 'Slabo pokryté', full: 'Slabo pokryté' },
+  { field: 'elo_pin',               label: 'Abs. väzby',    full: 'Absolútne väzby' },
+  { field: 'elo_relative_pin',      label: 'Rel. väzby',    full: 'Relatívne väzby' },
+  { field: 'elo_fork',              label: 'Vidličky',      full: 'Vidličky' },
+  { field: 'elo_direct_threat',     label: 'Hrozby',        full: 'Priame hrozby' },
+];
+
+// ─── Stránkované načítanie (Supabase vracia max. 1000 riadkov) ──────────────
+async function sbFetchAll(query) {
+  const PAGE = 1000;
+  let all = [], offset = 0;
+  while (true) {
+    const sep = query.includes('?') ? '&' : '?';
+    const batch = await sbFetch(`${query}${sep}limit=${PAGE}&offset=${offset}`);
+    if (!batch || !batch.length) break;
+    all = all.concat(batch);
+    if (batch.length < PAGE) break;
+    offset += PAGE;
+  }
+  return all;
+}
+
+function setStatus(text, type = '') {
+  const el = document.getElementById('status');
+  el.textContent = text;
+  el.className = 'status' + (type ? ' ' + type : '');
+}
+
+function goHome() { location.href = 'index.html'; }
+
+// ─── Farebné pásmo bunky ─────────────────────────────────────────────────────
+function tier(v) {
+  if (v < WEAK)    return { bg: '#fef2f2', fg: '#b91c1c' };
+  if (v <= STRONG) return { bg: '#fff7ed', fg: '#c2410c' };
+  return             { bg: '#f0fdf4', fg: '#166534' };
+}
+function cellHtml(v, opts = {}) {
+  const t = tier(v);
+  const untrained = (v === 1200);
+  const border = untrained ? 'border:1px dashed #cbd5e1;' : '';
+  const title  = untrained ? ' title="Zatiaľ netrénované (východisková hodnota 1200)"' : '';
+  const weight = opts.bold ? 600 : 500;
+  const sep    = opts.sep ? ' col-sep' : '';
+  return `<td class="cell${sep}" style="background:${t.bg};color:${t.fg};font-weight:${weight};${border}"${title}>${Math.round(v)}</td>`;
+}
+
+// ─── Načítanie hráčov skupiny ────────────────────────────────────────────────
+async function fetchMapPlayers(trenerFilter) {
+  const cols = 'id,name,surname,trener_id,' + SKILL_COLS.map(c => c.field).join(',');
+  if (IS_TRENER) {
+    return await sbFetchAll(`players?trener_id=eq.${USER_ID}&select=${cols}&order=surname.asc,name.asc`);
+  }
+  // admin / hlavny_trener
+  if (trenerFilter && trenerFilter !== 'all') {
+    return await sbFetchAll(`players?trener_id=eq.${trenerFilter}&select=${cols}&order=surname.asc,name.asc`);
+  }
+  const all = await sbFetchAll(`players?select=${cols},profile:profiles!user_id(role)&order=surname.asc,name.asc`);
+  return (all || []).filter(p => p.profile?.role !== 'admin');
+}
+
+async function fetchTrenerList() {
+  try {
+    const trainers = await sbFetch('profiles?role=eq.trener&select=id,name,surname,nick_name&order=surname.asc');
+    return trainers || [];
+  } catch(e) { return []; }
+}
+
+// ─── Vykreslenie mapy ────────────────────────────────────────────────────────
+function skillValues(p) {
+  return SKILL_COLS.map(c => Number(p[c.field] ?? 1200));
+}
+function mean(arr) {
+  return arr.length ? arr.reduce((s, v) => s + v, 0) / arr.length : 0;
+}
+
+function renderMap(players) {
+  const table   = document.getElementById('mapTable');
+  const head     = document.getElementById('mapHead');
+  const body     = document.getElementById('mapBody');
+  const legend   = document.getElementById('mapLegend');
+  const focusEl  = document.getElementById('focusLine');
+
+  if (!players || !players.length) {
+    table.style.display = 'none';
+    legend.style.display = 'none';
+    focusEl.style.display = 'none';
+    setStatus('Táto skupina nemá žiadnych hráčov.', 'error');
+    return;
+  }
+
+  // Hlavička: Hráč | 9 zručností | Priemer
+  let h = '<tr><th class="name-h">Hráč</th>';
+  SKILL_COLS.forEach(c => { h += `<th title="${c.full}">${c.label}</th>`; });
+  h += '<th class="col-sep">Priemer</th></tr>';
+  head.innerHTML = h;
+
+  // Riadky hráčov
+  let b = '';
+  players.forEach(p => {
+    const vals = skillValues(p);
+    const name = `${p.surname || ''} ${p.name || ''}`.trim() || '(bez mena)';
+    b += `<tr><td class="name">${name}</td>`;
+    vals.forEach(v => { b += cellHtml(v); });
+    b += cellHtml(mean(vals), { bold: true, sep: true });
+    b += '</tr>';
+  });
+
+  // Riadok priemeru skupiny
+  const colAvg = SKILL_COLS.map((c, i) => mean(players.map(p => Number(p[c.field] ?? 1200))));
+  const overall = mean(colAvg);
+  b += '<tr class="avg-row"><td class="avg-name">Priemer skupiny</td>';
+  colAvg.forEach(v => { b += cellHtml(v, { bold: true }); });
+  b += cellHtml(overall, { bold: true, sep: true });
+  b += '</tr>';
+  body.innerHTML = b;
+
+  table.style.display = '';
+  legend.style.display = 'flex';
+
+  // Záver: dve najslabšie zručnosti skupiny
+  const ranked = SKILL_COLS
+    .map((c, i) => ({ label: c.full, avg: colAvg[i] }))
+    .sort((a, b2) => a.avg - b2.avg);
+  const worst = ranked.slice(0, 2).map(r => `${r.label} (${Math.round(r.avg)})`).join(', ');
+  focusEl.innerHTML = `🎯 <strong>Na čo zamerať tréning:</strong> ${worst} — najnižší priemer v skupine.`;
+  focusEl.style.display = 'block';
+
+  setStatus(`Skupina: ${players.length} ${players.length === 1 ? 'hráč' : (players.length < 5 ? 'hráči' : 'hráčov')}.`);
+}
+
+// ─── Načítanie a obnovenie ───────────────────────────────────────────────────
+async function loadMap() {
+  setStatus('Načítavam...');
+  try {
+    const filter = document.getElementById('trenerSelect').value;
+    const players = await fetchMapPlayers(filter);
+    renderMap(players);
+  } catch(e) {
+    setStatus('Chyba pri načítaní: ' + e.message, 'error');
+  }
+}
+
+// ─── Inicializácia ───────────────────────────────────────────────────────────
+async function init() {
+  // Ochrana: len prihlásení; stránka je pre trénerov/adminov
+  if (!requireLogin()) return;
+  if (IS_HRAC) {
+    alert('Slabinová mapa je dostupná len pre trénerov a administrátorov.');
+    goHome();
+    return;
+  }
+
+  // Role banner
+  const banner = document.getElementById('roleBanner');
+  if (IS_TRENER) {
+    banner.textContent = `🧑‍🏫 Tréner ${USER_NICK} — moja skupina`;
+    banner.className = 'role-banner trener';
+  } else if (IS_HLAVNY_TRENER) {
+    banner.textContent = `👑 Hlavný tréner ${USER_NICK} — všetci hráči`;
+    banner.className = 'role-banner hlavny_trener';
+  } else if (IS_ADMIN) {
+    banner.textContent = '🔧 Admin — všetci hráči';
+    banner.className = 'role-banner admin';
+  }
+  banner.style.display = '';
+
+  // Výber skupiny — len pre admina / hlavného trénera
+  if (IS_ADMIN || IS_HLAVNY_TRENER) {
+    document.getElementById('filterCard').style.display = '';
+    const sel = document.getElementById('trenerSelect');
+    const trainers = await fetchTrenerList();
+    trainers.forEach(t => {
+      const opt = document.createElement('option');
+      opt.value = t.id;
+      opt.textContent = t.nick_name || `${t.surname || ''} ${t.name || ''}`.trim();
+      sel.appendChild(opt);
+    });
+    sel.addEventListener('change', loadMap);
+  } else {
+    // Tréner: aj tak zobraz tlačidlo Späť do menu
+    document.getElementById('filterCard').style.display = '';
+    document.querySelector('#trenerSelect').closest('.filter-field').style.display = 'none';
+  }
+
+  await loadMap();
+}
+
+init();
+</script>
+</body>
+</html>
