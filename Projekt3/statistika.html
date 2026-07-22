@@ -163,6 +163,38 @@ tr:hover td { background: #eff6ff; }
   padding: 30px;
 }
 
+/* ─── Prepínač tabuľky (Základné ELO / Zručnosti) ───────────── */
+.view-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 14px 0 2px;
+}
+.view-row .view-label {
+  font-size: 12px;
+  color: #64748b;
+  text-transform: uppercase;
+  font-weight: bold;
+}
+.view-toggle {
+  display: inline-flex;
+  gap: 5px;
+}
+.view-toggle button {
+  padding: 8px 16px;
+  border: 1px solid #cbd5e1;
+  border-radius: 20px;
+  background: white;
+  color: #475569;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: bold;
+  transition: all .15s;
+}
+.view-toggle button:hover { border-color: #1e3a5f; color: #1e3a5f; }
+.view-toggle button.active { background: #1e3a5f; color: white; border-color: #1e3a5f; }
+
 /* ─── Grafy ─────────────────────────────────────────────────── */
 .charts-section {
   margin-top: 32px;
@@ -293,6 +325,14 @@ tr:hover td { background: #eff6ff; }
 
   <div id="status" class="status">Vyber obdobie a klikni na Načítať štatistiku.</div>
 
+  <div class="view-row">
+    <span class="view-label">Zobrazenie</span>
+    <div class="view-toggle" id="viewToggle">
+      <button type="button" data-view="basic" class="active">Základné ELO</button>
+      <button type="button" data-view="skills">Zručnosti</button>
+    </div>
+  </div>
+
   <div class="table-wrapper">
     <table id="statsTable" style="display:none;">
       <thead id="statsHead"></thead>
@@ -382,6 +422,24 @@ const IS_HRAC           = USER_ROLE === 'hrac';
 
 let statsData = [];
 
+// Aktívny pohľad tabuľky: 'basic' = Základné ELO, 'skills' = Zručnosti
+let statsView = 'basic';
+
+// 9 zručností s vlastným ELO stĺpcom (elo_<typ>).
+// Poradie zodpovedá tréningovej postupnosti v skills.html (COMPLETE_SKILLS).
+// label = krátky názov do hlavičky, full = plný názov (tooltip + XLSX).
+const SKILL_COLS = [
+  { field: 'elo_checks',            label: 'Šachy',         full: 'Šachy' },
+  { field: 'elo_captures',          label: 'Brania',        full: 'Brania' },
+  { field: 'elo_pawn_breakthrough', label: 'Prielomy',      full: 'Pešiakové prielomy' },
+  { field: 'elo_direct_attack',     label: 'Br. so ziskom', full: 'Brania so ziskom' },
+  { field: 'elo_underdefended',     label: 'Slabo pokryté', full: 'Slabo pokryté' },
+  { field: 'elo_pin',               label: 'Abs. väzby',    full: 'Absolútne väzby' },
+  { field: 'elo_relative_pin',      label: 'Rel. väzby',    full: 'Relatívne väzby' },
+  { field: 'elo_fork',              label: 'Vidličky',      full: 'Vidličky' },
+  { field: 'elo_direct_threat',     label: 'Hrozby',        full: 'Priame hrozby' },
+];
+
 // ─── Inicializácia ───────────────────────────────────────────────────────────
 function init() {
   // Role banner
@@ -406,16 +464,31 @@ function init() {
 
   // Hlavička tabuľky podľa roly
   renderTableHead();
+
+  // Prepínač Základné ELO / Zručnosti
+  document.getElementById('viewToggle').addEventListener('click', e => {
+    const btn = e.target.closest('button');
+    if (!btn) return;
+    const v = btn.dataset.view;
+    if (!v || v === statsView) return;
+    statsView = v;
+    document.querySelectorAll('#viewToggle button')
+      .forEach(b => b.classList.toggle('active', b === btn));
+    renderTableHead();
+    if (statsData.length) renderTable();
+  });
+
   initDates();
 }
 
 // ─── Hlavička tabuľky ────────────────────────────────────────────────────────
 function renderTableHead() {
   const head = document.getElementById('statsHead');
-  // Stĺpec "Meno trénera" len pre admina
+  // Stĺpec "Meno trénera" len pre admina / hlavného trénera
   const trenerCol = ( IS_ADMIN || IS_HLAVNY_TRENER) ? '<th>Tréner</th>' : '';
-  head.innerHTML = `
-    <tr>
+
+  // Spoločné "ostatné položky" — rovnaké v oboch pohľadoch
+  const commonCols = `
       <th>Meno</th>
       <th>Priezvisko</th>
       ${trenerCol}
@@ -424,13 +497,22 @@ function renderTableHead() {
       <th>Úspešnosť</th>
       <th>Hodnotené obdobie</th>
       <th>Čas celkom</th>
-      <th>Čas za obdobie</th>
+      <th>Čas za obdobie</th>`;
+
+  // ELO stĺpce podľa pohľadu
+  let eloCols;
+  if (statsView === 'skills') {
+    eloCols = SKILL_COLS.map(c => `<th title="${c.full}">${c.label}</th>`).join('')
+            + '<th>ELO Zručnosti</th>';
+  } else {
+    eloCols = `
       <th>ELO Taktika</th>
       <th>ELO Stratégia</th>
       <th>ELO Koncovka</th>
-      <th>ELO Zručnosti</th>
-    </tr>
-  `;
+      <th>ELO Mix</th>`;
+  }
+
+  head.innerHTML = `<tr>${commonCols}${eloCols}</tr>`;
 }
 
 // ─── Pomocné funkcie ─────────────────────────────────────────────────────────
@@ -580,13 +662,17 @@ async function loadStats() {
         dateTo,
         totalTime:    Number(p.total_time || 0),
         periodTime:   log.timeSpent,
-        eloTaktika:   p.elo_taktika   || 1500,
-        eloStrategia: p.elo_strategia || 1500,
-        eloKoncovka:  p.elo_koncovka  || 1500,
-        eloZrucnosti: p.elo_zrucnosti || 1500
+        eloTaktika:   p.elo_taktika   ?? 1500,
+        eloStrategia: p.elo_strategia ?? 1500,
+        eloKoncovka:  p.elo_koncovka  ?? 1500,
+        eloMix:       p.elo           ?? 1500,
+        eloZrucnosti: p.elo_zrucnosti ?? 1500,
+        // 9 zručností — default 1200 (ako v DB pre elo_<zručnosť>)
+        skills: SKILL_COLS.reduce((o, c) => { o[c.field] = p[c.field] ?? 1200; return o; }, {})
       };
     });
 
+    renderTableHead();
     renderTable();
 
     const label = IS_HRAC ? 'Tvoja štatistika' : `Načítaných ${players.length} hráčov`;
@@ -619,8 +705,9 @@ function renderTable() {
 
   statsData.forEach(r => {
     const trenerCol = (IS_ADMIN || IS_HLAVNY_TRENER) ? `<td>${r.trenerName}</td>` : '';
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
+
+    // Spoločné bunky (ostatné položky) — rovnaké v oboch pohľadoch
+    const commonCells = `
       <td>${r.name}</td>
       <td>${r.surname}</td>
       ${trenerCol}
@@ -629,12 +716,23 @@ function renderTable() {
       <td>${r.accuracy}%</td>
       <td>${formatDate(r.dateFrom)} — ${formatDate(r.dateTo)}</td>
       <td>${formatTime(r.totalTime)}</td>
-      <td>${formatTime(r.periodTime)}</td>
+      <td>${formatTime(r.periodTime)}</td>`;
+
+    // ELO bunky podľa pohľadu (súhrnné ELO zvýraznené tučným)
+    let eloCells;
+    if (statsView === 'skills') {
+      eloCells = SKILL_COLS.map(c => `<td>${r.skills[c.field]}</td>`).join('')
+               + `<td><strong>${r.eloZrucnosti}</strong></td>`;
+    } else {
+      eloCells = `
       <td>${r.eloTaktika}</td>
       <td>${r.eloStrategia}</td>
       <td>${r.eloKoncovka}</td>
-      <td>${r.eloZrucnosti}</td>
-    `;
+      <td><strong>${r.eloMix}</strong></td>`;
+    }
+
+    const tr = document.createElement('tr');
+    tr.innerHTML = commonCells + eloCells;
     tbody.appendChild(tr);
   });
 }
@@ -644,25 +742,42 @@ function exportXlsx() {
   if (!statsData.length) return;
 
   const trenerHeader = (IS_ADMIN || IS_HLAVNY_TRENER) ? ['Tréner'] : [];
-  const headers = [
+
+  // Spoločné (ostatné položky) — rovnaké v oboch pohľadoch
+  const commonHeaders = [
     'Meno', 'Priezvisko',
     ...trenerHeader,
     'Riešené (obdobie)', 'Vyriešené (obdobie)', 'Úspešnosť (%)',
     'Obdobie od', 'Obdobie po',
-    'Čas celkom', 'Čas za obdobie',
-    'ELO Taktika', 'ELO Stratégia', 'ELO Koncovka', 'ELO Zručnosti'
+    'Čas celkom', 'Čas za obdobie'
   ];
+
+  // ELO hlavičky + názov listu/súboru podľa aktívneho pohľadu
+  let eloHeaders, sheetName, fileTag;
+  if (statsView === 'skills') {
+    eloHeaders = [...SKILL_COLS.map(c => c.full), 'ELO Zručnosti'];
+    sheetName  = 'Zručnosti';
+    fileTag    = 'Zrucnosti';
+  } else {
+    eloHeaders = ['ELO Taktika', 'ELO Stratégia', 'ELO Koncovka', 'ELO Mix'];
+    sheetName  = 'Základné ELO';
+    fileTag    = 'ELO';
+  }
+  const headers = [...commonHeaders, ...eloHeaders];
 
   const rows = statsData.map(r => {
     const trenerCol = (IS_ADMIN || IS_HLAVNY_TRENER) ? [r.trenerName] : [];
-    return [
+    const common = [
       r.name, r.surname,
       ...trenerCol,
       r.played, r.solved, r.accuracy,
       r.dateFrom, r.dateTo,
-      formatTime(r.totalTime), formatTime(r.periodTime),
-      r.eloTaktika, r.eloStrategia, r.eloKoncovka, r.eloZrucnosti
+      formatTime(r.totalTime), formatTime(r.periodTime)
     ];
+    const elo = statsView === 'skills'
+      ? [...SKILL_COLS.map(c => r.skills[c.field]), r.eloZrucnosti]
+      : [r.eloTaktika, r.eloStrategia, r.eloKoncovka, r.eloMix];
+    return [...common, ...elo];
   });
 
   const dateFrom = document.getElementById('dateFrom').value;
@@ -672,15 +787,15 @@ function exportXlsx() {
     const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
     ws['!cols'] = headers.map(h => ({ wch: Math.max(h.length, 12) }));
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Štatistika');
-    XLSX.writeFile(wb, `Statistika_${dateFrom}_${dateTo}.xlsx`);
+    XLSX.utils.book_append_sheet(wb, ws, sheetName);
+    XLSX.writeFile(wb, `Statistika_${fileTag}_${dateFrom}_${dateTo}.xlsx`);
   } else {
     const bom = '\uFEFF';
     const csv = bom + [headers, ...rows].map(r => r.join(';')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `Statistika_${dateFrom}_${dateTo}.csv`;
+    a.download = `Statistika_${fileTag}_${dateFrom}_${dateTo}.csv`;
     a.click();
   }
 }
