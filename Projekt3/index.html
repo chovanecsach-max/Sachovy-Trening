@@ -177,6 +177,8 @@ body {
   animation: fadeIn 0.15s ease;
 }
 .submenu.open { display: grid; }
+/* Podmenu trénera má len 3 položky — nech sa netiahnu cez celú šírku */
+.submenu-trener { grid-template-columns: repeat(4, 1fr); }
 
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(-6px); }
@@ -288,6 +290,7 @@ body {
 
   /* Podmenu zrucnosti: 5 stlpcov (2 rady) */
   .submenu { grid-template-columns: repeat(5, 1fr); gap: 8px; padding: 10px; }
+  .submenu-trener { grid-template-columns: repeat(3, 1fr); }
   .sub-btn { padding: 12px 4px; font-size: 11px; gap: 6px; min-height: 74px;
              touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
   .sub-icon { width: 32px; height: 32px; font-size: 15px; }
@@ -299,6 +302,7 @@ body {
 @media (max-width: 560px) {
   .nav-row { grid-template-columns: repeat(4, 1fr); }
   .submenu { grid-template-columns: repeat(4, 1fr); }
+  .submenu-trener { grid-template-columns: repeat(3, 1fr); }
   .leaderboards { grid-template-columns: 1fr; }
 }
 </style>
@@ -395,17 +399,26 @@ body {
       <div class="nav-icon i-stat">📊</div>
       Štatistika
     </button>
-    <button class="nav-btn" id="mapBtn" onclick="goSlabiny()" style="display:none;">
-      <div class="nav-icon i-stat">🎯</div>
-      Slabiny
-    </button>
     <button class="nav-btn" onclick="goManual()">
       <div class="nav-icon i-stat">📖</div>
       Manuál
     </button>
-    <button class="nav-btn nav-admin" id="adminBtn" onclick="goAdmin()" style="display:none;">
-      <div class="nav-icon i-admin">⚙</div>
-      Admin
+    <button class="nav-btn nav-admin" id="trenerBtn" onclick="toggleTrenerMenu()" style="display:none;">
+      <div class="nav-icon i-admin">🧑‍🏫</div>
+      Tréner
+    </button>
+  </div>
+
+  <!-- Submenu trénera — nástroje pre trénerov a adminov -->
+  <div id="trenerSubmenu" class="submenu submenu-trener">
+    <button class="sub-btn" onclick="goSlabiny()">
+      <div class="sub-icon i-taktika">🎯</div>Slabinová mapa
+    </button>
+    <button class="sub-btn" onclick="goPrehlad()">
+      <div class="sub-icon i-strategia">📋</div>Prehľad zadaní
+    </button>
+    <button class="sub-btn" id="adminSubBtn" onclick="goAdmin()" style="display:none;">
+      <div class="sub-icon i-admin">⚙</div>Administrácia
     </button>
   </div>
 
@@ -484,11 +497,11 @@ async function initPage() {
   document.getElementById('userAvatar').textContent = nick.charAt(0).toUpperCase();
   document.getElementById('userName').textContent = nick;
 
-  if (role === 'admin') {
-    document.getElementById('adminBtn').style.display = 'flex';
-  }
   if (role === 'trener' || role === 'hlavny_trener' || role === 'admin') {
-    document.getElementById('mapBtn').style.display = 'flex';
+    document.getElementById('trenerBtn').style.display = 'flex';
+  }
+  if (role === 'admin') {
+    document.getElementById('adminSubBtn').style.display = 'flex';
   }
 
   // Platnosť prístupu — zobraz len hráčom a trénerom (admin/hlavný tréner majú neobmedzený prístup)
@@ -660,6 +673,7 @@ function goAdmin()         { location.href = "admin.html"; }
 function goStats()         { location.href = "statistika.html"; }
 function goSlabiny()       { location.href = "slabinova-mapa.html"; }
 function goZadania()       { location.href = "zadania.html"; }
+function goPrehlad()       { location.href = "zadania-prehlad.html"; }
 
 // Odznak s počtom nesplnených zadaní. Splnenie sa vyhodnocuje rovnako ako na
 // stránke zadania.html: pri cieli na ELO podľa aktuálneho elo_<zručnosť>,
@@ -704,8 +718,30 @@ function toggleSkillsMenu() {
   const menu = document.getElementById('skillsSubmenu');
   const btn  = document.getElementById('btnSkills');
   const isOpen = menu.classList.contains('open');
+  closeTrenerMenu();
   menu.classList.toggle('open');
   btn.classList.toggle('active', !isOpen);
+}
+
+function toggleTrenerMenu() {
+  const menu = document.getElementById('trenerSubmenu');
+  const btn  = document.getElementById('trenerBtn');
+  const isOpen = menu.classList.contains('open');
+  closeSkillsMenu();
+  menu.classList.toggle('open');
+  btn.classList.toggle('active', !isOpen);
+}
+
+function closeSkillsMenu() {
+  document.getElementById('skillsSubmenu').classList.remove('open');
+  document.getElementById('btnSkills').classList.remove('active');
+}
+
+function closeTrenerMenu() {
+  const m = document.getElementById('trenerSubmenu');
+  const b = document.getElementById('trenerBtn');
+  if (m) m.classList.remove('open');
+  if (b) b.classList.remove('active');
 }
 
 // ─── Rebríčky ────────────────────────────────────────────────────────────────
