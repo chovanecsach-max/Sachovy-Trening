@@ -216,7 +216,12 @@ async function load() {
   }
 
   // Spočítaj pokrok a rozdeľ na aktívne / splnené
-  const withProg = rows.map(a => ({ a, prog: computeProgress(a, player, history) }));
+  const withProg = rows.map(a => {
+    const prog = computeProgress(a, player, history);
+    // Zadanie ručne uzavreté trénerom sa berie ako splnené
+    if (a.completed_at) { prog.done = true; prog.pct = 1; }
+    return { a, prog };
+  });
   const active = withProg.filter(x => !x.prog.done);
   const done   = withProg.filter(x =>  x.prog.done);
 
