@@ -198,6 +198,15 @@ function setStatus(text, type = '') {
 
 function goHome() { location.href = 'index.html'; }
 
+// ─── Len skutoční hráči ──────────────────────────────────────────────────────
+// Mapa hodnotí zverencov, takže záznamy trénerov/adminov sa vynechávajú —
+// inak by ich (spravidla netrénované, 1200) hodnoty skresľovali priemer skupiny.
+// Hráč bez naviazaného profilu (založený ručne, bez konta) sa ponecháva.
+const STAFF_ROLES = ['trener', 'hlavny_trener', 'admin'];
+function onlyPlayers(rows) {
+  return (rows || []).filter(p => !STAFF_ROLES.includes(p.profile?.role));
+}
+
 // ─── Farebné pásmo bunky ─────────────────────────────────────────────────────
 function tier(v) {
   if (v < WEAK)    return { bg: '#fef2f2', fg: '#b91c1c' };
@@ -216,16 +225,17 @@ function cellHtml(v, opts = {}) {
 
 // ─── Načítanie hráčov skupiny ────────────────────────────────────────────────
 async function fetchMapPlayers(trenerFilter) {
-  const cols = 'id,name,surname,trener_id,' + SKILL_COLS.map(c => c.field).join(',');
+  const cols = 'id,name,surname,trener_id,' + SKILL_COLS.map(c => c.field).join(',')
+             + ',profile:profiles!user_id(role)';
+  let rows;
   if (IS_TRENER) {
-    return await sbFetchAll(`players?trener_id=eq.${USER_ID}&select=${cols}&order=surname.asc,name.asc`);
+    rows = await sbFetchAll(`players?trener_id=eq.${USER_ID}&select=${cols}&order=surname.asc,name.asc`);
+  } else if (trenerFilter && trenerFilter !== 'all') {
+    rows = await sbFetchAll(`players?trener_id=eq.${trenerFilter}&select=${cols}&order=surname.asc,name.asc`);
+  } else {
+    rows = await sbFetchAll(`players?select=${cols}&order=surname.asc,name.asc`);
   }
-  // admin / hlavny_trener
-  if (trenerFilter && trenerFilter !== 'all') {
-    return await sbFetchAll(`players?trener_id=eq.${trenerFilter}&select=${cols}&order=surname.asc,name.asc`);
-  }
-  const all = await sbFetchAll(`players?select=${cols},profile:profiles!user_id(role)&order=surname.asc,name.asc`);
-  return (all || []).filter(p => p.profile?.role !== 'admin');
+  return onlyPlayers(rows);
 }
 
 async function fetchTrenerList() {
