@@ -65,14 +65,14 @@ button { padding: 10px 16px; border: none; border-radius: 10px; cursor: pointer;
 /* ── Legenda ── */
 .map-legend { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; font-size: 12px; color: #64748b; margin: 6px 0 10px; }
 .map-legend .box { width: 13px; height: 13px; border-radius: 3px; display: inline-block; vertical-align: -2px; margin-right: 5px; }
-.map-legend .untrained-box { background: rgb(250,158,140); box-shadow: inset 0 0 0 2px rgba(255,255,255,.75); }
+.map-legend .untrained-box { background: rgb(246,116,103); box-shadow: inset 0 0 0 2px rgba(255,255,255,.75); }
 .map-legend .scale-lbl { font-weight: bold; color: #475569; }
 .map-legend .scale-mid { color: #94a3b8; }
 .scale-bar {
   width: 240px; height: 13px; border-radius: 7px; display: inline-block; vertical-align: -2px;
   background: linear-gradient(to right,
-    rgb(239,83,80) 0%, rgb(252,141,120) 17.6%, rgb(253,186,116) 29.4%,
-    rgb(253,224,71) 47%, rgb(190,242,100) 64.7%, rgb(110,231,152) 82.4%, rgb(52,211,113) 100%);
+    rgb(239,83,80) 0%, rgb(252,141,120) 16.67%, rgb(253,186,116) 33.33%,
+    rgb(253,224,71) 50%, rgb(190,242,100) 66.67%, rgb(110,231,152) 83.33%, rgb(52,211,113) 100%);
 }
 
 /* ── Mriežka ── */
@@ -167,16 +167,17 @@ const IS_HRAC          = USER_ROLE === 'hrac';
 
 // Prahy pre farebné pásma (ľahko upraviteľné)
 // Farebná škála — plynulý prechod sýtych farieb podľa ELO.
-// Kotviace body sa dajú posunúť podľa úrovne akadémie; medzi nimi sa
-// farba dopočíta, takže aj malé rozdiely sú viditeľné.
+// Rozsah 1100–2150 pokrýva aj silných hráčov (2000+). Kotviace body sú
+// rovnomerné (krok 175); medzi nimi sa farba dopočíta. Ak sa rozsah zmení,
+// treba upraviť aj gradient v CSS triede .scale-bar.
 const SCALE = [
   { v: 1100, c: [239,  83,  80] },  // sýta červená
-  { v: 1250, c: [252, 141, 120] },  // lososová
-  { v: 1350, c: [253, 186, 116] },  // oranžová
-  { v: 1500, c: [253, 224,  71] },  // žltá
-  { v: 1650, c: [190, 242, 100] },  // limetková
-  { v: 1800, c: [110, 231, 152] },  // zelená
-  { v: 1950, c: [ 52, 211, 113] }   // sýta zelená
+  { v: 1275, c: [252, 141, 120] },  // lososová
+  { v: 1450, c: [253, 186, 116] },  // oranžová
+  { v: 1625, c: [253, 224,  71] },  // žltá
+  { v: 1800, c: [190, 242, 100] },  // limetková
+  { v: 1975, c: [110, 231, 152] },  // zelená
+  { v: 2150, c: [ 52, 211, 113] }   // sýta zelená
 ];
 
 // 9 zručností — rovnaké poradie a názvy ako v štatistike
@@ -294,11 +295,11 @@ function renderLegend() {
     maxEl.textContent = Math.round(relMax);
     note.textContent  = 'najslabšia → najsilnejšia hodnota v skupine';
   } else {
-    minEl.textContent = '1100';
-    maxEl.textContent = '1950+';
+    minEl.textContent = String(SCALE[0].v);
+    maxEl.textContent = SCALE[SCALE.length - 1].v + '+';
     note.textContent  = (colorMode === 'rel')
       ? 'všetky hodnoty rovnaké — zobrazujem absolútne'
-      : '1350 · 1500 · 1650';
+      : [SCALE[2].v, SCALE[3].v, SCALE[4].v].join(' · ');
   }
 }
 
