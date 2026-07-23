@@ -71,6 +71,48 @@ function getEloCategory(mode) {
   return "mix";
 }
 
+// ─── Hlásenie tichých zlyhaní zápisu ────────────────────────────────────────
+// Niektoré zápisy (napr. ELO história) zámerne neblokujú tréning — keď zlyhajú,
+// hráč nič nespozoruje. Bez záznamu sa taká chyba hľadá veľmi ťažko (presne to
+// nastalo pri CHECK obmedzení na elo_history.category, ktoré ticho odmietalo
+// nové kategórie zručností). Preto sa zlyhanie zapíše aj do error_log.
+// Samotné hlásenie nesmie nikdy zhodiť tréning ani zahltiť tabuľku, preto je
+// celé v try/catch a obmedzené na 3 hlásenia na jedno načítanie stránky.
+let __plyReportCount = 0;
+
+async function reportPlayerError(context, err) {
+  try {
+    if (__plyReportCount >= 3) return;
+    __plyReportCount++;
+
+    let token = SUPABASE_KEY;
+    try {
+      const { data } = await sbClient.auth.getSession();
+      if (data?.session?.access_token) token = data.session.access_token;
+    } catch (e) {}
+
+    let userId = null;
+    try { userId = sessionStorage.getItem('user_id') || null; } catch (e) {}
+
+    await fetch(`${SUPABASE_URL}/rest/v1/error_log`, {
+      method: 'POST',
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=minimal'
+      },
+      body: JSON.stringify({
+        user_id: userId,
+        page: (location.pathname || '').slice(0, 200),
+        message: ('[player] ' + context + ': ' + (err && err.message ? err.message : String(err || ''))).slice(0, 2000),
+        stack: String((err && err.stack) || '').slice(0, 4000),
+        user_agent: (navigator.userAgent || '').slice(0, 300)
+      })
+    });
+  } catch (e) { /* hlásenie chyby nesmie samo zlyhať nahlas */ }
+}
+
 // ─── ELO história ───────────────────────────────────────────────────────────
 
 async function logEloHistory(playerId, mode, newElo) {
@@ -85,8 +127,9 @@ async function logEloHistory(playerId, mode, newElo) {
       })
     });
   } catch (e) {
-    // Neblokuje tréning — len tiché varovanie
+    // Neblokuje tréning, ale chybu už nenecháme zmiznúť — zapíše sa do error_log
     console.warn("ELO história sa neuložila:", e);
+    reportPlayerError(`elo_history zápis zlyhal (kategória: ${getEloCategory(mode)})`, e);
   }
 }
 
@@ -231,6 +274,7 @@ async function updatePlayerElo(playerId, puzzleElo, result, mode) {
     await logEloHistory(playerId, mode, newElo);
   } catch (e) {
     console.error("Chyba pri aktualizácii ELO:", e);
+    reportPlayerError(`aktualizácia ELO zlyhala (režim: ${mode})`, e);
   }
 }
 
@@ -252,6 +296,7 @@ async function registerPlayerResult(playerId, result, timeSpent = 0) {
     });
   } catch (e) {
     console.error("Chyba pri ukladaní výsledku hráča:", e);
+    reportPlayerError("uloženie výsledku hráča zlyhalo", e);
   }
 }
 
