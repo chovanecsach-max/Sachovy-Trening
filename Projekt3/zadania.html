@@ -120,7 +120,7 @@ function computeProgress(a, player, historyRows) {
     };
   }
   const n = historyRows.filter(r =>
-    r.category === a.skill && r.created_at >= a.created_at).length;
+    r.category === a.skill && new Date(r.created_at) >= new Date(a.created_at)).length;
   return {
     pct:  clamp01(n / a.target_value),
     done: n >= a.target_value,
@@ -198,14 +198,21 @@ async function load() {
 
   // Pre ciele typu "počet úloh" načítaj históriu od najstaršieho takého zadania
   let history = [];
+  let historyFailed = false;
   const counts = rows.filter(r => r.target_type === 'count');
   if (counts.length) {
-    const from = counts.map(r => r.created_at).sort()[0];
+    // POZOR: časy z PostgREST končia na "+00:00" a znak "+" sa v URL číta ako
+    // medzera — dotaz by zlyhal a pokrok by ticho ostal na nule. Preto ich
+    // normalizujeme cez toISOString() na tvar s "Z", ktorý je v URL bezpečný.
+    const from = new Date(counts.map(r => r.created_at).sort()[0]).toISOString();
     try {
       history = await sbFetch(
         `elo_history?player_id=eq.${player.id}&created_at=gte.${from}&select=category,created_at`
       ) || [];
-    } catch (e) { history = []; }
+    } catch (e) {
+      historyFailed = true;
+      console.error('História pre výpočet pokroku sa nenačítala:', e);
+    }
   }
 
   // Spočítaj pokrok a rozdeľ na aktívne / splnené
@@ -232,7 +239,9 @@ async function load() {
     html += done.map(x => renderCard(x.a, x.prog)).join('');
   }
   document.getElementById('list').innerHTML = html;
-  setStatus('');
+  setStatus(historyFailed
+    ? 'Pokrok pri cieľoch typu „počet úloh" sa nepodarilo načítať — skús obnoviť stránku.'
+    : '', historyFailed ? 'error' : '');
 }
 
 load();
