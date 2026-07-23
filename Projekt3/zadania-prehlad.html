@@ -128,9 +128,14 @@ const SKILL_NAMES = {
   checks: 'Šachy', captures: 'Brania', pawn_breakthrough: 'Pešiakové prielomy',
   direct_attack: 'Brania so ziskom', underdefended: 'Slabo pokryté',
   pin: 'Absolútne väzby', relative_pin: 'Relatívne väzby',
-  fork: 'Vidličky', direct_threat: 'Priame hrozby'
+  fork: 'Vidličky', direct_threat: 'Priame hrozby',
+  // Základné kategórie (klasický tréning)
+  taktika: 'Taktika', strategia: 'Stratégia', koncovka: 'Koncovka'
 };
-const ELO_FIELDS = Object.keys(SKILL_NAMES).map(k => 'elo_' + k);
+
+// Základné kategórie sa trénujú cez training.html, zručnosti cez skills.html
+const BASIC_MODES = ['taktika', 'strategia', 'koncovka'];
+const ELO_FIELDS = [...new Set(Object.keys(SKILL_NAMES).map(k => 'elo_' + k))];
 
 let allRows = [];   // { a, player, prog, state }
 
