@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Moje zadania</title>
+<style>
+body { font-family: Arial, sans-serif; background: #f4f4f6; margin: 0; padding: 12px; color: #111827; }
+.app { max-width: 860px; margin: 0 auto; background: white; border-radius: 14px;
+       box-shadow: 0 10px 30px rgba(0,0,0,0.08); padding: 20px; }
+h1 { margin: 0 0 6px 0; text-align: center; font-size: 26px; }
+.subtitle { text-align: center; color: #475569; margin: 0 0 18px 0; }
+
+button { padding: 10px 16px; border: none; border-radius: 10px; cursor: pointer; font-size: 14px; }
+.secondary { background: #e5e7eb; color: #111827; }
+.train-btn { background: #1e3a5f; color: white; font-weight: bold; padding: 8px 14px; font-size: 13px; }
+.train-btn:hover { background: #2b4d7a; }
+
+.status { margin: 12px 0; padding: 10px; border-radius: 10px; border: 1px solid #d1d5db;
+          background: #f8fafc; color: #334155; font-size: 14px; }
+.status.error { background: #fef2f2; border-color: #fca5a5; color: #b91c1c; }
+
+.topbar { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+.summary { font-size: 14px; color: #334155; }
+.summary strong { color: #111827; }
+
+/* ── Karta zadania ── */
+.asg { border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px 16px; margin-bottom: 12px; background: #fff; }
+.asg.done    { background: #f8fdf9; border-color: #bbf7d0; }
+.asg.overdue { background: #fffbfa; border-color: #fecaca; }
+
+.asg-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+.asg-skill { font-size: 16px; font-weight: bold; color: #111827; }
+.badge { font-size: 12px; font-weight: bold; padding: 4px 10px; border-radius: 20px; }
+.badge.run  { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
+.badge.done { background: #f0fdf4; color: #166534; border: 1px solid #86efac; }
+.badge.late { background: #fef2f2; color: #b91c1c; border: 1px solid #fca5a5; }
+
+.asg-goal { font-size: 14px; color: #334155; margin-bottom: 8px; }
+.asg-goal .num { font-weight: bold; color: #111827; }
+
+.bar { height: 12px; background: #eef2f7; border-radius: 7px; overflow: hidden; margin: 8px 0 6px; }
+.bar span { display: block; height: 100%; border-radius: 7px; transition: width .3s; }
+.bar span.run  { background: linear-gradient(to right, #60a5fa, #2563eb); }
+.bar span.done { background: linear-gradient(to right, #6ee7b7, #16a34a); }
+.bar span.late { background: linear-gradient(to right, #fca5a5, #dc2626); }
+
+.asg-meta { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap;
+            font-size: 13px; color: #64748b; margin-top: 6px; }
+.asg-note { font-size: 13px; color: #475569; font-style: italic; margin-top: 6px; }
+.deadline.late { color: #b91c1c; font-weight: bold; }
+
+.empty { text-align: center; color: #64748b; font-style: italic; padding: 30px; }
+.section-title { font-size: 13px; text-transform: uppercase; color: #94a3b8; font-weight: bold;
+                 margin: 18px 0 8px; letter-spacing: .5px; }
+</style>
+</head>
+
+<body oncontextmenu="return false;">
+<div class="app">
+  <h1>📌 Moje zadania</h1>
+  <p class="subtitle">Úlohy, ktoré ti zadal tréner.</p>
+
+  <div class="topbar">
+    <div class="summary" id="summary"></div>
+    <button class="secondary" onclick="goHome()">Späť do menu</button>
+  </div>
+
+  <div id="status" class="status">Načítavam...</div>
+  <div id="list"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/auth.js"></script>
+<script src="js/player.js"></script>
+<script>
+// Slovenské názvy zručností (kľúč = hodnota v assignments.skill)
+const SKILL_NAMES = {
+  checks: 'Šachy', captures: 'Brania', pawn_breakthrough: 'Pešiakové prielomy',
+  direct_attack: 'Brania so ziskom', underdefended: 'Slabo pokryté',
+  pin: 'Absolútne väzby', relative_pin: 'Relatívne väzby',
+  fork: 'Vidličky', direct_threat: 'Priame hrozby'
+};
+
+function goHome()  { location.href = 'index.html'; }
+function goTrain(skill) { location.href = 'skills.html?type=' + skill; }
+
+function setStatus(text, type = '') {
+  const el = document.getElementById('status');
+  el.textContent = text;
+  el.className = 'status' + (type ? ' ' + type : '');
+  el.style.display = text ? '' : 'none';
+}
+
+function todayISO() { return new Date().toISOString().substring(0, 10); }
+
+function daysLeft(deadline) {
+  const d1 = new Date(deadline + 'T00:00:00');
+  const d0 = new Date(todayISO() + 'T00:00:00');
+  return Math.round((d1 - d0) / 86400000);
+}
+
+function clamp01(x) { return Math.max(0, Math.min(1, x)); }
+
+// ─── Výpočet pokroku ─────────────────────────────────────────────────────────
+// 'elo'   → podľa aktuálneho players.elo_<zručnosť> oproti baseline a cieľu
+// 'count' → podľa počtu záznamov v elo_history danej kategórie od zadania
+function computeProgress(a, player, historyRows) {
+  if (a.target_type === 'elo') {
+    const cur  = Number(player['elo_' + a.skill] ?? 1200);
+    const base = (a.baseline_elo != null) ? Number(a.baseline_elo) : null;
+    const pct  = (base != null && a.target_value > base)
+      ? clamp01((cur - base) / (a.target_value - base))
+      : (cur >= a.target_value ? 1 : 0);
+    return {
+      pct,
+      done: cur >= a.target_value,
+      text: `ELO <span class="num">${cur}</span> z cieľových <span class="num">${a.target_value}</span>`
+          + (base != null ? ` (na začiatku ${base})` : '')
+    };
+  }
+  const n = historyRows.filter(r =>
+    r.category === a.skill && r.created_at >= a.created_at).length;
+  return {
+    pct:  clamp01(n / a.target_value),
+    done: n >= a.target_value,
+    text: `Vyriešené <span class="num">${n}</span> z <span class="num">${a.target_value}</span> úloh`
+  };
+}
+
+// ─── Vykreslenie ─────────────────────────────────────────────────────────────
+function renderCard(a, prog) {
+  const overdue = !prog.done && a.deadline && daysLeft(a.deadline) < 0;
+  const cls   = prog.done ? 'done' : (overdue ? 'overdue' : '');
+  const badge = prog.done ? '<span class="badge done">✅ Splnené</span>'
+              : overdue   ? '<span class="badge late">⏰ Po termíne</span>'
+                          : '<span class="badge run">Prebieha</span>';
+
+  let dl = '';
+  if (a.deadline) {
+    const n = daysLeft(a.deadline);
+    const txt = prog.done ? `termín ${a.deadline}`
+              : n < 0     ? `termín ${a.deadline} — meškáš ${Math.abs(n)} dní`
+              : n === 0   ? `termín je dnes!`
+                          : `termín ${a.deadline} — zostáva ${n} dní`;
+    dl = `<span class="deadline${(!prog.done && n < 0) ? ' late' : ''}">📅 ${txt}</span>`;
+  }
+
+  const barCls = prog.done ? 'done' : (overdue ? 'late' : 'run');
+
+  return `<div class="asg ${cls}">
+    <div class="asg-top">
+      <span class="asg-skill">${SKILL_NAMES[a.skill] || a.skill}</span>
+      ${badge}
+    </div>
+    <div class="asg-goal">${prog.text}</div>
+    <div class="bar"><span class="${barCls}" style="width:${Math.round(prog.pct * 100)}%"></span></div>
+    ${a.note ? `<div class="asg-note">💬 ${a.note}</div>` : ''}
+    <div class="asg-meta">
+      <span>${dl}</span>
+      ${prog.done ? '' : `<button class="train-btn" onclick="goTrain('${a.skill}')">Trénovať →</button>`}
+    </div>
+  </div>`;
+}
+
+// ─── Načítanie ───────────────────────────────────────────────────────────────
+async function load() {
+  if (!requireLogin()) return;
+
+  let player;
+  try {
+    player = await getCurrentPlayer();
+  } catch (e) {
+    setStatus('Chyba pri načítaní hráča: ' + e.message, 'error');
+    return;
+  }
+  if (!player) {
+    setStatus('Nemáš hráčsky záznam, takže ti zatiaľ nemôžu byť zadané úlohy.', 'error');
+    return;
+  }
+
+  let rows;
+  try {
+    rows = await sbFetch(`assignments?player_id=eq.${player.id}&order=created_at.desc`);
+  } catch (e) {
+    setStatus('Chyba pri načítaní zadaní: ' + e.message, 'error');
+    return;
+  }
+  rows = rows || [];
+
+  if (!rows.length) {
+    setStatus('');
+    document.getElementById('summary').textContent = '';
+    document.getElementById('list').innerHTML =
+      '<div class="empty">Zatiaľ nemáš žiadne zadania. Keď ti tréner nejaké pridelí, objavia sa tu.</div>';
+    return;
+  }
+
+  // Pre ciele typu "počet úloh" načítaj históriu od najstaršieho takého zadania
+  let history = [];
+  const counts = rows.filter(r => r.target_type === 'count');
+  if (counts.length) {
+    const from = counts.map(r => r.created_at).sort()[0];
+    try {
+      history = await sbFetch(
+        `elo_history?player_id=eq.${player.id}&created_at=gte.${from}&select=category,created_at`
+      ) || [];
+    } catch (e) { history = []; }
+  }
+
+  // Spočítaj pokrok a rozdeľ na aktívne / splnené
+  const withProg = rows.map(a => ({ a, prog: computeProgress(a, player, history) }));
+  const active = withProg.filter(x => !x.prog.done);
+  const done   = withProg.filter(x =>  x.prog.done);
+
+  // Aktívne: najbližší termín hore
+  active.sort((x, y) => (x.a.deadline || '9999-12-31').localeCompare(y.a.deadline || '9999-12-31'));
+
+  const late = active.filter(x => x.a.deadline && daysLeft(x.a.deadline) < 0).length;
+  document.getElementById('summary').innerHTML =
+    `Aktívne zadania: <strong>${active.length}</strong>`
+    + (late ? ` · <span style="color:#b91c1c;font-weight:bold;">po termíne: ${late}</span>` : '')
+    + ` · splnené: <strong>${done.length}</strong>`;
+
+  let html = '';
+  if (active.length) {
+    html += '<div class="section-title">Aktívne</div>';
+    html += active.map(x => renderCard(x.a, x.prog)).join('');
+  }
+  if (done.length) {
+    html += '<div class="section-title">Splnené</div>';
+    html += done.map(x => renderCard(x.a, x.prog)).join('');
+  }
+  document.getElementById('list').innerHTML = html;
+  setStatus('');
+}
+
+load();
+</script>
+</body>
+</html>
