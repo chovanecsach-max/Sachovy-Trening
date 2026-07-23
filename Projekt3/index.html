@@ -390,7 +390,7 @@ body {
       <div class="nav-icon i-mix">⚡</div>
       Mix
     </button>
-    <button class="nav-btn" id="asgBtn" onclick="goZadania()" style="position:relative;">
+    <button class="nav-btn" id="asgBtn" onclick="goZadania()" style="position:relative;display:none;">
       <div class="nav-icon i-stat">📌</div>
       Zadania
       <span id="asgBadge" style="display:none;position:absolute;top:6px;right:10px;background:#dc2626;color:#fff;font-size:11px;font-weight:bold;min-width:18px;height:18px;line-height:18px;border-radius:9px;padding:0 4px;">0</span>
@@ -499,6 +499,11 @@ async function initPage() {
 
   if (role === 'trener' || role === 'hlavny_trener' || role === 'admin') {
     document.getElementById('trenerBtn').style.display = 'flex';
+  }
+  // "Moje zadania" je hráčska položka — tréner/admin ju uvidí len vtedy,
+  // ak mu niekto zadanie naozaj pridelil (rieši loadAssignmentBadge).
+  if (role === 'hrac') {
+    document.getElementById('asgBtn').style.display = 'flex';
   }
   if (role === 'admin') {
     document.getElementById('adminSubBtn').style.display = 'flex';
@@ -684,6 +689,9 @@ async function loadAssignmentBadge() {
     if (!player) return;
     const rows = await sbFetch(`assignments?player_id=eq.${player.id}&select=skill,target_type,target_value,created_at`);
     if (!rows || !rows.length) return;
+
+    // Má aspoň jedno zadanie — zobraz tlačidlo aj trénerovi/adminovi
+    document.getElementById('asgBtn').style.display = 'flex';
 
     let history = [];
     const counts = rows.filter(r => r.target_type === 'count');
