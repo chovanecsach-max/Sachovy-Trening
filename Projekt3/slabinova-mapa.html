@@ -141,7 +141,7 @@ tr.detail-row > td { background: #f8fafc; border-radius: 8px; padding: 12px 14px
 <body oncontextmenu="return false;">
 <div class="app">
   <h1>Slabinová mapa</h1>
-  <p class="subtitle">Prehľad ELO zručností naprieč skupinou — kde je skupina slabá a na čo zamerať tréning.</p>
+  <p class="subtitle">Prehľad ELO naprieč skupinou — kde je skupina slabá a na čo zamerať tréning.</p>
 
   <div id="roleBanner" class="role-banner" style="display:none;"></div>
 
@@ -175,6 +175,14 @@ tr.detail-row > td { background: #f8fafc; border-radius: 8px; padding: 12px 14px
       <button class="primary" onclick="showBelow()">Kto je pod prahom</button>
     </div>
     <div id="belowResult" class="below-result" style="display:none;"></div>
+  </div>
+
+  <div class="view-row" id="setRow" style="display:none;">
+    <span class="view-label">Sada</span>
+    <div class="view-toggle" id="setToggle">
+      <button type="button" data-set="skills" class="active">Zručnosti</button>
+      <button type="button" data-set="basic">Základné kategórie</button>
+    </div>
   </div>
 
   <div class="view-row" id="colorRow" style="display:none;">
@@ -241,6 +249,29 @@ const SKILL_COLS = [
   { field: 'elo_fork',              label: 'Vidličky',      full: 'Vidličky' },
   { field: 'elo_direct_threat',     label: 'Hrozby',        full: 'Priame hrozby' },
 ];
+
+// Základné kategórie (klasický tréning). Mix je len informačný — nedá sa
+// cielene trénovať, takže nevstupuje do priemeru, poradia slabín ani zadaní.
+const BASIC_COLS = [
+  { field: 'elo_taktika',   label: 'Taktika',   full: 'Taktika' },
+  { field: 'elo_strategia', label: 'Stratégia', full: 'Stratégia' },
+  { field: 'elo_koncovka',  label: 'Koncovka',  full: 'Koncovka' },
+  { field: 'elo',           label: 'Mix',       full: 'Mix — len informačne', info: true }
+];
+
+const BASIC_CATS = [
+  { key: 'taktika',   label: 'Taktika',   color: '#ef4444' },
+  { key: 'strategia', label: 'Stratégia', color: '#3b82f6' },
+  { key: 'koncovka',  label: 'Koncovka',  color: '#10b981' },
+  { key: 'mix',       label: 'Mix',       color: '#a855f7' }
+];
+
+// Aktívna sada: 'skills' = 9 zručností, 'basic' = základné kategórie
+let colSet = 'skills';
+function activeCols()    { return colSet === 'basic' ? BASIC_COLS : SKILL_COLS; }
+function activeCats()    { return colSet === 'basic' ? BASIC_CATS : SKILL_CATS; }
+function targetCols()    { return activeCols().filter(c => !c.info); }   // bez Mixu
+function activeDefault() { return colSet === 'basic' ? 1000 : 1200; }    // východiskové ELO
 
 // Kategórie v elo_history (activeEloCategory v skills.html) + farby čiar
 const SKILL_CATS = [
@@ -331,7 +362,7 @@ function cellColor(v) {
 
 function computeRelRange(players) {
   const all = [];
-  players.forEach(p => skillValues(p).forEach(v => all.push(v)));
+  players.forEach(p => displayValues(p).forEach(v => all.push(v)));
   relMin = all.length ? Math.min(...all) : null;
   relMax = all.length ? Math.max(...all) : null;
 }
@@ -355,7 +386,7 @@ function renderLegend() {
 
 function cellHtml(v, opts = {}) {
   const t = cellColor(v);
-  const untrained = (v === 1200);
+  const untrained = (v === activeDefault());
   const border = untrained ? 'box-shadow:inset 0 0 0 2px rgba(255,255,255,.75);' : '';
   const title  = untrained ? ' title="Zatiaľ netrénované (východisková hodnota 1200)"' : '';
   const weight = opts.bold ? 700 : 600;
@@ -365,8 +396,8 @@ function cellHtml(v, opts = {}) {
 
 // ─── Načítanie hráčov skupiny ────────────────────────────────────────────────
 async function fetchMapPlayers(trenerFilter) {
-  const cols = 'id,name,surname,trener_id,' + SKILL_COLS.map(c => c.field).join(',')
-             + ',profile:profiles!user_id(role)';
+  const allFields = [...new Set([...SKILL_COLS, ...BASIC_COLS].map(c => c.field))].join(',');
+  const cols = `id,name,surname,trener_id,${allFields},profile:profiles!user_id(role)`;
   let rows;
   if (IS_TRENER) {
     rows = await sbFetchAll(`players?trener_id=eq.${USER_ID}&select=${cols}&order=surname.asc,name.asc`);
@@ -386,8 +417,13 @@ async function fetchTrenerList() {
 }
 
 // ─── Vykreslenie mapy ────────────────────────────────────────────────────────
+// Hodnoty všetkých zobrazených stĺpcov (vrátane informačných) — pre farby
+function displayValues(p) {
+  return activeCols().map(c => Number(p[c.field] ?? activeDefault()));
+}
+// Hodnoty, ktoré vstupujú do priemeru a poradia slabín (bez informačných)
 function skillValues(p) {
-  return SKILL_COLS.map(c => Number(p[c.field] ?? 1200));
+  return targetCols().map(c => Number(p[c.field] ?? activeDefault()));
 }
 function mean(arr) {
   return arr.length ? arr.reduce((s, v) => s + v, 0) / arr.length : 0;
@@ -398,8 +434,8 @@ function mean(arr) {
 // použije priemer skupiny v nej (teda "kto zaostáva za skupinou").
 function initThresholdPanel(weakestIdx) {
   const sel = document.getElementById('thrSkill');
-  sel.innerHTML = SKILL_COLS
-    .map((c, i) => `<option value="${i}">${c.full}</option>`).join('');
+  sel.innerHTML = activeCols()
+    .map((c, i) => c.info ? '' : `<option value="${i}">${c.full}</option>`).join('');
   sel.value = String(weakestIdx);
   setDefaultThreshold();
   sel.onchange = () => { setDefaultThreshold(); hideBelow(); };
@@ -420,7 +456,7 @@ function hideBelow() {
 
 function showBelow() {
   const i    = Number(document.getElementById('thrSkill').value || 0);
-  const col  = SKILL_COLS[i];
+  const col  = activeCols()[i];
   const thr  = Number(document.getElementById('thrValue').value);
   const el   = document.getElementById('belowResult');
 
@@ -430,7 +466,7 @@ function showBelow() {
     .map(p => ({
       id:   p.id,
       name: `${p.surname || ''} ${p.name || ''}`.trim() || '(bez mena)',
-      val:  Number(p[col.field] ?? 1200)
+      val:  Number(p[col.field] ?? activeDefault())
     }))
     .filter(x => x.val < thr)
     .sort((a, b) => a.val - b.val);
@@ -510,7 +546,7 @@ async function createAssignments() {
   if (!boxes.length) { setAsgStatus('Označ aspoň jedného hráča.', 'err'); return; }
 
   const i     = Number(document.getElementById('thrSkill').value || 0);
-  const col   = SKILL_COLS[i];
+  const col   = activeCols()[i];
   const skill = col.field.replace('elo_', '');          // 'fork', 'checks', …
   const type  = document.getElementById('asgType').value;
   const value = Number(document.getElementById('asgValue').value);
@@ -558,6 +594,7 @@ function renderMap(players) {
     legend.style.display = 'none';
     focusEl.style.display = 'none';
     document.getElementById('colorRow').style.display = 'none';
+    document.getElementById('setRow').style.display = 'none';
     document.getElementById('actionCard').style.display = 'none';
     setStatus('Táto skupina nemá žiadnych hráčov.', 'error');
     return;
@@ -571,7 +608,7 @@ function renderMap(players) {
   renderLegend();
 
   // Priemer stĺpca (nezávislý od zoradenia) — pre pätu aj záver
-  mapColAvg = SKILL_COLS.map(c => mean(players.map(p => Number(p[c.field] ?? 1200))));
+  mapColAvg = activeCols().map(c => mean(players.map(p => Number(p[c.field] ?? activeDefault()))));
 
   renderHead();
   renderRows();
@@ -579,10 +616,12 @@ function renderMap(players) {
   table.style.display = '';
   legend.style.display = 'flex';
   document.getElementById('colorRow').style.display = 'flex';
+  document.getElementById('setRow').style.display = 'flex';
 
   // Záver: dve najslabšie zručnosti skupiny
-  const ranked = SKILL_COLS
-    .map((c, i) => ({ label: c.full, avg: mapColAvg[i], idx: i }))
+  const ranked = activeCols()
+    .map((c, i) => ({ label: c.full, avg: mapColAvg[i], idx: i, info: !!c.info }))
+    .filter(r => !r.info)
     .sort((a, b2) => a.avg - b2.avg);
   const worst = ranked.slice(0, 2).map(r => `${r.label} (${Math.round(r.avg)})`).join(', ');
   focusEl.innerHTML = `🎯 <strong>Na čo zamerať tréning:</strong> ${worst} — najnižší priemer v skupine.`;
@@ -605,7 +644,7 @@ function sortTh(field, label, cls, title) {
 }
 function renderHead() {
   let h = '<tr>' + sortTh('name', 'Hráč', 'name-h');
-  SKILL_COLS.forEach(c => { h += sortTh(c.field, c.label, '', c.full); });
+  activeCols().forEach(c => { h += sortTh(c.field, c.label, c.info ? 'col-sep' : '', c.full); });
   h += sortTh('avg', 'Priemer', 'col-sep') + '</tr>';
   document.getElementById('mapHead').innerHTML = h;
 }
@@ -621,21 +660,21 @@ function renderRows() {
         const nb = `${b.surname || ''} ${b.name || ''}`.trim().toLowerCase();
         return na.localeCompare(nb, 'sk') * dir;
       }
-      const va = (sortField === 'avg') ? mean(skillValues(a)) : Number(a[sortField] ?? 1200);
-      const vb = (sortField === 'avg') ? mean(skillValues(b)) : Number(b[sortField] ?? 1200);
+      const va = (sortField === 'avg') ? mean(skillValues(a)) : Number(a[sortField] ?? activeDefault());
+      const vb = (sortField === 'avg') ? mean(skillValues(b)) : Number(b[sortField] ?? activeDefault());
       return (va - vb) * dir;
     });
   }
 
-  const colspan = SKILL_COLS.length + 2;
+  const colspan = activeCols().length + 2;
   let b = '';
   rows.forEach(p => {
-    const vals = skillValues(p);
+    const vals = displayValues(p);
     const nm = `${p.surname || ''} ${p.name || ''}`.trim() || '(bez mena)';
     const isOpen = (p.id === openPlayerId);
     b += `<tr><td class="name${isOpen ? ' open' : ''}" onclick="toggleDetail(${JSON.stringify(p.id)})"><span class="tw">${isOpen ? '▾' : '▸'}</span>${nm}</td>`;
-    vals.forEach(v => { b += cellHtml(v); });
-    b += cellHtml(mean(vals), { bold: true, sep: true });
+    vals.forEach((v, ci) => { b += cellHtml(v, { sep: !!activeCols()[ci].info }); });
+    b += cellHtml(mean(skillValues(p)), { bold: true, sep: true });
     b += '</tr>';
     if (isOpen) {
       b += `<tr class="detail-row"><td colspan="${colspan}">
@@ -655,8 +694,8 @@ function renderRows() {
 
   // Priemer skupiny
   b += '<tr class="avg-row"><td class="avg-name">Priemer skupiny</td>';
-  mapColAvg.forEach(v => { b += cellHtml(v, { bold: true }); });
-  b += cellHtml(mean(mapColAvg), { bold: true, sep: true });
+  mapColAvg.forEach((v, ci) => { b += cellHtml(v, { bold: true, sep: !!activeCols()[ci].info }); });
+  b += cellHtml(mean(mapColAvg.filter((_, ci) => !activeCols()[ci].info)), { bold: true, sep: true });
   b += '</tr>';
   document.getElementById('mapBody').innerHTML = b;
 
@@ -719,7 +758,7 @@ function formatDateLabel(iso) {
 }
 
 function renderSkillLineChart(data, days) {
-  const skillKeys = new Set(SKILL_CATS.map(c => c.key));
+  const skillKeys = new Set(activeCats().map(c => c.key));
   const skillData = (data || []).filter(d => skillKeys.has(d.category));
   if (detailChartInst) { detailChartInst.destroy(); detailChartInst = null; }
   const existing = Chart.getChart('detailChart'); if (existing) existing.destroy();
@@ -732,7 +771,7 @@ function renderSkillLineChart(data, days) {
 
   const allDates = [...new Set(skillData.map(d => d.created_at.substring(0, 10)))].sort();
   const labels = allDates.map(formatDateLabel);
-  const datasets = SKILL_CATS.map(c => {
+  const datasets = activeCats().map(c => {
     const byDay = {};
     skillData.filter(d => d.category === c.key).forEach(d => { byDay[d.created_at.substring(0, 10)] = d.elo_value; });
     return {
@@ -801,6 +840,19 @@ async function init() {
     banner.className = 'role-banner admin';
   }
   banner.style.display = '';
+
+  // Prepínač sady stĺpcov: Zručnosti / Základné kategórie
+  document.getElementById('setToggle').addEventListener('click', e => {
+    const btn = e.target.closest('button');
+    if (!btn) return;
+    const v = btn.dataset.set;
+    if (!v || v === colSet) return;
+    colSet = v;
+    document.querySelectorAll('#setToggle button')
+      .forEach(b => b.classList.toggle('active', b === btn));
+    sortField = null;                 // poradie stĺpcov sa zmenilo
+    if (mapPlayers.length) renderMap(mapPlayers);
+  });
 
   // Prepínač farebnej škály: Absolútne / V rámci skupiny
   document.getElementById('colorToggle').addEventListener('click', e => {
