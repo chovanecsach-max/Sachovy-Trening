@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Prehľad zadaní</title>
+<style>
+body { font-family: Arial, sans-serif; background: #f4f4f6; margin: 0; padding: 12px; color: #111827; }
+.app { max-width: 1150px; margin: 0 auto; background: white; border-radius: 14px;
+       box-shadow: 0 10px 30px rgba(0,0,0,0.08); padding: 20px; }
+h1 { margin: 0 0 6px 0; text-align: center; font-size: 26px; }
+.subtitle { text-align: center; color: #475569; margin: 0 0 18px 0; }
+
+.role-banner { padding: 10px 14px; border-radius: 10px; margin-bottom: 16px; font-size: 14px; text-align: center; }
+.role-banner.trener        { background: #f0fdf4; border: 1px solid #86efac; color: #166534; }
+.role-banner.hlavny_trener { background: #faf5ff; border: 1px solid #d8b4fe; color: #6b21a8; }
+.role-banner.admin         { background: #fff7ed; border: 1px solid #fdba74; color: #c2410c; }
+
+.filter-card { border: 1px solid #d1d5db; border-radius: 12px; padding: 14px; margin-bottom: 16px; background: #f8fafc; }
+.filter-row { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; }
+.filter-field { display: flex; flex-direction: column; gap: 4px; }
+.filter-field label { font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: bold; }
+select { padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px; background: white; min-width: 170px; }
+button { padding: 10px 16px; border: none; border-radius: 10px; cursor: pointer; font-size: 14px; }
+.secondary { background: #e5e7eb; color: #111827; }
+
+.status { margin: 12px 0; padding: 10px; border-radius: 10px; border: 1px solid #d1d5db;
+          background: #f8fafc; color: #334155; font-size: 14px; }
+.status.error { background: #fef2f2; border-color: #fca5a5; color: #b91c1c; }
+.status.success { background: #f0fdf4; border-color: #86efac; color: #166534; }
+
+/* Súhrn */
+.tiles { display: flex; gap: 10px; flex-wrap: wrap; margin: 4px 0 14px; }
+.tile { flex: 1; min-width: 120px; border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px 14px; background: #fff; }
+.tile .n { font-size: 22px; font-weight: bold; line-height: 1.1; }
+.tile .l { font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: bold; margin-top: 3px; }
+.tile.run .n  { color: #1d4ed8; }
+.tile.done .n { color: #166534; }
+.tile.late .n { color: #b91c1c; }
+
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th { background: #1e3a5f; color: white; padding: 9px 8px; text-align: left; font-size: 12px; }
+td { padding: 8px; border-bottom: 1px solid #e5e7eb; vertical-align: middle; }
+tr.done td { background: #f8fdf9; }
+tr.late td { background: #fffbfa; }
+.table-wrapper { overflow-x: auto; }
+
+.badge { font-size: 11px; font-weight: bold; padding: 3px 9px; border-radius: 20px; white-space: nowrap; }
+.badge.run  { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
+.badge.done { background: #f0fdf4; color: #166534; border: 1px solid #86efac; }
+.badge.late { background: #fef2f2; color: #b91c1c; border: 1px solid #fca5a5; }
+
+.bar { height: 9px; width: 110px; background: #eef2f7; border-radius: 5px; overflow: hidden; margin-bottom: 3px; }
+.bar span { display: block; height: 100%; }
+.bar span.run  { background: #2563eb; }
+.bar span.done { background: #16a34a; }
+.bar span.late { background: #dc2626; }
+.prog-txt { font-size: 11px; color: #64748b; white-space: nowrap; }
+
+.act { background: none; border: 1px solid #cbd5e1; border-radius: 7px; padding: 4px 9px; font-size: 12px; margin-right: 4px; }
+.act:hover { border-color: #1e3a5f; color: #1e3a5f; }
+.act.del:hover { border-color: #dc2626; color: #dc2626; }
+.empty { text-align: center; color: #64748b; font-style: italic; padding: 30px; }
+.note-cell { color: #475569; font-style: italic; font-size: 12px; max-width: 180px; }
+</style>
+</head>
+
+<body oncontextmenu="return false;">
+<div class="app">
+  <h1>📋 Prehľad zadaní</h1>
+  <p class="subtitle">Ako hráči plnia zadané úlohy.</p>
+
+  <div id="roleBanner" class="role-banner" style="display:none;"></div>
+
+  <div class="filter-card">
+    <div class="filter-row">
+      <div class="filter-field">
+        <label>Stav</label>
+        <select id="fStatus">
+          <option value="open">Nesplnené</option>
+          <option value="all">Všetky</option>
+          <option value="done">Splnené</option>
+          <option value="late">Po termíne</option>
+        </select>
+      </div>
+      <div class="filter-field">
+        <label>Zručnosť</label>
+        <select id="fSkill"><option value="">Všetky zručnosti</option></select>
+      </div>
+      <button class="secondary" onclick="goMap()">← Slabinová mapa</button>
+      <button class="secondary" onclick="goHome()">Späť do menu</button>
+    </div>
+  </div>
+
+  <div id="status" class="status">Načítavam...</div>
+
+  <div class="tiles" id="tiles" style="display:none;">
+    <div class="tile run"><div class="n" id="tRun">0</div><div class="l">Prebieha</div></div>
+    <div class="tile late"><div class="n" id="tLate">0</div><div class="l">Po termíne</div></div>
+    <div class="tile done"><div class="n" id="tDone">0</div><div class="l">Splnené</div></div>
+    <div class="tile"><div class="n" id="tAll">0</div><div class="l">Spolu</div></div>
+  </div>
+
+  <div class="table-wrapper">
+    <table id="tbl" style="display:none;">
+      <thead><tr>
+        <th>Hráč</th><th>Zručnosť</th><th>Cieľ</th><th>Pokrok</th>
+        <th>Termín</th><th>Stav</th><th>Poznámka</th><th>Akcie</th>
+      </tr></thead>
+      <tbody id="tbody"></tbody>
+    </table>
+    <div id="empty" class="empty" style="display:none;">Žiadne zadania pre zvolený filter.</div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/auth.js"></script>
+<script src="js/player.js"></script>
+<script>
+const USER_ROLE        = sessionStorage.getItem('user_role') || '';
+const USER_NICK        = sessionStorage.getItem('user_nick') || sessionStorage.getItem('user_name') || '';
+const IS_ADMIN         = USER_ROLE === 'admin';
+const IS_TRENER        = USER_ROLE === 'trener';
+const IS_HLAVNY_TRENER = USER_ROLE === 'hlavny_trener';
+const IS_HRAC          = USER_ROLE === 'hrac';
+
+const SKILL_NAMES = {
+  checks: 'Šachy', captures: 'Brania', pawn_breakthrough: 'Pešiakové prielomy',
+  direct_attack: 'Brania so ziskom', underdefended: 'Slabo pokryté',
+  pin: 'Absolútne väzby', relative_pin: 'Relatívne väzby',
+  fork: 'Vidličky', direct_threat: 'Priame hrozby'
+};
+const ELO_FIELDS = Object.keys(SKILL_NAMES).map(k => 'elo_' + k);
+
+let allRows = [];   // { a, player, prog, state }
+
+function goHome() { location.href = 'index.html'; }
+function goMap()  { location.href = 'slabinova-mapa.html'; }
+
+function setStatus(text, type = '') {
+  const el = document.getElementById('status');
+  el.textContent = text;
+  el.className = 'status' + (type ? ' ' + type : '');
+  el.style.display = text ? '' : 'none';
+}
+
+function todayISO() { return new Date().toISOString().substring(0, 10); }
+function daysLeft(d) {
+  return Math.round((new Date(d + 'T00:00:00') - new Date(todayISO() + 'T00:00:00')) / 86400000);
+}
+function clamp01(x) { return Math.max(0, Math.min(1, x)); }
+
+// ─── Pokrok (rovnaká logika ako na stránke hráča) ───────────────────────────
+function computeProgress(a, player, history) {
+  if (a.target_type === 'elo') {
+    const cur  = Number(player?.['elo_' + a.skill] ?? 1200);
+    const base = (a.baseline_elo != null) ? Number(a.baseline_elo) : null;
+    const pct  = (base != null && a.target_value > base)
+      ? clamp01((cur - base) / (a.target_value - base))
+      : (cur >= a.target_value ? 1 : 0);
+    return { pct, done: cur >= a.target_value, txt: `${cur} / ${a.target_value}` };
+  }
+  const n = history.filter(r =>
+    r.player_id === a.player_id && r.category === a.skill &&
+    new Date(r.created_at) >= new Date(a.created_at)).length;
+  return { pct: clamp01(n / a.target_value), done: n >= a.target_value, txt: `${n} / ${a.target_value} úloh` };
+}
+
+// ─── Načítanie ───────────────────────────────────────────────────────────────
+async function load() {
+  setStatus('Načítavam...');
+  try {
+    const sel = `*,player:players(id,name,surname,${ELO_FIELDS.join(',')})`;
+    const rows = await sbFetch(`assignments?select=${sel}&order=created_at.desc`) || [];
+
+    if (!rows.length) {
+      document.getElementById('tbl').style.display = 'none';
+      document.getElementById('tiles').style.display = 'none';
+      document.getElementById('empty').style.display = '';
+      document.getElementById('empty').textContent = 'Zatiaľ si nezadal žiadne úlohy.';
+      setStatus('');
+      return;
+    }
+
+    // História pre ciele typu "počet úloh" — jeden dotaz pre všetkých hráčov.
+    // Čas normalizujeme cez toISOString(), lebo "+" z PostgREST by sa v URL
+    // čítal ako medzera a dotaz by zlyhal.
+    let history = [];
+    const counts = rows.filter(r => r.target_type === 'count');
+    if (counts.length) {
+      const from = new Date(counts.map(r => r.created_at).sort()[0]).toISOString();
+      const ids  = [...new Set(counts.map(r => r.player_id))].join(',');
+      try {
+        history = await sbFetch(
+          `elo_history?player_id=in.(${ids})&created_at=gte.${from}&select=player_id,category,created_at`
+        ) || [];
+      } catch (e) {
+        setStatus('Pokrok pri cieľoch „počet úloh" sa nepodarilo načítať.', 'error');
+      }
+    }
+
+    allRows = rows.map(a => {
+      const prog = computeProgress(a, a.player, history);
+      // Ručne uzavreté zadanie sa berie ako splnené bez ohľadu na výpočet
+      const done = !!a.completed_at || prog.done;
+      const late = !done && a.deadline && daysLeft(a.deadline) < 0;
+      return { a, prog, done, late };
+    });
+
+    // Naplň filter zručností podľa toho, čo sa reálne vyskytuje
+    const sk = document.getElementById('fSkill');
+    if (sk.options.length === 1) {
+      [...new Set(allRows.map(x => x.a.skill))].forEach(k => {
+        const o = document.createElement('option');
+        o.value = k; o.textContent = SKILL_NAMES[k] || k;
+        sk.appendChild(o);
+      });
+    }
+
+    render();
+    setStatus('');
+  } catch (e) {
+    setStatus('Chyba pri načítaní: ' + e.message, 'error');
+  }
+}
+
+// ─── Vykreslenie ─────────────────────────────────────────────────────────────
+function render() {
+  const fS = document.getElementById('fStatus').value;
+  const fK = document.getElementById('fSkill').value;
+
+  let rows = allRows.filter(x => !fK || x.a.skill === fK);
+  if (fS === 'open') rows = rows.filter(x => !x.done);
+  if (fS === 'done') rows = rows.filter(x =>  x.done);
+  if (fS === 'late') rows = rows.filter(x =>  x.late);
+
+  // Súhrn počítame zo všetkých (po filtri zručnosti), nie z filtra stavu
+  const base = allRows.filter(x => !fK || x.a.skill === fK);
+  document.getElementById('tRun').textContent  = base.filter(x => !x.done).length;
+  document.getElementById('tLate').textContent = base.filter(x =>  x.late).length;
+  document.getElementById('tDone').textContent = base.filter(x =>  x.done).length;
+  document.getElementById('tAll').textContent  = base.length;
+  document.getElementById('tiles').style.display = 'flex';
+
+  // Nesplnené hore, v rámci nich najbližší termín prvý
+  rows.sort((x, y) => {
+    if (x.done !== y.done) return x.done ? 1 : -1;
+    return (x.a.deadline || '9999-12-31').localeCompare(y.a.deadline || '9999-12-31');
+  });
+
+  const tbl = document.getElementById('tbl');
+  const emp = document.getElementById('empty');
+  if (!rows.length) {
+    tbl.style.display = 'none';
+    emp.style.display = '';
+    emp.textContent = 'Žiadne zadania pre zvolený filter.';
+    return;
+  }
+  emp.style.display = 'none';
+  tbl.style.display = '';
+
+  document.getElementById('tbody').innerHTML = rows.map(x => {
+    const a = x.a;
+    const nm = a.player
+      ? `${a.player.surname || ''} ${a.player.name || ''}`.trim()
+      : `#${a.player_id}`;
+    const cls  = x.done ? 'done' : (x.late ? 'late' : '');
+    const bcls = x.done ? 'done' : (x.late ? 'late' : 'run');
+    const badge = x.done
+      ? `<span class="badge done">✅ Splnené${a.completed_at ? ' (uzavreté)' : ''}</span>`
+      : x.late ? '<span class="badge late">⏰ Po termíne</span>'
+               : '<span class="badge run">Prebieha</span>';
+    const goal = a.target_type === 'elo'
+      ? `ELO ${a.target_value}` : `${a.target_value} úloh`;
+    let dl = '—';
+    if (a.deadline) {
+      const n = daysLeft(a.deadline);
+      dl = x.done ? a.deadline
+         : n < 0  ? `<span style="color:#b91c1c;font-weight:bold;">${a.deadline} (${Math.abs(n)} d)</span>`
+         : `${a.deadline} (o ${n} d)`;
+    }
+    return `<tr class="${cls}">
+      <td>${nm}</td>
+      <td>${SKILL_NAMES[a.skill] || a.skill}</td>
+      <td>${goal}</td>
+      <td><div class="bar"><span class="${bcls}" style="width:${Math.round(x.prog.pct * 100)}%"></span></div>
+          <div class="prog-txt">${x.prog.txt}</div></td>
+      <td>${dl}</td>
+      <td>${badge}</td>
+      <td class="note-cell">${a.note ? a.note : ''}</td>
+      <td style="white-space:nowrap;">
+        ${a.completed_at ? '' : `<button class="act" onclick="closeAsg(${a.id})" title="Označiť ako uzavreté">Uzavrieť</button>`}
+        <button class="act del" onclick="deleteAsg(${a.id})" title="Zmazať zadanie">Zmazať</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+// ─── Akcie ───────────────────────────────────────────────────────────────────
+async function closeAsg(id) {
+  if (!confirm('Označiť zadanie ako uzavreté?')) return;
+  try {
+    await sbFetch(`assignments?id=eq.${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ completed_at: new Date().toISOString() })
+    });
+    setStatus('Zadanie bolo uzavreté.', 'success');
+    await load();
+  } catch (e) {
+    setStatus('Chyba pri uzatváraní: ' + e.message, 'error');
+  }
+}
+
+async function deleteAsg(id) {
+  if (!confirm('Naozaj zmazať toto zadanie? Akcia sa nedá vrátiť.')) return;
+  try {
+    await sbFetch(`assignments?id=eq.${id}`, { method: 'DELETE' });
+    setStatus('Zadanie bolo zmazané.', 'success');
+    await load();
+  } catch (e) {
+    setStatus('Chyba pri mazaní: ' + e.message, 'error');
+  }
+}
+
+// ─── Inicializácia ───────────────────────────────────────────────────────────
+function init() {
+  if (!requireLogin()) return;
+  if (IS_HRAC) {
+    alert('Prehľad zadaní je dostupný len pre trénerov a administrátorov.');
+    location.href = 'zadania.html';
+    return;
+  }
+
+  const b = document.getElementById('roleBanner');
+  if (IS_TRENER) {
+    b.textContent = `🧑‍🏫 Tréner ${USER_NICK} — zadania, ktoré si zadal`;
+    b.className = 'role-banner trener';
+  } else if (IS_HLAVNY_TRENER) {
+    b.textContent = `👑 Hlavný tréner ${USER_NICK} — všetky zadania`;
+    b.className = 'role-banner hlavny_trener';
+  } else if (IS_ADMIN) {
+    b.textContent = '🔧 Admin — všetky zadania';
+    b.className = 'role-banner admin';
+  }
+  b.style.display = '';
+
+  document.getElementById('fStatus').addEventListener('change', render);
+  document.getElementById('fSkill').addEventListener('change', render);
+
+  load();
+}
+
+init();
+</script>
+</body>
+</html>
