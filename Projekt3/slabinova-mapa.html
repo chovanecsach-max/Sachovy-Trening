@@ -153,6 +153,7 @@ tr.detail-row > td { background: #f8fafc; border-radius: 8px; padding: 12px 14px
           <option value="all">Všetci hráči</option>
         </select>
       </div>
+      <button class="secondary" onclick="goPrehlad()">📋 Prehľad zadaní</button>
       <button class="secondary" onclick="goHome()">Späť do menu</button>
     </div>
   </div>
@@ -289,6 +290,7 @@ function setStatus(text, type = '') {
 }
 
 function goHome() { location.href = 'index.html'; }
+function goPrehlad() { location.href = 'zadania-prehlad.html'; }
 
 // ─── Len skutoční hráči ──────────────────────────────────────────────────────
 // Mapa hodnotí zverencov, takže záznamy trénerov/adminov sa vynechávajú —
