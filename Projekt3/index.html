@@ -386,6 +386,11 @@ body {
       <div class="nav-icon i-mix">⚡</div>
       Mix
     </button>
+    <button class="nav-btn" id="asgBtn" onclick="goZadania()" style="position:relative;">
+      <div class="nav-icon i-stat">📌</div>
+      Zadania
+      <span id="asgBadge" style="display:none;position:absolute;top:6px;right:10px;background:#dc2626;color:#fff;font-size:11px;font-weight:bold;min-width:18px;height:18px;line-height:18px;border-radius:9px;padding:0 4px;">0</span>
+    </button>
     <button class="nav-btn" onclick="goStats()">
       <div class="nav-icon i-stat">📊</div>
       Štatistika
@@ -488,6 +493,9 @@ async function initPage() {
 
   // Platnosť prístupu — zobraz len hráčom a trénerom (admin/hlavný tréner majú neobmedzený prístup)
   checkValidity(role);
+
+  // Počet nesplnených zadaní na odznak pri tlačidle Zadania
+  loadAssignmentBadge();
 
   try {
     const player = await getCurrentPlayer();
@@ -651,6 +659,42 @@ function goTraining(mode) { location.href = "training.html?mode=" + mode; }
 function goAdmin()         { location.href = "admin.html"; }
 function goStats()         { location.href = "statistika.html"; }
 function goSlabiny()       { location.href = "slabinova-mapa.html"; }
+function goZadania()       { location.href = "zadania.html"; }
+
+// Odznak s počtom nesplnených zadaní. Splnenie sa vyhodnocuje rovnako ako na
+// stránke zadania.html: pri cieli na ELO podľa aktuálneho elo_<zručnosť>,
+// pri počte úloh podľa záznamov v elo_history od zadania.
+async function loadAssignmentBadge() {
+  try {
+    const player = await getCurrentPlayer();
+    if (!player) return;
+    const rows = await sbFetch(`assignments?player_id=eq.${player.id}&select=skill,target_type,target_value,created_at`);
+    if (!rows || !rows.length) return;
+
+    let history = [];
+    const counts = rows.filter(r => r.target_type === 'count');
+    if (counts.length) {
+      const from = counts.map(r => r.created_at).sort()[0];
+      history = await sbFetch(`elo_history?player_id=eq.${player.id}&created_at=gte.${from}&select=category,created_at`) || [];
+    }
+
+    const open = rows.filter(a => {
+      if (a.target_type === 'elo') {
+        return Number(player['elo_' + a.skill] ?? 1200) < a.target_value;
+      }
+      const n = history.filter(r => r.category === a.skill && r.created_at >= a.created_at).length;
+      return n < a.target_value;
+    }).length;
+
+    if (open > 0) {
+      const b = document.getElementById('asgBadge');
+      b.textContent = open;
+      b.style.display = '';
+    }
+  } catch (e) {
+    console.warn('Odznak zadaní sa nenačítal:', e);
+  }
+}
 function goSkills(type)    { location.href = "skills.html?type=" + type; }
 function goManual()        { location.href = "manual.html"; }
 
