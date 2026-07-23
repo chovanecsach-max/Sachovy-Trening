@@ -79,11 +79,20 @@ const SKILL_NAMES = {
   checks: 'Šachy', captures: 'Brania', pawn_breakthrough: 'Pešiakové prielomy',
   direct_attack: 'Brania so ziskom', underdefended: 'Slabo pokryté',
   pin: 'Absolútne väzby', relative_pin: 'Relatívne väzby',
-  fork: 'Vidličky', direct_threat: 'Priame hrozby'
+  fork: 'Vidličky', direct_threat: 'Priame hrozby',
+  // Základné kategórie (klasický tréning)
+  taktika: 'Taktika', strategia: 'Stratégia', koncovka: 'Koncovka'
 };
 
+// Základné kategórie sa trénujú cez training.html, zručnosti cez skills.html
+const BASIC_MODES = ['taktika', 'strategia', 'koncovka'];
+
 function goHome()  { location.href = 'index.html'; }
-function goTrain(skill) { location.href = 'skills.html?type=' + skill; }
+function goTrain(skill) {
+  location.href = BASIC_MODES.includes(skill)
+    ? 'training.html?mode=' + skill
+    : 'skills.html?type=' + skill;
+}
 
 function setStatus(text, type = '') {
   const el = document.getElementById('status');
