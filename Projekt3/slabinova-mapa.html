@@ -79,6 +79,21 @@ input[type="number"] {
 }
 .below-list .val { font-weight: bold; padding: 2px 7px; border-radius: 5px; color: #1f2937; }
 .below-none { font-size: 13px; color: #166534; background: #f0fdf4; border: 1px solid #86efac; border-radius: 8px; padding: 10px 12px; }
+.below-list li label { display: flex; align-items: center; gap: 8px; cursor: pointer; margin: 0; }
+.below-list input[type="checkbox"] { width: 15px; height: 15px; cursor: pointer; }
+.below-tools { font-size: 12px; margin-bottom: 8px; }
+.below-tools a { color: #1d4ed8; cursor: pointer; text-decoration: underline; margin-right: 10px; }
+
+/* ── Formulár zadania ── */
+.assign-box { margin-top: 14px; border-top: 1px dashed #cbd5e1; padding-top: 12px; }
+.assign-box .filter-row { align-items: flex-end; }
+input[type="text"], input[type="date"] {
+  padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px; background: white;
+}
+input[type="text"] { min-width: 200px; }
+.asg-status { margin-top: 10px; padding: 9px 12px; border-radius: 8px; font-size: 13px; }
+.asg-status.ok  { background: #f0fdf4; border: 1px solid #86efac; color: #166534; }
+.asg-status.err { background: #fef2f2; border: 1px solid #fca5a5; color: #b91c1c; }
 
 /* ── Legenda ── */
 .map-legend { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; font-size: 12px; color: #64748b; margin: 6px 0 10px; }
@@ -411,6 +426,7 @@ function showBelow() {
 
   const below = mapPlayers
     .map(p => ({
+      id:   p.id,
       name: `${p.surname || ''} ${p.name || ''}`.trim() || '(bez mena)',
       val:  Number(p[col.field] ?? 1200)
     }))
@@ -419,16 +435,115 @@ function showBelow() {
 
   if (!below.length) {
     el.innerHTML = `<div class="below-none">✅ V zručnosti <strong>${col.full}</strong> nie je pod prahom ${thr} nikto zo skupiny.</div>`;
-  } else {
-    const items = below.map(x => {
-      const c = cellColor(x.val);
-      return `<li><span class="val" style="background:${c.bg}">${x.val}</span>${x.name}</li>`;
-    }).join('');
-    el.innerHTML =
-      `<div class="below-head">${col.full} — pod prahom ${thr}: ${below.length} z ${mapPlayers.length}</div>
-       <ul class="below-list">${items}</ul>`;
+    el.style.display = '';
+    return;
   }
+
+  const items = below.map(x => {
+    const c = cellColor(x.val);
+    return `<li><label>
+      <input type="checkbox" class="pchk" value="${x.id}" data-val="${x.val}" checked>
+      <span class="val" style="background:${c.bg}">${x.val}</span>${x.name}
+    </label></li>`;
+  }).join('');
+
+  // Predvolený termín: o 14 dní
+  const d = new Date(); d.setDate(d.getDate() + 14);
+  const defDeadline = d.toISOString().substring(0, 10);
+
+  el.innerHTML = `
+    <div class="below-head">${col.full} — pod prahom ${thr}: ${below.length} z ${mapPlayers.length}</div>
+    <div class="below-tools"><a onclick="checkAll(true)">Označiť všetkých</a><a onclick="checkAll(false)">Zrušiť označenie</a></div>
+    <ul class="below-list">${items}</ul>
+    <div class="assign-box">
+      <div class="filter-row">
+        <div class="filter-field">
+          <label>Typ cieľa</label>
+          <select id="asgType">
+            <option value="elo">Dosiahnuť ELO</option>
+            <option value="count">Vyriešiť počet úloh</option>
+          </select>
+        </div>
+        <div class="filter-field">
+          <label>Hodnota</label>
+          <input type="number" id="asgValue" min="1" max="2600" step="10" value="${thr}">
+        </div>
+        <div class="filter-field">
+          <label>Termín</label>
+          <input type="date" id="asgDeadline" value="${defDeadline}">
+        </div>
+        <div class="filter-field">
+          <label>Poznámka (nepovinné)</label>
+          <input type="text" id="asgNote" placeholder="napr. pozri si aj teóriu">
+        </div>
+        <button class="primary" onclick="createAssignments()">📌 Zadať úlohu označeným</button>
+      </div>
+      <div id="asgStatus" class="asg-status" style="display:none;"></div>
+    </div>`;
   el.style.display = '';
+
+  // Pri prepnutí typu cieľa prednastav zmysluplnú hodnotu
+  document.getElementById('asgType').onchange = function () {
+    const v = document.getElementById('asgValue');
+    v.value = (this.value === 'count') ? 20 : thr;
+    v.step  = (this.value === 'count') ? 5 : 10;
+  };
+}
+
+function checkAll(state) {
+  document.querySelectorAll('.pchk').forEach(b => { b.checked = state; });
+}
+
+function setAsgStatus(text, type) {
+  const el = document.getElementById('asgStatus');
+  if (!el) return;
+  el.textContent = text;
+  el.className = 'asg-status ' + type;
+  el.style.display = '';
+}
+
+// ─── Vytvorenie zadaní pre označených hráčov ────────────────────────────────
+async function createAssignments() {
+  const boxes = [...document.querySelectorAll('.pchk:checked')];
+  if (!boxes.length) { setAsgStatus('Označ aspoň jedného hráča.', 'err'); return; }
+
+  const i     = Number(document.getElementById('thrSkill').value || 0);
+  const col   = SKILL_COLS[i];
+  const skill = col.field.replace('elo_', '');          // 'fork', 'checks', …
+  const type  = document.getElementById('asgType').value;
+  const value = Number(document.getElementById('asgValue').value);
+  const dl    = document.getElementById('asgDeadline').value || null;
+  const note  = (document.getElementById('asgNote').value || '').trim() || null;
+
+  if (!value || value <= 0)                    { setAsgStatus('Zadaj platnú hodnotu cieľa.', 'err'); return; }
+  if (type === 'elo'   && (value < 800 || value > 2600)) { setAsgStatus('ELO cieľ musí byť medzi 800 a 2600.', 'err'); return; }
+  if (type === 'count' && value > 500)         { setAsgStatus('Počet úloh je príliš vysoký (max 500).', 'err'); return; }
+
+  const rows = boxes.map(b => ({
+    player_id:    Number(b.value),
+    trener_id:    USER_ID,
+    skill:        skill,
+    target_type:  type,
+    target_value: value,
+    baseline_elo: Number(b.dataset.val),
+    deadline:     dl,
+    note:         note
+  }));
+
+  setAsgStatus('Zadávam...', 'ok');
+  try {
+    await sbFetch('assignments', {
+      method: 'POST',
+      prefer: 'return=minimal',
+      body: JSON.stringify(rows)
+    });
+    const cielText = (type === 'elo')
+      ? `dosiahnuť ELO ${value}`
+      : `vyriešiť ${value} úloh`;
+    setAsgStatus(`✅ Zadané ${rows.length} hráčom — ${col.full}: ${cielText}${dl ? ', termín ' + dl : ''}.`, 'ok');
+  } catch (e) {
+    setAsgStatus('Chyba pri zadávaní: ' + e.message, 'err');
+  }
 }
 
 function renderMap(players) {
