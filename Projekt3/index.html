@@ -417,6 +417,9 @@ body {
     <button class="sub-btn" onclick="goPrehlad()">
       <div class="sub-icon i-strategia">📋</div>Prehľad zadaní
     </button>
+    <button class="sub-btn" onclick="goReport()">
+      <div class="sub-icon i-koncovka">📄</div>Mesačný report
+    </button>
     <button class="sub-btn" id="adminSubBtn" onclick="goAdmin()" style="display:none;">
       <div class="sub-icon i-admin">⚙</div>Administrácia
     </button>
@@ -679,6 +682,7 @@ function goStats()         { location.href = "statistika.html"; }
 function goSlabiny()       { location.href = "slabinova-mapa.html"; }
 function goZadania()       { location.href = "zadania.html"; }
 function goPrehlad()       { location.href = "zadania-prehlad.html"; }
+function goReport()        { location.href = "report.html"; }
 
 // Odznak s počtom nesplnených zadaní. Splnenie sa vyhodnocuje rovnako ako na
 // stránke zadania.html: pri cieli na ELO podľa aktuálneho elo_<zručnosť>,
