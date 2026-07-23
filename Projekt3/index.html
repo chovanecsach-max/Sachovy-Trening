@@ -674,7 +674,9 @@ async function loadAssignmentBadge() {
     let history = [];
     const counts = rows.filter(r => r.target_type === 'count');
     if (counts.length) {
-      const from = counts.map(r => r.created_at).sort()[0];
+      // Čas z PostgREST končí na "+00:00"; znak "+" sa v URL číta ako medzera,
+      // preto ho normalizujeme cez toISOString() na tvar s "Z".
+      const from = new Date(counts.map(r => r.created_at).sort()[0]).toISOString();
       history = await sbFetch(`elo_history?player_id=eq.${player.id}&created_at=gte.${from}&select=category,created_at`) || [];
     }
 
@@ -682,7 +684,7 @@ async function loadAssignmentBadge() {
       if (a.target_type === 'elo') {
         return Number(player['elo_' + a.skill] ?? 1200) < a.target_value;
       }
-      const n = history.filter(r => r.category === a.skill && r.created_at >= a.created_at).length;
+      const n = history.filter(r => r.category === a.skill && new Date(r.created_at) >= new Date(a.created_at)).length;
       return n < a.target_value;
     }).length;
 
