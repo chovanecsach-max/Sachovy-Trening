@@ -51,6 +51,17 @@ button { padding: 10px 16px; border: none; border-radius: 10px; cursor: pointer;
 }
 .focus-line strong { color: #1d4ed8; }
 
+/* ── Prepínač farebnej škály ── */
+.view-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 10px 0 4px; }
+.view-row .view-label { font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: bold; }
+.view-toggle { display: inline-flex; gap: 5px; }
+.view-toggle button {
+  padding: 7px 14px; border: 1px solid #cbd5e1; border-radius: 18px;
+  background: white; color: #475569; font-size: 13px; font-weight: bold; transition: all .15s;
+}
+.view-toggle button:hover { border-color: #1e3a5f; color: #1e3a5f; }
+.view-toggle button.active { background: #1e3a5f; color: white; border-color: #1e3a5f; }
+
 /* ── Legenda ── */
 .map-legend { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; font-size: 12px; color: #64748b; margin: 6px 0 10px; }
 .map-legend .box { width: 13px; height: 13px; border-radius: 3px; display: inline-block; vertical-align: -2px; margin-right: 5px; }
@@ -117,11 +128,19 @@ tr.detail-row > td { background: #f8fafc; border-radius: 8px; padding: 12px 14px
 
   <div id="focusLine" class="focus-line"></div>
 
+  <div class="view-row" id="colorRow" style="display:none;">
+    <span class="view-label">Farebná škála</span>
+    <div class="view-toggle" id="colorToggle">
+      <button type="button" data-mode="abs" class="active">Absolútne</button>
+      <button type="button" data-mode="rel">V rámci skupiny</button>
+    </div>
+  </div>
+
   <div class="map-legend" id="mapLegend" style="display:none;">
-    <span class="scale-lbl">1100</span>
+    <span class="scale-lbl" id="scaleMin">1100</span>
     <span class="scale-bar"></span>
-    <span class="scale-lbl">1950+</span>
-    <span class="scale-mid">1350 · 1500 · 1650</span>
+    <span class="scale-lbl" id="scaleMax">1950+</span>
+    <span class="scale-mid" id="scaleNote">1350 · 1500 · 1650</span>
     <span><span class="box untrained-box"></span>zatiaľ netrénované</span>
   </div>
 
@@ -195,6 +214,10 @@ let openPlayerId    = null;
 let detailDays      = 90;
 let detailChartInst = null;
 
+// Farebná škála: 'abs' = absolútne ELO, 'rel' = v rámci skupiny
+let colorMode = 'abs';
+let relMin = null, relMax = null;
+
 // ─── Stránkované načítanie (Supabase vracia max. 1000 riadkov) ──────────────
 async function sbFetchAll(query) {
   const PAGE = 1000;
@@ -244,8 +267,43 @@ function tier(v) {
   }
   return { bg: `rgb(${c[0]},${c[1]},${c[2]})`, fg: '#1f2937' };
 }
+function cellColor(v) {
+  // V relatívnom režime sa najslabšia hodnota v skupine natiahne na začiatok
+  // škály a najsilnejšia na koniec — rozdiely vnútri skupiny sú tak maximálne
+  // viditeľné. Ak sú všetky hodnoty rovnaké, ostáva absolútne farbenie.
+  if (colorMode === 'rel' && relMin !== null && relMax > relMin) {
+    const t = (v - relMin) / (relMax - relMin);
+    return tier(SCALE[0].v + t * (SCALE[SCALE.length - 1].v - SCALE[0].v));
+  }
+  return tier(v);
+}
+
+function computeRelRange(players) {
+  const all = [];
+  players.forEach(p => skillValues(p).forEach(v => all.push(v)));
+  relMin = all.length ? Math.min(...all) : null;
+  relMax = all.length ? Math.max(...all) : null;
+}
+
+function renderLegend() {
+  const minEl = document.getElementById('scaleMin');
+  const maxEl = document.getElementById('scaleMax');
+  const note  = document.getElementById('scaleNote');
+  if (colorMode === 'rel' && relMin !== null && relMax > relMin) {
+    minEl.textContent = Math.round(relMin);
+    maxEl.textContent = Math.round(relMax);
+    note.textContent  = 'najslabšia → najsilnejšia hodnota v skupine';
+  } else {
+    minEl.textContent = '1100';
+    maxEl.textContent = '1950+';
+    note.textContent  = (colorMode === 'rel')
+      ? 'všetky hodnoty rovnaké — zobrazujem absolútne'
+      : '1350 · 1500 · 1650';
+  }
+}
+
 function cellHtml(v, opts = {}) {
-  const t = tier(v);
+  const t = cellColor(v);
   const untrained = (v === 1200);
   const border = untrained ? 'box-shadow:inset 0 0 0 2px rgba(255,255,255,.75);' : '';
   const title  = untrained ? ' title="Zatiaľ netrénované (východisková hodnota 1200)"' : '';
@@ -293,12 +351,17 @@ function renderMap(players) {
     table.style.display = 'none';
     legend.style.display = 'none';
     focusEl.style.display = 'none';
+    document.getElementById('colorRow').style.display = 'none';
     setStatus('Táto skupina nemá žiadnych hráčov.', 'error');
     return;
   }
 
   mapPlayers = players;
   collapseDetail();
+
+  // Rozsah pre relatívne farbenie + legenda podľa režimu
+  computeRelRange(players);
+  renderLegend();
 
   // Priemer stĺpca (nezávislý od zoradenia) — pre pätu aj záver
   mapColAvg = SKILL_COLS.map(c => mean(players.map(p => Number(p[c.field] ?? 1200))));
@@ -308,6 +371,7 @@ function renderMap(players) {
 
   table.style.display = '';
   legend.style.display = 'flex';
+  document.getElementById('colorRow').style.display = 'flex';
 
   // Záver: dve najslabšie zručnosti skupiny
   const ranked = SKILL_COLS
@@ -527,6 +591,20 @@ async function init() {
     banner.className = 'role-banner admin';
   }
   banner.style.display = '';
+
+  // Prepínač farebnej škály: Absolútne / V rámci skupiny
+  document.getElementById('colorToggle').addEventListener('click', e => {
+    const btn = e.target.closest('button');
+    if (!btn) return;
+    const m = btn.dataset.mode;
+    if (!m || m === colorMode) return;
+    colorMode = m;
+    document.querySelectorAll('#colorToggle button')
+      .forEach(b => b.classList.toggle('active', b === btn));
+    collapseDetail();
+    renderLegend();
+    renderRows();
+  });
 
   // Zoraďovanie klikom na hlavičku stĺpca (delegované — hlavička sa prekresľuje)
   document.getElementById('mapHead').addEventListener('click', e => {
