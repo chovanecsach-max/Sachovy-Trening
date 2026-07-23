@@ -54,6 +54,15 @@ button { padding: 10px 16px; border: none; border-radius: 10px; cursor: pointer;
 /* ── Legenda ── */
 .map-legend { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; font-size: 12px; color: #64748b; margin: 6px 0 10px; }
 .map-legend .box { width: 13px; height: 13px; border-radius: 3px; display: inline-block; vertical-align: -2px; margin-right: 5px; }
+.map-legend .untrained-box { background: rgb(250,158,140); box-shadow: inset 0 0 0 2px rgba(255,255,255,.75); }
+.map-legend .scale-lbl { font-weight: bold; color: #475569; }
+.map-legend .scale-mid { color: #94a3b8; }
+.scale-bar {
+  width: 240px; height: 13px; border-radius: 7px; display: inline-block; vertical-align: -2px;
+  background: linear-gradient(to right,
+    rgb(239,83,80) 0%, rgb(252,141,120) 17.6%, rgb(253,186,116) 29.4%,
+    rgb(253,224,71) 47%, rgb(190,242,100) 64.7%, rgb(110,231,152) 82.4%, rgb(52,211,113) 100%);
+}
 
 /* ── Mriežka ── */
 .map-wrap { overflow-x: auto; margin-top: 6px; }
@@ -109,10 +118,11 @@ tr.detail-row > td { background: #f8fafc; border-radius: 8px; padding: 12px 14px
   <div id="focusLine" class="focus-line"></div>
 
   <div class="map-legend" id="mapLegend" style="display:none;">
-    <span><span class="box" style="background:#fef2f2;border:1px solid #fca5a5;"></span>slabé (&lt; 1350)</span>
-    <span><span class="box" style="background:#fff7ed;border:1px solid #fdba74;"></span>stredné (1350–1650)</span>
-    <span><span class="box" style="background:#f0fdf4;border:1px solid #86efac;"></span>silné (&gt; 1650)</span>
-    <span><span class="box" style="border:1px dashed #cbd5e1;"></span>zatiaľ netrénované</span>
+    <span class="scale-lbl">1100</span>
+    <span class="scale-bar"></span>
+    <span class="scale-lbl">1950+</span>
+    <span class="scale-mid">1350 · 1500 · 1650</span>
+    <span><span class="box untrained-box"></span>zatiaľ netrénované</span>
   </div>
 
   <div class="map-wrap">
@@ -137,8 +147,18 @@ const IS_HLAVNY_TRENER = USER_ROLE === 'hlavny_trener';
 const IS_HRAC          = USER_ROLE === 'hrac';
 
 // Prahy pre farebné pásma (ľahko upraviteľné)
-const WEAK   = 1350;   // pod = slabé (červené)
-const STRONG = 1650;   // nad = silné (zelené); medzi = stredné (oranžové)
+// Farebná škála — plynulý prechod sýtych farieb podľa ELO.
+// Kotviace body sa dajú posunúť podľa úrovne akadémie; medzi nimi sa
+// farba dopočíta, takže aj malé rozdiely sú viditeľné.
+const SCALE = [
+  { v: 1100, c: [239,  83,  80] },  // sýta červená
+  { v: 1250, c: [252, 141, 120] },  // lososová
+  { v: 1350, c: [253, 186, 116] },  // oranžová
+  { v: 1500, c: [253, 224,  71] },  // žltá
+  { v: 1650, c: [190, 242, 100] },  // limetková
+  { v: 1800, c: [110, 231, 152] },  // zelená
+  { v: 1950, c: [ 52, 211, 113] }   // sýta zelená
+];
 
 // 9 zručností — rovnaké poradie a názvy ako v štatistike
 const SKILL_COLS = [
@@ -209,16 +229,27 @@ function onlyPlayers(rows) {
 
 // ─── Farebné pásmo bunky ─────────────────────────────────────────────────────
 function tier(v) {
-  if (v < WEAK)    return { bg: '#fef2f2', fg: '#b91c1c' };
-  if (v <= STRONG) return { bg: '#fff7ed', fg: '#c2410c' };
-  return             { bg: '#f0fdf4', fg: '#166534' };
+  const s = SCALE;
+  let c;
+  if (v <= s[0].v) c = s[0].c;
+  else if (v >= s[s.length - 1].v) c = s[s.length - 1].c;
+  else {
+    for (let i = 0; i < s.length - 1; i++) {
+      if (v >= s[i].v && v <= s[i + 1].v) {
+        const t = (v - s[i].v) / (s[i + 1].v - s[i].v);
+        c = s[i].c.map((ch, j) => Math.round(ch + t * (s[i + 1].c[j] - ch)));
+        break;
+      }
+    }
+  }
+  return { bg: `rgb(${c[0]},${c[1]},${c[2]})`, fg: '#1f2937' };
 }
 function cellHtml(v, opts = {}) {
   const t = tier(v);
   const untrained = (v === 1200);
-  const border = untrained ? 'border:1px dashed #cbd5e1;' : '';
+  const border = untrained ? 'box-shadow:inset 0 0 0 2px rgba(255,255,255,.75);' : '';
   const title  = untrained ? ' title="Zatiaľ netrénované (východisková hodnota 1200)"' : '';
-  const weight = opts.bold ? 600 : 500;
+  const weight = opts.bold ? 700 : 600;
   const sep    = opts.sep ? ' col-sep' : '';
   return `<td class="cell${sep}" style="background:${t.bg};color:${t.fg};font-weight:${weight};${border}"${title}>${Math.round(v)}</td>`;
 }
