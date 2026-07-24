@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Analýza koncoviek</title>
+<style>
+body { font-family: Arial, sans-serif; background: #f4f4f6; margin: 0; padding: 12px; color: #111827; }
+.app { max-width: 1000px; margin: 0 auto; background: white; border-radius: 14px;
+       box-shadow: 0 10px 30px rgba(0,0,0,0.08); padding: 22px; }
+h1 { margin: 0 0 6px 0; text-align: center; font-size: 26px; }
+.subtitle { text-align: center; color: #475569; margin: 0 0 18px 0; }
+.note { background: #eff6ff; border: 1px solid #bfdbfe; color: #1e3a5f; border-radius: 10px;
+        padding: 10px 14px; font-size: 13px; margin-bottom: 16px; }
+
+button { padding: 10px 16px; border: none; border-radius: 10px; cursor: pointer; font-size: 14px; }
+.primary { background: #111827; color: white; font-weight: bold; }
+.secondary { background: #e5e7eb; color: #111827; }
+.row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; }
+
+.status { margin: 12px 0; padding: 10px; border-radius: 10px; border: 1px solid #d1d5db;
+          background: #f8fafc; color: #334155; font-size: 14px; }
+.status.error { background: #fef2f2; border-color: #fca5a5; color: #b91c1c; }
+
+.sec-title { font-size: 13px; text-transform: uppercase; color: #94a3b8; font-weight: bold;
+             margin: 22px 0 10px; letter-spacing: .5px; border-bottom: 1px solid #e2e8f0; padding-bottom: 5px; }
+
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th { background: #1e3a5f; color: white; padding: 8px; text-align: left; font-size: 12px; }
+td { padding: 7px 8px; border-bottom: 1px solid #e5e7eb; vertical-align: middle; }
+td.num { text-align: right; font-weight: bold; white-space: nowrap; }
+tr.other td { background: #fffbeb; }
+.bar { height: 9px; background: #eef2f7; border-radius: 5px; overflow: hidden; min-width: 90px; }
+.bar span { display: block; height: 100%; background: #2563eb; }
+.bar span.other { background: #d97706; }
+code { background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 5px; padding: 1px 6px; font-size: 12px; }
+.ids a { color: #1d4ed8; margin-right: 6px; font-size: 12px; }
+.hint { font-size: 12px; color: #64748b; margin-top: 6px; }
+</style>
+</head>
+
+<body oncontextmenu="return false;">
+<div class="app">
+  <h1>🔍 Analýza koncoviek</h1>
+  <p class="subtitle">Klasifikácia úloh podľa materiálu — len náhľad, nič sa neukladá.</p>
+
+  <div class="note">
+    Stránka načíta všetky úlohy s kategóriou <code>Koncovka</code>, určí typ podľa materiálu
+    a ukáže rozdelenie. Dôležitá je spodná časť: čo skončí v <strong>Ostatných</strong> a ako často —
+    podľa toho sa rozhodne, či sa oplatí pridať ďalšie kategórie.
+  </div>
+
+  <div class="row">
+    <button class="primary" onclick="run()">Načítať a klasifikovať</button>
+    <button class="secondary" onclick="goHome()">Späť do menu</button>
+  </div>
+
+  <div id="status" class="status">Klikni na Načítať a klasifikovať.</div>
+  <div id="out"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/auth.js"></script>
+<script src="js/player.js"></script>
+<script>
+// ─── Klasifikátor ────────────────────────────────────────────────────────────
+// Materiál sa počíta z FEN-u. Strany sú zameniteľné (pravidlo sa skúša v oboch
+// smeroch), takže nezáleží na tom, či má vežu biely alebo čierny.
+function material(fen) {
+  const board = String(fen || '').split(' ')[0];
+  const c = { w:{Q:0,R:0,B:0,N:0,P:0}, b:{Q:0,R:0,B:0,N:0,P:0} };
+  for (const ch of board) {
+    if (ch === 'K' || ch === 'k') continue;
+    const u = ch.toUpperCase();
+    if ('QRBNP'.includes(u)) c[ch === u ? 'w' : 'b'][u]++;
+  }
+  return c;
+}
+const NP  = s => s.Q + s.R + s.B + s.N;    // počet figúr (bez kráľa a pešiakov)
+const MIN = s => s.B + s.N;                // ľahké figúry
+const one = (s, k) => s[k] === 1 && NP(s) === 1;
+
+// Poradie je dôležité — platí prvé pravidlo, ktoré sadne.
+const RULES = [
+  ['Veža proti pešiakom',            (a,b)=> one(a,'R') && a.P===0 && NP(b)===0 && b.P>=1],
+  ['Dámske',                         (a,b)=> one(a,'Q') && one(b,'Q') && a.P>=1 && b.P>=1],
+  ['Vežové',                         (a,b)=> one(a,'R') && one(b,'R') && a.P>=1 && b.P>=1],
+  ['Strelcové',                      (a,b)=> one(a,'B') && one(b,'B') && a.P>=1 && b.P>=1],
+  ['Jazdcové',                       (a,b)=> one(a,'N') && one(b,'N') && a.P>=1 && b.P>=1],
+  ['Veža a pešiaci proti pešiakom',  (a,b)=> one(a,'R') && a.P>=1 && NP(b)===0 && b.P>=1],
+  ['Jazdec proti pešiakom',          (a,b)=> one(a,'N') && a.P>=1 && NP(b)===0 && b.P>=1],
+  ['Pešiakové',                      (a,b)=> NP(a)===0 && NP(b)===0 && a.P>=1 && b.P>=1],
+  ['Ľahké figúry',                   (a,b)=> MIN(a)===NP(a) && MIN(b)===NP(b) && MIN(a)>=1 && MIN(b)>=1 && a.P>=1 && b.P>=1],
+  ['Zmiešané',                       (a,b)=> NP(a)===1 && NP(b)===1 && a.P>=1 && b.P>=1 &&
+                                             !['Q','R','B','N'].every(k => a[k] === b[k])],
+];
+const CATS = RULES.map(r => r[0]).concat('Ostatné');
+
+function classify(fen) {
+  const m = material(fen);
+  for (const [n, f] of RULES) if (f(m.w, m.b) || f(m.b, m.w)) return n;
+  return 'Ostatné';
+}
+
+// Materiálový podpis, napr. "KRPPP–KPPP". Strany sa zoradia tak, aby bol
+// podpis rovnaký bez ohľadu na farbu.
+function signature(fen) {
+  const m = material(fen);
+  const s = x => 'K' + 'Q'.repeat(x.Q) + 'R'.repeat(x.R) + 'B'.repeat(x.B) + 'N'.repeat(x.N) + 'P'.repeat(x.P);
+  const a = s(m.w), b = s(m.b);
+  return (a >= b ? a + '–' + b : b + '–' + a);
+}
+
+// ─── Načítanie ───────────────────────────────────────────────────────────────
+function goHome() { location.href = 'index.html'; }
+function setStatus(t, type = '') {
+  const el = document.getElementById('status');
+  el.textContent = t; el.className = 'status' + (type ? ' ' + type : '');
+  el.style.display = t ? '' : 'none';
+}
+function lichess(fen) {
+  return 'https://lichess.org/analysis/' + String(fen || '').trim().replace(/ /g, '_');
+}
+
+async function run() {
+  setStatus('Načítavam koncovky...');
+  document.getElementById('out').innerHTML = '';
+  try {
+    const BATCH = 1000;
+    let rows = [], off = 0;
+    while (true) {
+      const d = await sbFetch(
+        `puzzles?category=eq.Koncovka&select=id,title,fen,elo&order=id.asc&limit=${BATCH}&offset=${off}`
+      );
+      if (!d || !d.length) break;
+      rows = rows.concat(d);
+      setStatus(`Načítavam koncovky... (${rows.length})`);
+      if (d.length < BATCH) break;
+      off += BATCH;
+    }
+    if (!rows.length) { setStatus('Nenašli sa žiadne úlohy s kategóriou Koncovka.', 'error'); return; }
+    render(rows);
+    setStatus('');
+  } catch (e) {
+    setStatus('Chyba pri načítaní: ' + e.message, 'error');
+  }
+}
+
+function render(rows) {
+  const noFen = rows.filter(r => !r.fen || !String(r.fen).trim());
+  const good  = rows.filter(r => r.fen && String(r.fen).trim());
+
+  const byCat = {};
+  CATS.forEach(c => byCat[c] = []);
+  good.forEach(r => {
+    const c = classify(r.fen);
+    (byCat[c] = byCat[c] || []).push(r);
+  });
+
+  const total = good.length;
+  let h = `<div class="sec-title">Rozdelenie (${total} koncoviek${noFen.length ? `, ${noFen.length} bez FEN-u` : ''})</div>
+    <table><thead><tr><th>Kategória</th><th style="width:80px;">Počet</th><th style="width:70px;">Podiel</th><th>Zastúpenie</th></tr></thead><tbody>`;
+
+  CATS.forEach(c => {
+    const n = (byCat[c] || []).length;
+    if (!n && c !== 'Ostatné') return;
+    const pct = total ? (n / total * 100) : 0;
+    const isOther = c === 'Ostatné';
+    h += `<tr class="${isOther ? 'other' : ''}">
+      <td>${isOther ? '<strong>Ostatné</strong>' : c}</td>
+      <td class="num">${n}</td>
+      <td class="num">${pct.toFixed(1)} %</td>
+      <td><div class="bar"><span class="${isOther ? 'other' : ''}" style="width:${pct.toFixed(1)}%"></span></div></td>
+    </tr>`;
+  });
+  h += `</tbody></table>`;
+
+  // Ostatné zoskupené podľa materiálu — podľa toho sa rozhoduje o nových kategóriách
+  const others = byCat['Ostatné'] || [];
+  if (others.length) {
+    const bySig = {};
+    others.forEach(r => { const s = signature(r.fen); (bySig[s] = bySig[s] || []).push(r); });
+    const sorted = Object.entries(bySig).sort((a, b) => b[1].length - a[1].length);
+
+    h += `<div class="sec-title">Čo je v Ostatných (${others.length} úloh, ${sorted.length} rôznych materiálov)</div>
+      <table><thead><tr><th style="width:180px;">Materiál</th><th style="width:70px;">Počet</th><th>Príklady úloh</th></tr></thead><tbody>`;
+    sorted.forEach(([sig, list]) => {
+      const ex = list.slice(0, 5).map(r =>
+        `<a href="${lichess(r.fen)}" target="_blank" rel="noopener" title="${(r.title || '').replace(/"/g,'')}">#${r.id}</a>`).join('');
+      h += `<tr><td><code>${sig}</code></td><td class="num">${list.length}</td>
+            <td class="ids">${ex}${list.length > 5 ? ` <span style="color:#94a3b8;">+${list.length - 5} ďalších</span>` : ''}</td></tr>`;
+    });
+    h += `</tbody></table>
+      <div class="hint">Odkazy otvoria pozíciu v Lichess. Materiál je zapísaný ako obe strany oddelené pomlčkou,
+      napr. <code>KRBPPP–KRPPP</code> = kráľ, veža, strelec a tri pešiaky proti kráľovi, veži a trom pešiakom.</div>`;
+  }
+
+  if (noFen.length) {
+    h += `<div class="sec-title">Úlohy bez FEN-u (${noFen.length})</div>
+      <div class="ids">${noFen.slice(0, 40).map(r => `#${r.id}`).join(' ')}${noFen.length > 40 ? ' …' : ''}</div>`;
+  }
+
+  document.getElementById('out').innerHTML = h;
+}
+
+// ─── Inicializácia ───────────────────────────────────────────────────────────
+(function () {
+  if (!requireLogin()) return;
+  const role = sessionStorage.getItem('user_role') || '';
+  if (role !== 'admin') {
+    alert('Analýza koncoviek je dostupná len pre administrátora.');
+    goHome();
+  }
+})();
+</script>
+</body>
+</html>
