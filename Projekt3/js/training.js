@@ -78,6 +78,14 @@ async function pickPuzzleForPlayer(player, puzzles) {
     filtered = puzzles.filter(p => p.category === "Strategia");
   } else if (mode === "koncovka") {
     filtered = puzzles.filter(p => p.category === "Koncovka");
+    // Nepovinné spresnenie: ?endgame=Vežové vyberie len daný typ koncovky.
+    // Ak by pre daný typ nezostala žiadna úloha, ponecháme všetky koncovky,
+    // nech tréning nikdy neskončí hláškou "nenašla sa úloha".
+    const wanted = new URLSearchParams(window.location.search).get("endgame");
+    if (wanted) {
+      const narrowed = filtered.filter(p => p.endgame_type === wanted);
+      if (narrowed.length) filtered = narrowed;
+    }
   }
 
   // Použi správne ELO hráča podľa režimu
@@ -112,6 +120,7 @@ async function pickPuzzleForPlayer(player, puzzles) {
       turnText: p.turn_text,
       prompt: p.prompt,
       category: p.category,
+      endgame_type: p.endgame_type,
       elo: p.elo,
       time: p.time,
       solutionTree: p.solution_tree
@@ -133,7 +142,7 @@ async function loadPuzzlesFromSupabase() {
     let offset = 0;
     while (true) {
       const data = await sbFetch(
-        `puzzles?select=id,category,elo&order=id.asc&limit=${BATCH}&offset=${offset}`
+        `puzzles?select=id,category,elo,endgame_type&order=id.asc&limit=${BATCH}&offset=${offset}`
       );
       if (!data || !data.length) break;
       allData = allData.concat(data);
