@@ -35,6 +35,10 @@ tr.other td { background: #fffbeb; }
 .bar span.other { background: #d97706; }
 code { background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 5px; padding: 1px 6px; font-size: 12px; }
 .ids a { color: #1d4ed8; margin-right: 6px; font-size: 12px; }
+.save-box { background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 10px;
+             padding: 12px 14px; font-size: 13px; margin-bottom: 16px; }
+.save-box.ok  { background: #f0fdf4; border-color: #86efac; color: #166534; }
+.save-box.err { background: #fef2f2; border-color: #fca5a5; color: #b91c1c; }
 .hint { font-size: 12px; color: #64748b; margin-top: 6px; }
 </style>
 </head>
@@ -62,60 +66,14 @@ code { background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 5px; paddi
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/auth.js"></script>
 <script src="js/player.js"></script>
+<script src="js/koncovky.js"></script>
 <script>
-// ─── Klasifikátor ────────────────────────────────────────────────────────────
-// Materiál sa počíta z FEN-u. Strany sú zameniteľné (pravidlo sa skúša v oboch
-// smeroch), takže nezáleží na tom, či má vežu biely alebo čierny.
-function material(fen) {
-  const board = String(fen || '').split(' ')[0];
-  const c = { w:{Q:0,R:0,B:0,N:0,P:0}, b:{Q:0,R:0,B:0,N:0,P:0} };
-  for (const ch of board) {
-    if (ch === 'K' || ch === 'k') continue;
-    const u = ch.toUpperCase();
-    if ('QRBNP'.includes(u)) c[ch === u ? 'w' : 'b'][u]++;
-  }
-  return c;
-}
-const NP  = s => s.Q + s.R + s.B + s.N;    // počet figúr (bez kráľa a pešiakov)
-const MIN = s => s.B + s.N;                // ľahké figúry
-const one = (s, k) => s[k] === 1 && NP(s) === 1;
+// Klasifikátor je v js/koncovky.js — jediné miesto s pravidlami.
+const CATS = ENDGAME_TYPES;
+const classify  = classifyEndgame;
+const signature = endgameSignature;
 
-// Poradie je dôležité — platí prvé pravidlo, ktoré sadne.
-// "pešiaci" = nula a viac pešiakov, pričom ASPOŇ JEDNA strana musí mať
-// aspoň jedného. Podmienka preto platí na súčet oboch strán, nie na každú
-// zvlášť — inak by K+veža+pešiak proti K+veža nespadlo medzi vežové.
-const anyP = (a,b) => (a.P + b.P) >= 1;
-
-const RULES = [
-  ['Veža proti pešiakom',            (a,b)=> one(a,'R') && a.P===0 && NP(b)===0 && b.P>=1],
-  ['Dáma proti pešiakom',            (a,b)=> one(a,'Q') && a.P===0 && NP(b)===0 && b.P>=1],
-  ['Dámske',                         (a,b)=> one(a,'Q') && one(b,'Q') && anyP(a,b)],
-  ['Vežové',                         (a,b)=> one(a,'R') && one(b,'R') && anyP(a,b)],
-  ['Strelcové',                      (a,b)=> one(a,'B') && one(b,'B') && anyP(a,b)],
-  ['Jazdcové',                       (a,b)=> one(a,'N') && one(b,'N') && anyP(a,b)],
-  ['Veža a pešiaci proti pešiakom',  (a,b)=> one(a,'R') && a.P>=1 && NP(b)===0],
-  ['Jazdec proti pešiakom',          (a,b)=> one(a,'N') && a.P>=1 && NP(b)===0],
-  ['Pešiakové',                      (a,b)=> NP(a)===0 && NP(b)===0 && anyP(a,b)],
-  ['Ľahké figúry',                   (a,b)=> MIN(a)===NP(a) && MIN(b)===NP(b) && MIN(a)>=1 && MIN(b)>=1 && anyP(a,b)],
-  ['Zmiešané',                       (a,b)=> NP(a)===1 && NP(b)===1 && anyP(a,b) &&
-                                             !['Q','R','B','N'].every(k => a[k] === b[k])],
-];
-const CATS = RULES.map(r => r[0]).concat('Ostatné');
-
-function classify(fen) {
-  const m = material(fen);
-  for (const [n, f] of RULES) if (f(m.w, m.b) || f(m.b, m.w)) return n;
-  return 'Ostatné';
-}
-
-// Materiálový podpis, napr. "KRPPP–KPPP". Strany sa zoradia tak, aby bol
-// podpis rovnaký bez ohľadu na farbu.
-function signature(fen) {
-  const m = material(fen);
-  const s = x => 'K' + 'Q'.repeat(x.Q) + 'R'.repeat(x.R) + 'B'.repeat(x.B) + 'N'.repeat(x.N) + 'P'.repeat(x.P);
-  const a = s(m.w), b = s(m.b);
-  return (a >= b ? a + '–' + b : b + '–' + a);
-}
+let allRows = [], colsMissing = false;
 
 // ─── Načítanie ───────────────────────────────────────────────────────────────
 function goHome() { location.href = 'index.html'; }
@@ -131,13 +89,23 @@ function lichess(fen) {
 async function run() {
   setStatus('Načítavam koncovky...');
   document.getElementById('out').innerHTML = '';
+  colsMissing = false;
   try {
     const BATCH = 1000;
     let rows = [], off = 0;
     while (true) {
-      const d = await sbFetch(
-        `puzzles?category=eq.Koncovka&select=id,title,fen,elo&order=id.asc&limit=${BATCH}&offset=${off}`
-      );
+      let d;
+      try {
+        d = await sbFetch(
+          `puzzles?category=eq.Koncovka&select=id,title,fen,elo,endgame_type,material_signature&order=id.asc&limit=${BATCH}&offset=${off}`
+        );
+      } catch (err) {
+        // Stĺpce ešte neexistujú — načítaj bez nich a upozorni
+        colsMissing = true;
+        d = await sbFetch(
+          `puzzles?category=eq.Koncovka&select=id,title,fen,elo&order=id.asc&limit=${BATCH}&offset=${off}`
+        );
+      }
       if (!d || !d.length) break;
       rows = rows.concat(d);
       setStatus(`Načítavam koncovky... (${rows.length})`);
@@ -153,6 +121,7 @@ async function run() {
 }
 
 function render(rows) {
+  allRows = rows;
   const noFen = rows.filter(r => !r.fen || !String(r.fen).trim());
   const good  = rows.filter(r => r.fen && String(r.fen).trim());
 
@@ -164,7 +133,30 @@ function render(rows) {
   });
 
   const total = good.length;
-  let h = `<div class="sec-title">Rozdelenie (${total} koncoviek${noFen.length ? `, ${noFen.length} bez FEN-u` : ''})</div>
+  // Čo treba zapísať: uložená hodnota sa líši od vypočítanej
+  const pending = good.filter(r => r.endgame_type !== classify(r.fen)
+                                || r.material_signature !== signature(r.fen));
+  const saved   = good.filter(r => r.endgame_type).length;
+
+  let h = '';
+  if (colsMissing) {
+    h += `<div class="save-box err">V tabuľke <code>puzzles</code> zatiaľ nie sú stĺpce
+      <code>endgame_type</code> a <code>material_signature</code>. Spusti najprv SQL
+      <code>koncovky_stlpce.sql</code>, potom sa dá klasifikácia uložiť.</div>`;
+  } else if (!pending.length) {
+    h += `<div class="save-box ok">✅ Klasifikácia je v databáze aktuálna — všetkých
+      ${good.length} koncoviek má uložený správny typ. Netreba nič zapisovať.</div>`;
+  } else {
+    h += `<div class="save-box">
+      <strong>Na zápis čaká ${pending.length} úloh</strong>
+      (uložených doteraz: ${saved} z ${good.length}).
+      Zapíše sa len rozdiel — už uložené a nezmenené úlohy sa nechajú tak.
+      <div style="margin-top:10px;"><button class="primary" onclick="save()">💾 Uložiť klasifikáciu</button></div>
+      <div id="saveMsg" class="hint" style="margin-top:8px;"></div>
+    </div>`;
+  }
+
+  h += `<div class="sec-title">Rozdelenie (${total} koncoviek${noFen.length ? `, ${noFen.length} bez FEN-u` : ''})</div>
     <table><thead><tr><th>Kategória</th><th style="width:80px;">Počet</th><th style="width:70px;">Podiel</th><th>Zastúpenie</th></tr></thead><tbody>`;
 
   CATS.forEach(c => {
@@ -207,6 +199,50 @@ function render(rows) {
   }
 
   document.getElementById('out').innerHTML = h;
+}
+
+// ─── Uloženie klasifikácie ───────────────────────────────────────────────────
+// Zapisuje sa po skupinách rovnakého materiálu: podpis jednoznačne určuje typ,
+// takže jedna skupina = jeden PATCH s viacerými id naraz.
+async function save() {
+  const good = allRows.filter(r => r.fen && String(r.fen).trim());
+  const pending = good.filter(r => r.endgame_type !== classify(r.fen)
+                                || r.material_signature !== signature(r.fen));
+  if (!pending.length) return;
+
+  const msg = document.getElementById('saveMsg');
+  const groups = {};
+  pending.forEach(r => {
+    const sig = signature(r.fen);
+    (groups[sig] = groups[sig] || []).push(r);
+  });
+  const keys = Object.keys(groups);
+
+  let done = 0, failed = 0;
+  for (let i = 0; i < keys.length; i++) {
+    const sig  = keys[i];
+    const list = groups[sig];
+    const type = classify(list[0].fen);
+    try {
+      await sbFetch(`puzzles?id=in.(${list.map(r => r.id).join(',')})`, {
+        method: 'PATCH',
+        body: JSON.stringify({ endgame_type: type, material_signature: sig })
+      });
+      list.forEach(r => { r.endgame_type = type; r.material_signature = sig; });
+      done += list.length;
+    } catch (e) {
+      failed += list.length;
+      console.error('Zápis zlyhal pre', sig, e);
+    }
+    if (msg) msg.textContent = `Zapisujem... ${i + 1} z ${keys.length} skupín (${done} úloh)`;
+  }
+
+  if (msg) {
+    msg.innerHTML = failed
+      ? `Zapísaných ${done}, zlyhalo ${failed}. Skontroluj, či má admin právo zapisovať do tabuľky puzzles.`
+      : `✅ Zapísaných ${done} úloh. Klasifikácia je uložená.`;
+  }
+  render(allRows);
 }
 
 // ─── Inicializácia ───────────────────────────────────────────────────────────
