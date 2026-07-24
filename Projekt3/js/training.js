@@ -9,7 +9,8 @@ async function addTrainingResult(playerId, puzzleId, result, timeSpent = 0) {
         player_id: playerId,
         puzzle_id: puzzleId,
         result: result,
-        time_spent: Math.max(0, Math.round(timeSpent))
+        time_spent: Math.max(0, Math.round(timeSpent)),
+        source: "puzzles"        // úloha z tabuľky puzzles (klasický tréning)
       })
     });
   } catch (e) {
