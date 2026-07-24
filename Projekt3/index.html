@@ -179,6 +179,8 @@ body {
 .submenu.open { display: grid; }
 /* Podmenu trénera má len 3 položky — nech sa netiahnu cez celú šírku */
 .submenu-trener { grid-template-columns: repeat(4, 1fr); }
+.submenu-koncovky { grid-template-columns: repeat(4, 1fr); }
+.sub-count { font-size: 11px; color: #94a3b8; margin-left: 4px; }
 
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(-6px); }
@@ -291,6 +293,7 @@ body {
   /* Podmenu zrucnosti: 5 stlpcov (2 rady) */
   .submenu { grid-template-columns: repeat(5, 1fr); gap: 8px; padding: 10px; }
   .submenu-trener { grid-template-columns: repeat(3, 1fr); }
+  .submenu-koncovky { grid-template-columns: repeat(2, 1fr); }
   .sub-btn { padding: 12px 4px; font-size: 11px; gap: 6px; min-height: 74px;
              touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
   .sub-icon { width: 32px; height: 32px; font-size: 15px; }
@@ -303,6 +306,7 @@ body {
   .nav-row { grid-template-columns: repeat(4, 1fr); }
   .submenu { grid-template-columns: repeat(4, 1fr); }
   .submenu-trener { grid-template-columns: repeat(3, 1fr); }
+  .submenu-koncovky { grid-template-columns: repeat(2, 1fr); }
   .leaderboards { grid-template-columns: 1fr; }
 }
 </style>
@@ -382,7 +386,7 @@ body {
       <div class="nav-icon i-strategia">♜</div>
       Stratégia
     </button>
-    <button class="nav-btn" onclick="goTraining('koncovka')">
+    <button class="nav-btn" id="btnKoncovky" onclick="toggleKoncovkyMenu()">
       <div class="nav-icon i-koncovka">♚</div>
       Koncovka
     </button>
@@ -429,6 +433,13 @@ body {
   </div>
 
   <!-- Submenu zručnosti — 10 v rade -->
+  <!-- Submenu typov koncoviek — napĺňa sa až pri prvom otvorení -->
+  <div id="koncovkySubmenu" class="submenu submenu-koncovky">
+    <button class="sub-btn" onclick="goKoncovka('')">
+      <div class="sub-icon i-koncovka">♚</div>Všetky koncovky
+    </button>
+  </div>
+
   <div id="skillsSubmenu" class="submenu">
     <button class="sub-btn" onclick="goSkills('checks')">
       <div class="sub-icon i-skills">♞</div>Šachy
@@ -731,11 +742,59 @@ async function loadAssignmentBadge() {
 function goSkills(type)    { location.href = "skills.html?type=" + type; }
 function goManual()        { location.href = "manual.html"; }
 
+function goKoncovka(type) {
+  location.href = "training.html?mode=koncovka" + (type ? "&endgame=" + encodeURIComponent(type) : "");
+}
+
+// Typy koncoviek sa načítajú až pri prvom otvorení podmenu — nezaťažuje to
+// štart stránky. Zobrazia sa len typy, ktoré naozaj majú úlohy.
+let koncovkyLoaded = false;
+async function loadKoncovkyTypes() {
+  if (koncovkyLoaded) return;
+  koncovkyLoaded = true;
+  try {
+    const rows = await sbFetch('puzzles?category=eq.Koncovka&select=endgame_type');
+    if (!rows || !rows.length) return;
+    const counts = {};
+    rows.forEach(r => { const t = r.endgame_type || 'Neklasifikované'; counts[t] = (counts[t] || 0) + 1; });
+    const menu = document.getElementById('koncovkySubmenu');
+    Object.entries(counts)
+      .filter(([t]) => t !== 'Neklasifikované')
+      .sort((a, b) => b[1] - a[1])
+      .forEach(([t, n]) => {
+        const b = document.createElement('button');
+        b.className = 'sub-btn';
+        b.onclick = () => goKoncovka(t);
+        b.innerHTML = `<div class="sub-icon i-koncovka">♚</div>${t}<span class="sub-count">${n}</span>`;
+        menu.appendChild(b);
+      });
+  } catch (e) {
+    console.warn('Typy koncoviek sa nenačítali:', e);
+  }
+}
+
+function toggleKoncovkyMenu() {
+  const menu = document.getElementById('koncovkySubmenu');
+  const btn  = document.getElementById('btnKoncovky');
+  const isOpen = menu.classList.contains('open');
+  closeSkillsMenu(); closeTrenerMenu();
+  menu.classList.toggle('open');
+  btn.classList.toggle('active', !isOpen);
+  if (!isOpen) loadKoncovkyTypes();
+}
+
+function closeKoncovkyMenu() {
+  const m = document.getElementById('koncovkySubmenu');
+  const b = document.getElementById('btnKoncovky');
+  if (m) m.classList.remove('open');
+  if (b) b.classList.remove('active');
+}
+
 function toggleSkillsMenu() {
   const menu = document.getElementById('skillsSubmenu');
   const btn  = document.getElementById('btnSkills');
   const isOpen = menu.classList.contains('open');
-  closeTrenerMenu();
+  closeTrenerMenu(); closeKoncovkyMenu();
   menu.classList.toggle('open');
   btn.classList.toggle('active', !isOpen);
 }
@@ -744,7 +803,7 @@ function toggleTrenerMenu() {
   const menu = document.getElementById('trenerSubmenu');
   const btn  = document.getElementById('trenerBtn');
   const isOpen = menu.classList.contains('open');
-  closeSkillsMenu();
+  closeSkillsMenu(); closeKoncovkyMenu();
   menu.classList.toggle('open');
   btn.classList.toggle('active', !isOpen);
 }
