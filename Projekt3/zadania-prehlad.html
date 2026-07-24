@@ -156,7 +156,15 @@ function daysLeft(d) {
 function clamp01(x) { return Math.max(0, Math.min(1, x)); }
 
 // ─── Pokrok (rovnaká logika ako na stránke hráča) ───────────────────────────
-function computeProgress(a, player, history) {
+function computeProgress(a, player, history, egLog, egIds) {
+  if (a.endgame_type) {
+    const ids = egIds[a.endgame_type] || new Set();
+    const n = egLog.filter(r => r.player_id === a.player_id && ids.has(r.puzzle_id) &&
+                new Date(r.created_at) >= new Date(a.created_at)).length;
+    return { pct: clamp01(n / a.target_value), done: n >= a.target_value,
+             txt: `${n} / ${a.target_value} koncoviek` };
+  }
+
   if (a.target_type === 'elo') {
     const cur  = Number(player?.['elo_' + a.skill] ?? 1200);
     const base = (a.baseline_elo != null) ? Number(a.baseline_elo) : null;
@@ -204,8 +212,28 @@ async function load() {
       }
     }
 
+    // Zadania na koncovky — zoznam úloh podľa typu a vyriešené z klasického tréningu
+    let egIds = {}, egLog = [];
+    const egAsg = rows.filter(r => r.endgame_type);
+    if (egAsg.length) {
+      try {
+        const pz = await sbFetch('puzzles?category=eq.Koncovka&select=id,endgame_type') || [];
+        pz.forEach(x => {
+          const t = x.endgame_type || 'Neklasifikované';
+          (egIds[t] = egIds[t] || new Set()).add(x.id);
+        });
+        const from = new Date(egAsg.map(r => r.created_at).sort()[0]).toISOString();
+        const pids = [...new Set(egAsg.map(r => r.player_id))].join(',');
+        egLog = await sbFetch(
+          `training_log?player_id=in.(${pids})&source=eq.puzzles&result=eq.win&created_at=gte.${from}&select=player_id,puzzle_id,created_at`
+        ) || [];
+      } catch (e) {
+        setStatus('Pokrok pri koncovkových zadaniach sa nepodarilo načítať.', 'error');
+      }
+    }
+
     allRows = rows.map(a => {
-      const prog = computeProgress(a, a.player, history);
+      const prog = computeProgress(a, a.player, history, egLog, egIds);
       // Ručne uzavreté zadanie sa berie ako splnené bez ohľadu na výpočet
       const done = !!a.completed_at || prog.done;
       const late = !done && a.deadline && daysLeft(a.deadline) < 0;
@@ -215,7 +243,7 @@ async function load() {
     // Naplň filter zručností podľa toho, čo sa reálne vyskytuje
     const sk = document.getElementById('fSkill');
     if (sk.options.length === 1) {
-      [...new Set(allRows.map(x => x.a.skill))].forEach(k => {
+      [...new Set(allRows.map(x => x.a.endgame_type || x.a.skill))].forEach(k => {
         const o = document.createElement('option');
         o.value = k; o.textContent = SKILL_NAMES[k] || k;
         sk.appendChild(o);
@@ -234,13 +262,13 @@ function render() {
   const fS = document.getElementById('fStatus').value;
   const fK = document.getElementById('fSkill').value;
 
-  let rows = allRows.filter(x => !fK || x.a.skill === fK);
+  let rows = allRows.filter(x => !fK || (x.a.endgame_type || x.a.skill) === fK);
   if (fS === 'open') rows = rows.filter(x => !x.done);
   if (fS === 'done') rows = rows.filter(x =>  x.done);
   if (fS === 'late') rows = rows.filter(x =>  x.late);
 
   // Súhrn počítame zo všetkých (po filtri zručnosti), nie z filtra stavu
-  const base = allRows.filter(x => !fK || x.a.skill === fK);
+  const base = allRows.filter(x => !fK || (x.a.endgame_type || x.a.skill) === fK);
   document.getElementById('tRun').textContent  = base.filter(x => !x.done).length;
   document.getElementById('tLate').textContent = base.filter(x =>  x.late).length;
   document.getElementById('tDone').textContent = base.filter(x =>  x.done).length;
@@ -275,8 +303,8 @@ function render() {
       ? `<span class="badge done">✅ Splnené${a.completed_at ? ' (uzavreté)' : ''}</span>`
       : x.late ? '<span class="badge late">⏰ Po termíne</span>'
                : '<span class="badge run">Prebieha</span>';
-    const goal = a.target_type === 'elo'
-      ? `ELO ${a.target_value}` : `${a.target_value} úloh`;
+    const goal = a.target_type === 'elo' ? `ELO ${a.target_value}`
+               : `${a.target_value} ${a.endgame_type ? 'koncoviek' : 'úloh'}`;
     let dl = '—';
     if (a.deadline) {
       const n = daysLeft(a.deadline);
@@ -286,7 +314,7 @@ function render() {
     }
     return `<tr class="${cls}">
       <td>${nm}</td>
-      <td>${SKILL_NAMES[a.skill] || a.skill}</td>
+      <td>${a.endgame_type ? '♚ ' + a.endgame_type : (SKILL_NAMES[a.skill] || a.skill)}</td>
       <td>${goal}</td>
       <td><div class="bar"><span class="${bcls}" style="width:${Math.round(x.prog.pct * 100)}%"></span></div>
           <div class="prog-txt">${x.prog.txt}</div></td>
