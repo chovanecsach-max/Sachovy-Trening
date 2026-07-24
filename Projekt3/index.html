@@ -420,6 +420,9 @@ body {
     <button class="sub-btn" onclick="goReport()">
       <div class="sub-icon i-koncovka">📄</div>Mesačný report
     </button>
+    <button class="sub-btn" id="koncovkySubBtn" onclick="goKoncovky()" style="display:none;">
+      <div class="sub-icon i-strategia">🔍</div>Analýza koncoviek
+    </button>
     <button class="sub-btn" id="adminSubBtn" onclick="goAdmin()" style="display:none;">
       <div class="sub-icon i-admin">⚙</div>Administrácia
     </button>
@@ -510,6 +513,7 @@ async function initPage() {
   }
   if (role === 'admin') {
     document.getElementById('adminSubBtn').style.display = 'flex';
+    document.getElementById('koncovkySubBtn').style.display = 'flex';
   }
 
   // Platnosť prístupu — zobraz len hráčom a trénerom (admin/hlavný tréner majú neobmedzený prístup)
@@ -683,6 +687,7 @@ function goSlabiny()       { location.href = "slabinova-mapa.html"; }
 function goZadania()       { location.href = "zadania.html"; }
 function goPrehlad()       { location.href = "zadania-prehlad.html"; }
 function goReport()        { location.href = "report.html"; }
+function goKoncovky()      { location.href = "koncovky-analyza.html"; }
 
 // Odznak s počtom nesplnených zadaní. Splnenie sa vyhodnocuje rovnako ako na
 // stránke zadania.html: pri cieli na ELO podľa aktuálneho elo_<zručnosť>,
