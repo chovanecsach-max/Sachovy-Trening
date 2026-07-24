@@ -81,17 +81,22 @@ const MIN = s => s.B + s.N;                // ľahké figúry
 const one = (s, k) => s[k] === 1 && NP(s) === 1;
 
 // Poradie je dôležité — platí prvé pravidlo, ktoré sadne.
+// "pešiaci" = nula a viac pešiakov, pričom ASPOŇ JEDNA strana musí mať
+// aspoň jedného. Podmienka preto platí na súčet oboch strán, nie na každú
+// zvlášť — inak by K+veža+pešiak proti K+veža nespadlo medzi vežové.
+const anyP = (a,b) => (a.P + b.P) >= 1;
+
 const RULES = [
   ['Veža proti pešiakom',            (a,b)=> one(a,'R') && a.P===0 && NP(b)===0 && b.P>=1],
-  ['Dámske',                         (a,b)=> one(a,'Q') && one(b,'Q') && a.P>=1 && b.P>=1],
-  ['Vežové',                         (a,b)=> one(a,'R') && one(b,'R') && a.P>=1 && b.P>=1],
-  ['Strelcové',                      (a,b)=> one(a,'B') && one(b,'B') && a.P>=1 && b.P>=1],
-  ['Jazdcové',                       (a,b)=> one(a,'N') && one(b,'N') && a.P>=1 && b.P>=1],
-  ['Veža a pešiaci proti pešiakom',  (a,b)=> one(a,'R') && a.P>=1 && NP(b)===0 && b.P>=1],
-  ['Jazdec proti pešiakom',          (a,b)=> one(a,'N') && a.P>=1 && NP(b)===0 && b.P>=1],
-  ['Pešiakové',                      (a,b)=> NP(a)===0 && NP(b)===0 && a.P>=1 && b.P>=1],
-  ['Ľahké figúry',                   (a,b)=> MIN(a)===NP(a) && MIN(b)===NP(b) && MIN(a)>=1 && MIN(b)>=1 && a.P>=1 && b.P>=1],
-  ['Zmiešané',                       (a,b)=> NP(a)===1 && NP(b)===1 && a.P>=1 && b.P>=1 &&
+  ['Dámske',                         (a,b)=> one(a,'Q') && one(b,'Q') && anyP(a,b)],
+  ['Vežové',                         (a,b)=> one(a,'R') && one(b,'R') && anyP(a,b)],
+  ['Strelcové',                      (a,b)=> one(a,'B') && one(b,'B') && anyP(a,b)],
+  ['Jazdcové',                       (a,b)=> one(a,'N') && one(b,'N') && anyP(a,b)],
+  ['Veža a pešiaci proti pešiakom',  (a,b)=> one(a,'R') && a.P>=1 && NP(b)===0],
+  ['Jazdec proti pešiakom',          (a,b)=> one(a,'N') && a.P>=1 && NP(b)===0],
+  ['Pešiakové',                      (a,b)=> NP(a)===0 && NP(b)===0 && anyP(a,b)],
+  ['Ľahké figúry',                   (a,b)=> MIN(a)===NP(a) && MIN(b)===NP(b) && MIN(a)>=1 && MIN(b)>=1 && anyP(a,b)],
+  ['Zmiešané',                       (a,b)=> NP(a)===1 && NP(b)===1 && anyP(a,b) &&
                                              !['Q','R','B','N'].every(k => a[k] === b[k])],
 ];
 const CATS = RULES.map(r => r[0]).concat('Ostatné');
