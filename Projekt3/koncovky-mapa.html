@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mapa koncoviek</title>
+<style>
+body { font-family: Arial, sans-serif; background: #f4f4f6; margin: 0; padding: 12px; color: #111827; }
+.app { max-width: 1150px; margin: 0 auto; background: white; border-radius: 14px;
+       box-shadow: 0 10px 30px rgba(0,0,0,0.08); padding: 20px; }
+h1 { margin: 0 0 6px 0; text-align: center; font-size: 26px; }
+.subtitle { text-align: center; color: #475569; margin: 0 0 18px 0; }
+
+.role-banner { padding: 10px 14px; border-radius: 10px; margin-bottom: 16px; font-size: 14px; text-align: center; }
+.role-banner.trener        { background: #f0fdf4; border: 1px solid #86efac; color: #166534; }
+.role-banner.hlavny_trener { background: #faf5ff; border: 1px solid #d8b4fe; color: #6b21a8; }
+.role-banner.admin         { background: #fff7ed; border: 1px solid #fdba74; color: #c2410c; }
+
+.filter-card { border: 1px solid #d1d5db; border-radius: 12px; padding: 14px; margin-bottom: 14px; background: #f8fafc; }
+.filter-row { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; }
+.filter-field { display: flex; flex-direction: column; gap: 4px; }
+.filter-field label { font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: bold; }
+select { padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px; background: white; min-width: 200px; }
+button { padding: 10px 16px; border: none; border-radius: 10px; cursor: pointer; font-size: 14px; }
+.secondary { background: #e5e7eb; color: #111827; }
+
+.status { margin: 12px 0; padding: 10px; border-radius: 10px; border: 1px solid #d1d5db;
+          background: #f8fafc; color: #334155; font-size: 14px; }
+.status.error { background: #fef2f2; border-color: #fca5a5; color: #b91c1c; }
+
+.focus-line { margin: 4px 0 12px; padding: 12px 14px; border-radius: 10px;
+              background: #eff6ff; border: 1px solid #bfdbfe; color: #1e3a5f; font-size: 14px; display: none; }
+.focus-line strong { color: #1d4ed8; }
+.warn-line { margin: 0 0 12px; padding: 10px 14px; border-radius: 10px; background: #fffbeb;
+             border: 1px solid #fde68a; color: #92400e; font-size: 13px; }
+
+.map-legend { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; font-size: 12px; color: #64748b; margin: 6px 0 10px; }
+.map-legend .box { width: 13px; height: 13px; border-radius: 3px; display: inline-block; vertical-align: -2px; margin-right: 5px; }
+
+.map-wrap { overflow-x: auto; }
+table.map { border-collapse: separate; border-spacing: 3px; font-size: 12px; width: 100%; min-width: 720px; }
+table.map th { padding: 4px 3px; color: #64748b; font-weight: bold; font-size: 11px; line-height: 1.2; vertical-align: bottom; text-align: center; }
+table.map th.name-h { text-align: left; padding-left: 8px; }
+table.map td.name { padding: 7px 8px; white-space: nowrap; color: #111827; }
+table.map td.cell { text-align: center; padding: 6px 5px; border-radius: 5px; line-height: 1.25; }
+table.map td.cell .n { font-weight: bold; font-size: 13px; }
+table.map td.cell .e { font-size: 10px; opacity: .75; }
+table.map tr.avg-row td { border-top: 2px solid #e5e7eb; padding-top: 8px; }
+table.map td.avg-name { font-weight: bold; white-space: nowrap; padding-left: 8px; }
+.thin { font-size: 10px; color: #b45309; }
+</style>
+</head>
+
+<body oncontextmenu="return false;">
+<div class="app">
+  <h1>♚ Mapa koncoviek</h1>
+  <p class="subtitle">Koľko koncoviek ktorého typu hráči odtrénovali — a čo ešte nemali v ruke.</p>
+
+  <div id="roleBanner" class="role-banner" style="display:none;"></div>
+
+  <div class="filter-card" id="filterCard" style="display:none;">
+    <div class="filter-row">
+      <div class="filter-field" id="groupField">
+        <label>Skupina (tréner)</label>
+        <select id="trenerSelect"><option value="all">Všetci hráči</option></select>
+      </div>
+      <button class="secondary" onclick="goSlabiny()">← Slabinová mapa</button>
+      <button class="secondary" onclick="goHome()">Späť do menu</button>
+    </div>
+  </div>
+
+  <div id="status" class="status">Načítavam...</div>
+  <div id="focusLine" class="focus-line"></div>
+  <div id="warnLine"></div>
+
+  <div class="map-legend" id="mapLegend" style="display:none;">
+    <span><span class="box" style="background:#fff;border:1px dashed #cbd5e1;"></span>nevyskúšané</span>
+    <span><span class="box" style="background:#fee2e2;border:1px solid #fca5a5;"></span>1–2</span>
+    <span><span class="box" style="background:#fed7aa;border:1px solid #fdba74;"></span>3–5</span>
+    <span><span class="box" style="background:#fef08a;border:1px solid #fde047;"></span>6–9</span>
+    <span><span class="box" style="background:#bbf7d0;border:1px solid #86efac;"></span>10 a viac</span>
+    <span style="color:#94a3b8;">číslo = vyriešené / pokusy · Ø = priemerné ELO vyriešených</span>
+  </div>
+
+  <div class="map-wrap">
+    <table class="map" id="mapTable" style="display:none;">
+      <thead id="mapHead"></thead>
+      <tbody id="mapBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/auth.js"></script>
+<script src="js/player.js"></script>
+<script>
+const USER_ROLE        = sessionStorage.getItem('user_role') || '';
+const USER_ID          = sessionStorage.getItem('user_id') || '';
+const USER_NICK        = sessionStorage.getItem('user_nick') || sessionStorage.getItem('user_name') || '';
+const IS_ADMIN         = USER_ROLE === 'admin';
+const IS_TRENER        = USER_ROLE === 'trener';
+const IS_HLAVNY_TRENER = USER_ROLE === 'hlavny_trener';
+const IS_HRAC          = USER_ROLE === 'hrac';
+const STAFF_ROLES      = ['trener', 'hlavny_trener', 'admin'];
+
+// Pri malom počte vyriešených úloh je priemerné ELO len orientačné
+const THIN_EVIDENCE = 3;
+
+let egPuzzles = null;   // id → { type, elo }
+let egTypes   = [];     // typy koncoviek zoradené podľa počtu úloh
+
+function goHome()    { location.href = 'index.html'; }
+function goSlabiny() { location.href = 'slabinova-mapa.html'; }
+
+function setStatus(t, type = '') {
+  const el = document.getElementById('status');
+  el.textContent = t; el.className = 'status' + (type ? ' ' + type : '');
+  el.style.display = t ? '' : 'none';
+}
+
+async function sbFetchAll(query) {
+  const PAGE = 1000; let all = [], off = 0;
+  while (true) {
+    const sep = query.includes('?') ? '&' : '?';
+    const b = await sbFetch(`${query}${sep}limit=${PAGE}&offset=${off}`);
+    if (!b || !b.length) break;
+    all = all.concat(b);
+    if (b.length < PAGE) break;
+    off += PAGE;
+  }
+  return all;
+}
+
+// ─── Farba podľa pokrytia (počet vyriešených) ───────────────────────────────
+function coverColor(solved) {
+  if (solved === 0) return { bg: '#ffffff', fg: '#94a3b8', border: '1px dashed #cbd5e1' };
+  if (solved <= 2)  return { bg: '#fee2e2', fg: '#991b1b', border: '1px solid #fca5a5' };
+  if (solved <= 5)  return { bg: '#fed7aa', fg: '#9a3412', border: '1px solid #fdba74' };
+  if (solved <= 9)  return { bg: '#fef08a', fg: '#854d0e', border: '1px solid #fde047' };
+  return              { bg: '#bbf7d0', fg: '#166534', border: '1px solid #86efac' };
+}
+
+function cellHtml(st) {
+  const c = coverColor(st.solved);
+  if (!st.attempts) {
+    return `<td class="cell" style="background:${c.bg};color:${c.fg};border:${c.border};"
+            title="Tento typ koncovky hráč ešte netrénoval">–</td>`;
+  }
+  const thin = st.solved > 0 && st.solved < THIN_EVIDENCE;
+  const elo  = st.solved ? `<div class="e">Ø${Math.round(st.eloSum / st.solved)}${thin ? ' *' : ''}</div>` : '';
+  const tip  = `${st.solved} vyriešených z ${st.attempts} pokusov`
+             + (st.solved ? ` · priemerné ELO vyriešených ${Math.round(st.eloSum / st.solved)}` : '')
+             + (thin ? ' (málo úloh — orientačné)' : '');
+  return `<td class="cell" style="background:${c.bg};color:${c.fg};border:${c.border};" title="${tip}">
+            <div class="n">${st.solved}/${st.attempts}</div>${elo}</td>`;
+}
+
+// ─── Načítanie ───────────────────────────────────────────────────────────────
+async function fetchPlayers(trenerFilter) {
+  const cols = 'id,name,surname,profile:profiles!user_id(role)';
+  let q = `players?select=${cols}&order=surname.asc,name.asc`;
+  if (IS_TRENER)                                   q += `&trener_id=eq.${USER_ID}`;
+  else if (trenerFilter && trenerFilter !== 'all') q += `&trener_id=eq.${trenerFilter}`;
+  const rows = await sbFetchAll(q);
+  return (rows || []).filter(p => !STAFF_ROLES.includes(p.profile?.role));
+}
+
+async function loadEndgamePuzzles() {
+  if (egPuzzles) return;
+  const rows = await sbFetchAll('puzzles?category=eq.Koncovka&select=id,endgame_type,elo&order=id.asc');
+  egPuzzles = new Map();
+  const cnt = {};
+  (rows || []).forEach(p => {
+    const t = p.endgame_type || 'Neklasifikované';
+    egPuzzles.set(p.id, { type: t, elo: Number(p.elo || 0) });
+    cnt[t] = (cnt[t] || 0) + 1;
+  });
+  egTypes = Object.entries(cnt).sort((a, b) => b[1] - a[1]).map(e => e[0]);
+}
+
+async function loadMap() {
+  setStatus('Načítavam...');
+  try {
+    await loadEndgamePuzzles();
+    if (!egTypes.length) { setStatus('V databáze nie sú klasifikované koncovky.', 'error'); return; }
+
+    const filter  = document.getElementById('trenerSelect').value;
+    const players = await fetchPlayers(filter);
+    if (!players.length) { setStatus('Táto skupina nemá žiadnych hráčov.', 'error'); return; }
+
+    // Len klasický tréning (source='puzzles') — zručnosti sem nepatria
+    const ids = players.map(p => p.id).join(',');
+    const log = await sbFetchAll(
+      `training_log?source=eq.puzzles&player_id=in.(${ids})&select=player_id,puzzle_id,result`
+    );
+
+    render(players, log);
+    setStatus('');
+  } catch (e) {
+    setStatus('Chyba pri načítaní: ' + e.message, 'error');
+  }
+}
+
+// ─── Vykreslenie ─────────────────────────────────────────────────────────────
+function render(players, log) {
+  // stats[playerId][type] = { attempts, solved, eloSum }
+  const stats = {};
+  players.forEach(p => {
+    stats[p.id] = {};
+    egTypes.forEach(t => { stats[p.id][t] = { attempts: 0, solved: 0, eloSum: 0 }; });
+  });
+  (log || []).forEach(r => {
+    const pz = egPuzzles.get(r.puzzle_id);
+    if (!pz || !stats[r.player_id]) return;          // nie je koncovka alebo cudzí hráč
+    const s = stats[r.player_id][pz.type];
+    if (!s) return;
+    s.attempts++;
+    if (r.result === 'win') { s.solved++; s.eloSum += pz.elo; }
+  });
+
+  // Hlavička
+  let h = '<tr><th class="name-h">Hráč</th>';
+  egTypes.forEach(t => { h += `<th title="${t}">${t}</th>`; });
+  h += '<th>Spolu</th></tr>';
+  document.getElementById('mapHead').innerHTML = h;
+
+  // Riadky — najmenej pokryté hore
+  const rows = players.map(p => {
+    const tot = egTypes.reduce((a, t) => a + stats[p.id][t].solved, 0);
+    const untouched = egTypes.filter(t => stats[p.id][t].attempts === 0).length;
+    return { p, tot, untouched };
+  }).sort((a, b) => a.tot - b.tot);
+
+  let b = '';
+  rows.forEach(({ p, tot }) => {
+    const nm = `${p.surname || ''} ${p.name || ''}`.trim() || '(bez mena)';
+    b += `<tr><td class="name">${nm}</td>`;
+    egTypes.forEach(t => { b += cellHtml(stats[p.id][t]); });
+    const c = coverColor(tot);
+    b += `<td class="cell" style="background:${c.bg};color:${c.fg};border:${c.border};"><div class="n">${tot}</div></td></tr>`;
+  });
+
+  // Súhrn skupiny: koľko hráčov daný typ vôbec skúšalo
+  b += '<tr class="avg-row"><td class="avg-name">Skúšalo hráčov</td>';
+  const tried = {};
+  egTypes.forEach(t => {
+    tried[t] = players.filter(p => stats[p.id][t].attempts > 0).length;
+    const c = coverColor(tried[t] ? 10 : 0);
+    b += `<td class="cell" style="background:${c.bg};color:${c.fg};border:${c.border};">
+            <div class="n">${tried[t]}/${players.length}</div></td>`;
+  });
+  b += `<td class="cell" style="border:1px solid #e2e8f0;"></td></tr>`;
+  document.getElementById('mapBody').innerHTML = b;
+
+  document.getElementById('mapTable').style.display = '';
+  document.getElementById('mapLegend').style.display = 'flex';
+
+  // Na čo sa zamerať: typy, ktoré skúšalo najmenej hráčov
+  const worst = egTypes.map(t => ({ t, n: tried[t] })).sort((a, b2) => a.n - b2.n).slice(0, 3);
+  const fl = document.getElementById('focusLine');
+  fl.innerHTML = `🎯 <strong>Najmenej pokryté typy:</strong> `
+    + worst.map(w => `${w.t} (${w.n} z ${players.length})`).join(', ');
+  fl.style.display = 'block';
+
+  // Poctivé upozornenie na obmedzenie dát
+  document.getElementById('warnLine').innerHTML =
+    `<div class="warn-line">Počítajú sa len tréningy, pri ktorých sa dá spoľahlivo určiť pôvod úlohy.
+     Časť starších záznamov sa spätne priradiť nedala, takže skutočné počty môžu byť mierne vyššie.
+     Od zavedenia označovania sú všetky nové tréningy započítané presne.
+     Hviezdička pri priemernom ELO znamená menej než ${THIN_EVIDENCE} vyriešené úlohy — číslo je len orientačné.</div>`;
+}
+
+// ─── Inicializácia ───────────────────────────────────────────────────────────
+async function init() {
+  if (!requireLogin()) return;
+  if (IS_HRAC) { alert('Mapa koncoviek je dostupná len pre trénerov a administrátorov.'); goHome(); return; }
+
+  const bn = document.getElementById('roleBanner');
+  if (IS_TRENER)             { bn.textContent = `🧑‍🏫 Tréner ${USER_NICK} — moja skupina`; bn.className = 'role-banner trener'; }
+  else if (IS_HLAVNY_TRENER) { bn.textContent = `👑 Hlavný tréner ${USER_NICK} — všetci hráči`; bn.className = 'role-banner hlavny_trener'; }
+  else if (IS_ADMIN)         { bn.textContent = '🔧 Admin — všetci hráči'; bn.className = 'role-banner admin'; }
+  bn.style.display = '';
+
+  document.getElementById('filterCard').style.display = '';
+  if (IS_ADMIN || IS_HLAVNY_TRENER) {
+    const sel = document.getElementById('trenerSelect');
+    try {
+      const tr = await sbFetch('profiles?role=eq.trener&select=id,name,surname,nick_name&order=surname.asc') || [];
+      tr.forEach(t => {
+        const o = document.createElement('option');
+        o.value = t.id;
+        o.textContent = t.nick_name || `${t.surname || ''} ${t.name || ''}`.trim();
+        sel.appendChild(o);
+      });
+    } catch (e) {}
+    sel.addEventListener('change', loadMap);
+  } else {
+    document.getElementById('groupField').style.display = 'none';
+  }
+
+  await loadMap();
+}
+
+init();
+</script>
+</body>
+</html>
