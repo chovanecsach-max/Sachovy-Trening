@@ -1038,7 +1038,12 @@ function startPuzzleTimer(seconds) {
 }
 
 function inferCategory(puzzle) {
-  if (puzzle.category) return puzzle.category;
+  if (puzzle.category) {
+    // Pri koncovkách doplň aj typ podľa materiálu (napr. "Koncovka — Vežové")
+    return (puzzle.category === 'Koncovka' && puzzle.endgame_type)
+      ? `${puzzle.category} — ${puzzle.endgame_type}`
+      : puzzle.category;
+  }
 
   const prompt = (puzzle.prompt || '').toLowerCase();
   if (prompt.includes('mat v 1') || prompt.includes('mat 1')) return 'Mat 1';
