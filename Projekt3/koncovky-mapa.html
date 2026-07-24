@@ -48,6 +48,27 @@ table.map td.cell .e { font-size: 10px; opacity: .75; }
 table.map tr.avg-row td { border-top: 2px solid #e5e7eb; padding-top: 8px; }
 table.map td.avg-name { font-weight: bold; white-space: nowrap; padding-left: 8px; }
 .thin { font-size: 10px; color: #b45309; }
+
+/* ── Zadávanie úloh ── */
+.action-card { border: 1px solid #d1d5db; border-radius: 12px; padding: 14px; margin: 16px 0 4px; background: #f8fafc; }
+.action-card .filter-row { align-items: flex-end; }
+.primary { background: #111827; color: white; font-weight: bold; }
+input[type="number"] { padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px; background: white; width: 110px; }
+input[type="text"], input[type="date"] { padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px; background: white; }
+input[type="text"] { min-width: 190px; }
+.below-result { margin-top: 12px; border-top: 1px solid #e2e8f0; padding-top: 12px; }
+.below-head { font-size: 14px; font-weight: bold; margin-bottom: 8px; }
+.below-tools { font-size: 12px; margin-bottom: 8px; }
+.below-tools a { color: #1d4ed8; cursor: pointer; text-decoration: underline; margin-right: 10px; }
+.below-list { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.below-list li { background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 6px 10px; font-size: 13px; }
+.below-list label { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+.below-list .val { font-weight: bold; padding: 2px 7px; border-radius: 5px; }
+.below-none { font-size: 13px; color: #166534; background: #f0fdf4; border: 1px solid #86efac; border-radius: 8px; padding: 10px 12px; }
+.assign-box { margin-top: 14px; border-top: 1px dashed #cbd5e1; padding-top: 12px; }
+.asg-status { margin-top: 10px; padding: 9px 12px; border-radius: 8px; font-size: 13px; }
+.asg-status.ok  { background: #f0fdf4; border: 1px solid #86efac; color: #166534; }
+.asg-status.err { background: #fef2f2; border: 1px solid #fca5a5; color: #b91c1c; }
 </style>
 </head>
 
@@ -82,6 +103,21 @@ table.map td.avg-name { font-weight: bold; white-space: nowrap; padding-left: 8p
     <span style="color:#94a3b8;">číslo = vyriešené / pokusy · Ø = priemerné ELO vyriešených</span>
   </div>
 
+  <div class="action-card" id="actionCard" style="display:none;">
+    <div class="filter-row">
+      <div class="filter-field">
+        <label>Typ koncovky</label>
+        <select id="thrType"></select>
+      </div>
+      <div class="filter-field">
+        <label>Menej než (vyriešených)</label>
+        <input type="number" id="thrValue" min="1" max="100" step="1" value="3">
+      </div>
+      <button class="primary" onclick="showBelow()">Kto má málo</button>
+    </div>
+    <div id="belowResult" class="below-result" style="display:none;"></div>
+  </div>
+
   <div class="map-wrap">
     <table class="map" id="mapTable" style="display:none;">
       <thead id="mapHead"></thead>
@@ -106,6 +142,7 @@ const STAFF_ROLES      = ['trener', 'hlavny_trener', 'admin'];
 // Pri malom počte vyriešených úloh je priemerné ELO len orientačné
 const THIN_EVIDENCE = 3;
 
+let mapStats = {}, mapPlayers = [];
 let egPuzzles = null;   // id → { type, elo }
 let egTypes   = [];     // typy koncoviek zoradené podľa počtu úloh
 
@@ -252,6 +289,10 @@ function render(players, log) {
   b += `<td class="cell" style="border:1px solid #e2e8f0;"></td></tr>`;
   document.getElementById('mapBody').innerHTML = b;
 
+  mapStats   = stats;
+  mapPlayers = players;
+  initActionPanel();
+
   document.getElementById('mapTable').style.display = '';
   document.getElementById('mapLegend').style.display = 'flex';
 
@@ -268,6 +309,110 @@ function render(players, log) {
      Časť starších záznamov sa spätne priradiť nedala, takže skutočné počty môžu byť mierne vyššie.
      Od zavedenia označovania sú všetky nové tréningy započítané presne.
      Hviezdička pri priemernom ELO znamená menej než ${THIN_EVIDENCE} vyriešené úlohy — číslo je len orientačné.</div>`;
+}
+
+// ─── Zadávanie úloh podľa typu koncovky ─────────────────────────────────────
+function initActionPanel() {
+  const sel = document.getElementById('thrType');
+  const keep = sel.value;
+  sel.innerHTML = egTypes.map(t => `<option value="${t}">${t}</option>`).join('');
+  if (keep && egTypes.includes(keep)) sel.value = keep;
+  sel.onchange = hideBelow;
+  document.getElementById('actionCard').style.display = '';
+  hideBelow();
+}
+function hideBelow() {
+  const el = document.getElementById('belowResult');
+  el.style.display = 'none'; el.innerHTML = '';
+}
+function setAsgStatus(t, type) {
+  const el = document.getElementById('asgStatus');
+  if (!el) return;
+  el.textContent = t; el.className = 'asg-status ' + type; el.style.display = '';
+}
+
+function showBelow() {
+  const type = document.getElementById('thrType').value;
+  const thr  = Number(document.getElementById('thrValue').value);
+  const el   = document.getElementById('belowResult');
+  if (!thr || isNaN(thr) || thr < 1) { setStatus('Zadaj platný počet.', 'error'); return; }
+
+  const below = mapPlayers
+    .map(p => ({ id: p.id, name: `${p.surname || ''} ${p.name || ''}`.trim() || '(bez mena)',
+                 solved: (mapStats[p.id]?.[type]?.solved) || 0 }))
+    .filter(x => x.solved < thr)
+    .sort((a, b) => a.solved - b.solved);
+
+  if (!below.length) {
+    el.innerHTML = `<div class="below-none">✅ V type <strong>${type}</strong> má každý aspoň ${thr} vyriešených koncoviek.</div>`;
+    el.style.display = ''; return;
+  }
+
+  const d = new Date(); d.setDate(d.getDate() + 14);
+  const items = below.map(x => {
+    const c = coverColor(x.solved);
+    return `<li><label><input type="checkbox" class="pchk" value="${x.id}" checked>
+      <span class="val" style="background:${c.bg};color:${c.fg}">${x.solved}</span>${x.name}</label></li>`;
+  }).join('');
+
+  el.innerHTML = `
+    <div class="below-head">${type} — menej než ${thr} vyriešených: ${below.length} z ${mapPlayers.length}</div>
+    <div class="below-tools"><a onclick="checkAll(true)">Označiť všetkých</a><a onclick="checkAll(false)">Zrušiť označenie</a></div>
+    <ul class="below-list">${items}</ul>
+    <div class="assign-box">
+      <div class="filter-row">
+        <div class="filter-field">
+          <label>Cieľ (počet úloh)</label>
+          <input type="number" id="asgValue" min="1" max="200" step="1" value="${thr}">
+        </div>
+        <div class="filter-field">
+          <label>Termín</label>
+          <input type="date" id="asgDeadline" value="${d.toISOString().substring(0,10)}">
+        </div>
+        <div class="filter-field">
+          <label>Poznámka (nepovinné)</label>
+          <input type="text" id="asgNote" placeholder="napr. pozri si aj teóriu">
+        </div>
+        <button class="primary" onclick="createAssignments()">📌 Zadať úlohu označeným</button>
+      </div>
+      <div id="asgStatus" class="asg-status" style="display:none;"></div>
+    </div>`;
+  el.style.display = '';
+}
+
+function checkAll(state) {
+  document.querySelectorAll('.pchk').forEach(b => { b.checked = state; });
+}
+
+async function createAssignments() {
+  const boxes = [...document.querySelectorAll('.pchk:checked')];
+  if (!boxes.length) { setAsgStatus('Označ aspoň jedného hráča.', 'err'); return; }
+
+  const type  = document.getElementById('thrType').value;
+  const value = Number(document.getElementById('asgValue').value);
+  const dl    = document.getElementById('asgDeadline').value || null;
+  const note  = (document.getElementById('asgNote').value || '').trim() || null;
+  if (!value || value < 1 || value > 200) { setAsgStatus('Zadaj počet úloh medzi 1 a 200.', 'err'); return; }
+
+  // Pri koncovkách je cieľ vždy počtový — vlastné ELO pre typy neexistuje.
+  const rows = boxes.map(b => ({
+    player_id:    Number(b.value),
+    trener_id:    USER_ID,
+    skill:        null,
+    endgame_type: type,
+    target_type:  'count',
+    target_value: value,
+    deadline:     dl,
+    note:         note
+  }));
+
+  setAsgStatus('Zadávam...', 'ok');
+  try {
+    await sbFetch('assignments', { method: 'POST', prefer: 'return=minimal', body: JSON.stringify(rows) });
+    setAsgStatus(`✅ Zadané ${rows.length} hráčom — ${type}: vyriešiť ${value} koncoviek${dl ? ', termín ' + dl : ''}.`, 'ok');
+  } catch (e) {
+    setAsgStatus('Chyba pri zadávaní: ' + e.message, 'err');
+  }
 }
 
 // ─── Inicializácia ───────────────────────────────────────────────────────────
