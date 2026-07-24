@@ -88,6 +88,7 @@ const anyP = (a,b) => (a.P + b.P) >= 1;
 
 const RULES = [
   ['Veža proti pešiakom',            (a,b)=> one(a,'R') && a.P===0 && NP(b)===0 && b.P>=1],
+  ['Dáma proti pešiakom',            (a,b)=> one(a,'Q') && a.P===0 && NP(b)===0 && b.P>=1],
   ['Dámske',                         (a,b)=> one(a,'Q') && one(b,'Q') && anyP(a,b)],
   ['Vežové',                         (a,b)=> one(a,'R') && one(b,'R') && anyP(a,b)],
   ['Strelcové',                      (a,b)=> one(a,'B') && one(b,'B') && anyP(a,b)],
