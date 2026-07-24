@@ -711,14 +711,15 @@ async function loadAssignmentBadge() {
   try {
     const player = await getCurrentPlayer();
     if (!player) return;
-    const rows = await sbFetch(`assignments?player_id=eq.${player.id}&select=skill,target_type,target_value,created_at`);
+    const rows = await sbFetch(`assignments?player_id=eq.${player.id}&select=skill,endgame_type,target_type,target_value,created_at,completed_at`);
     if (!rows || !rows.length) return;
 
     // Má aspoň jedno zadanie — zobraz tlačidlo aj trénerovi/adminovi
     document.getElementById('asgBtn').style.display = 'flex';
 
+    // Zručnostné zadania s počtom úloh — z histórie ELO
     let history = [];
-    const counts = rows.filter(r => r.target_type === 'count');
+    const counts = rows.filter(r => r.target_type === 'count' && !r.endgame_type);
     if (counts.length) {
       // Čas z PostgREST končí na "+00:00"; znak "+" sa v URL číta ako medzera,
       // preto ho normalizujeme cez toISOString() na tvar s "Z".
@@ -726,7 +727,29 @@ async function loadAssignmentBadge() {
       history = await sbFetch(`elo_history?player_id=eq.${player.id}&created_at=gte.${from}&select=category,created_at`) || [];
     }
 
+    // Koncovkové zadania — z vyriešených úloh klasického tréningu
+    let egIds = {}, egLog = [];
+    const egAsg = rows.filter(r => r.endgame_type && !r.completed_at);
+    if (egAsg.length) {
+      const pz = await sbFetch('puzzles?category=eq.Koncovka&select=id,endgame_type') || [];
+      pz.forEach(x => {
+        const t = x.endgame_type || 'Neklasifikované';
+        (egIds[t] = egIds[t] || new Set()).add(x.id);
+      });
+      const from = new Date(egAsg.map(r => r.created_at).sort()[0]).toISOString();
+      egLog = await sbFetch(
+        `training_log?player_id=eq.${player.id}&source=eq.puzzles&result=eq.win&created_at=gte.${from}&select=puzzle_id,created_at`
+      ) || [];
+    }
+
     const open = rows.filter(a => {
+      if (a.completed_at) return false;                 // ručne uzavreté trénerom
+      if (a.endgame_type) {
+        const ids = egIds[a.endgame_type] || new Set();
+        const n = egLog.filter(r => ids.has(r.puzzle_id) &&
+                    new Date(r.created_at) >= new Date(a.created_at)).length;
+        return n < a.target_value;
+      }
       if (a.target_type === 'elo') {
         return Number(player['elo_' + a.skill] ?? 1200) < a.target_value;
       }
