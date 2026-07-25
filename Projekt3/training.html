@@ -709,6 +709,13 @@ let puzzleCounted = false;
 let puzzleSolvedCounted = false;
 let resultLogged = false;
 let everFailed = false; // true ak hráč raz chyboval — ELO sa nezapočíta ani po správnom riešení
+
+// Úlohy, za ktoré už v tejto session padlo ELO (win aj loss).
+// Zabraňuje opakovanému získavaniu ELO na tej istej pozícii cez "Znova"/"Skús znova".
+const eloAwardedPuzzleIds = new Set();
+// Úlohy vylúčené z výberu už pri štarte stránky (vyriešené, alebo neúspešné
+// v ochrannej lehote RETRY_AFTER_DAYS). null = nepodarilo sa načítať → ELO sa povolí.
+let excludedPuzzleIdsAtStart = null;
 let lastMove = null;
 let isAnimatingSolution = false;
 
@@ -797,9 +804,15 @@ function updateAdminBadge() {
   normalText.style.display = currentPuzzleIsAdmin ? 'none' : 'inline';
 }
 
+function getCurrentModeElo() {
+  if (!currentPlayer) return 0;
+  const mode = getTrainingMode() || 'mix';
+  return Number(getPlayerEloByMode(currentPlayer, mode) || 0);
+}
+
 function initSessionStats() {
   sessionStats = {
-    startElo: currentPlayer ? Number(currentPlayer.elo || 0) : 0,
+    startElo: getCurrentModeElo(),
     played: 0,
     solved: 0,
     timeSpent: 0
@@ -828,7 +841,7 @@ async function updateSessionSummaryUI() {
     ? 0
     : Math.round((sessionStats.solved / sessionStats.played) * 100);
 
-  const eloNow = currentPlayer ? Number(currentPlayer.elo || 0) : sessionStats.startElo;
+  const eloNow = currentPlayer ? getCurrentModeElo() : sessionStats.startElo;
   const eloChange = eloNow - sessionStats.startElo;
   const eloText = eloChange > 0 ? `+${eloChange}` : String(eloChange);
 
@@ -896,17 +909,54 @@ function markPuzzleSolvedOnce() {
   }
 }
 
+// ELO sa počíta len pri PRVOM riešení danej úlohy daným hráčom.
+// Opakované riešenie tej istej pozície je stále vítané (tréning, štatistiky),
+// ale už nemení ELO — inak by sa dalo na jednej pozícii nafarmiť ľubovoľne veľa bodov.
+function isEloEligible(puzzleId) {
+  const key = String(puzzleId);
+  if (eloAwardedPuzzleIds.has(key)) return false;
+  if (excludedPuzzleIdsAtStart && excludedPuzzleIdsAtStart.has(key)) return false;
+  return true;
+}
+
+// Použije rovnaké pravidlo ako výber úloh (getExcludedPuzzleIds v js/training.js):
+// vyriešená úloha je vylúčená natrvalo, neúspešná len po dobu RETRY_AFTER_DAYS.
+// Úloha, ktorá sa legitímne vráti do výberu po uplynutí lehoty, teda ELO dostane.
+async function loadExcludedPuzzleIds() {
+  excludedPuzzleIdsAtStart = null;
+  if (!currentPlayer) return;
+  try {
+    const ids = await getExcludedPuzzleIds(currentPlayer.id);
+    excludedPuzzleIdsAtStart = new Set((ids || []).map(String));
+  } catch (e) {
+    console.error('Nepodarilo sa načítať vylúčené úlohy:', e);
+    excludedPuzzleIdsAtStart = null; // fail-safe — ELO sa nezablokuje kvôli chybe siete
+  }
+}
+
 function recordResultOnce(result) {
   if (resultLogged || !currentPlayer || !current) return;
 
   const usedTime = Math.max(0, normalizeTimeValue(current.time) - timerRemaining);
 
-  // Ak hráč raz chyboval (everFailed), ELO a log sa zapisujú len pre pôvodný neúspech
-  // Pri následnom správnom riešení po "Skús znova" sa ELO nezapočíta
+  // Jediná podmienka pre "prvý plnohodnotný pokus o túto úlohu".
+  // Rozhoduje o ELO aj o agregátoch v players (played/solved/total_time).
+  // Zápis do training_log ju NEPOUŽÍVA — každý pokus sa loguje, aj opakovanie.
+  const countsForProgress =
+    !currentPuzzleIsAdmin &&
+    (!everFailed || result === 'loss') &&
+    isEloEligible(current.id);
+
   if (!currentPuzzleIsAdmin) {
+    // História — vždy úplná, vrátane opakovaného riešenia už známej pozície
     addTrainingResult(currentPlayer.id, current.id, result, usedTime);
-    registerPlayerResult(currentPlayer.id, result, usedTime);
-    if (!everFailed || result === 'loss') {
+
+    if (countsForProgress) {
+      eloAwardedPuzzleIds.add(String(current.id));
+
+      // Agregáty hráča — len za prvý pokus, aby opakovanie neskresľovalo úspešnosť
+      registerPlayerResult(currentPlayer.id, result, usedTime);
+
       updatePlayerElo(currentPlayer.id, current.elo, result, getTrainingMode());
       // Okamžite aktualizuj lokálny objekt — rovnaký vzorec ako v player.js
       const _mode   = getTrainingMode();
@@ -916,6 +966,7 @@ function recordResultOnce(result) {
       const _change = result === 'win' ? 10 + _diff / 50 : -(10 - _diff / 50);
       currentPlayer[_field] = Math.max(100, Math.round(_curElo + _change));
     }
+    // Súhrn session zachytáva skutočnú aktivitu, teda aj opakované pokusy
     updateSessionStats(result, usedTime);
   }
 
@@ -2098,6 +2149,7 @@ async function init() {
   loadStats();
   updateStatsUI();
   await updatePlayerUI();
+  await loadExcludedPuzzleIds(); // ELO len za úlohy, ktoré sú legitímne vo výbere
   initSessionStats();
   loadLeaderboard(); // načítaj rebríček
 
