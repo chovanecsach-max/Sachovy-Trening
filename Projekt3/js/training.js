@@ -24,8 +24,11 @@ async function getExcludedPuzzleIds(playerId) {
   try {
     // Zoberieme celú históriu (puzzle_id, result, created_at) zoradenú od najnovšej,
     // aby sme pre každú úlohu vedeli určiť jej POSLEDNÝ výsledok a jeho dátum.
+    // POZOR na source=eq.puzzles: puzzles.id aj skill_puzzles.id sú int4 od 1,
+    // takže id sa medzi tabuľkami prekrývajú. Bez tohto filtra by vyriešená
+    // zručnosť č. N vylúčila z klasického tréningu úlohu č. N.
     const data = await sbFetch(
-      `training_log?player_id=eq.${playerId}&select=puzzle_id,result,created_at&order=created_at.desc`
+      `training_log?player_id=eq.${playerId}&source=eq.puzzles&select=puzzle_id,result,created_at&order=created_at.desc`
     );
     if (!data) return [];
 
