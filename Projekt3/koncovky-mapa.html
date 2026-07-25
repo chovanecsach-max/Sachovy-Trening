@@ -21,6 +21,9 @@ h1 { margin: 0 0 6px 0; text-align: center; font-size: 26px; }
 .filter-field { display: flex; flex-direction: column; gap: 4px; }
 .filter-field label { font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: bold; }
 select { padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px; background: white; min-width: 200px; }
+input[type="date"] { padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px; background: white; }
+/* Riadok s priemerným ELO za zvolené obdobie v bunke mapy */
+.cell .p { font-size: 11px; font-weight: 700; margin-top: 2px; opacity: .95; }
 button { padding: 10px 16px; border: none; border-radius: 10px; cursor: pointer; font-size: 14px; }
 .secondary { background: #e5e7eb; color: #111827; }
 
@@ -85,6 +88,24 @@ input[type="text"] { min-width: 190px; }
         <label>Skupina (tréner)</label>
         <select id="trenerSelect"><option value="all">Všetci hráči</option></select>
       </div>
+      <div class="filter-field">
+        <label>Obdobie od</label>
+        <input type="date" id="dateFrom">
+      </div>
+      <div class="filter-field">
+        <label>Obdobie po</label>
+        <input type="date" id="dateTo">
+      </div>
+      <div class="filter-field">
+        <label>Rýchlo</label>
+        <select id="periodPreset">
+          <option value="3">Posledné 3 mesiace</option>
+          <option value="6">Posledných 6 mesiacov</option>
+          <option value="12">Posledných 12 mesiacov</option>
+          <option value="0">Celé obdobie</option>
+          <option value="custom">Vlastné</option>
+        </select>
+      </div>
       <button class="secondary" onclick="goSlabiny()">← Slabinová mapa</button>
       <button class="secondary" onclick="goHome()">Späť do menu</button>
     </div>
@@ -143,8 +164,36 @@ const STAFF_ROLES      = ['trener', 'hlavny_trener', 'admin'];
 const THIN_EVIDENCE = 3;
 
 let mapStats = {}, mapPlayers = [];
+let mapLog   = [];      // surové záznamy z training_log — obdobie sa prepočíta bez nového dotazu
 let egPuzzles = null;   // id → { type, elo }
 let egTypes   = [];     // typy koncoviek zoradené podľa počtu úloh
+
+// ─── Zvolené obdobie ────────────────────────────────────────────────────────
+// Pokrytie (koľko typov už hráč zvládol) je zo svojej podstaty kumulatívne,
+// preto sa počíta vždy z celej histórie. Obdobie sa týka len priemerného ELA,
+// aby sa dalo porovnať "ako to vyzerá celkovo" s "ako to vyzerá teraz".
+function periodBounds() {
+  const f = document.getElementById('dateFrom').value;
+  const t = document.getElementById('dateTo').value;
+  if (!f || !t) return null;
+  const from = new Date(f + 'T00:00:00').getTime();
+  const to   = new Date(t + 'T23:59:59.999').getTime();
+  if (isNaN(from) || isNaN(to) || from > to) return null;
+  return { from, to, label: `${f} – ${t}` };
+}
+
+function applyPreset() {
+  const raw = document.getElementById('periodPreset').value;
+  if (raw === 'custom') return;                 // dátumy si nastavuje používateľ sám
+  const m = Number(raw);
+  const fromEl = document.getElementById('dateFrom');
+  const toEl   = document.getElementById('dateTo');
+  if (!m) { fromEl.value = ''; toEl.value = ''; return; }   // 0 = celé obdobie
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth() - m, now.getDate());
+  fromEl.value = start.toISOString().substring(0, 10);
+  toEl.value   = now.toISOString().substring(0, 10);
+}
 
 function goHome()    { location.href = 'index.html'; }
 function goSlabiny() { location.href = 'slabinova-mapa.html'; }
@@ -177,19 +226,44 @@ function coverColor(solved) {
   return              { bg: '#bbf7d0', fg: '#166534', border: '1px solid #86efac' };
 }
 
-function cellHtml(st) {
+function cellHtml(st, per, period) {
   const c = coverColor(st.solved);
   if (!st.attempts) {
     return `<td class="cell" style="background:${c.bg};color:${c.fg};border:${c.border};"
             title="Tento typ koncovky hráč ešte netrénoval">–</td>`;
   }
-  const thin = st.solved > 0 && st.solved < THIN_EVIDENCE;
-  const elo  = st.solved ? `<div class="e">Ø${Math.round(st.eloSum / st.solved)}${thin ? ' *' : ''}</div>` : '';
-  const tip  = `${st.solved} vyriešených z ${st.attempts} pokusov`
-             + (st.solved ? ` · priemerné ELO vyriešených ${Math.round(st.eloSum / st.solved)}` : '')
-             + (thin ? ' (málo úloh — orientačné)' : '');
+  const thin    = st.solved > 0 && st.solved < THIN_EVIDENCE;
+  const avgAll  = st.solved ? Math.round(st.eloSum / st.solved) : null;
+  const elo     = avgAll ? `<div class="e">Ø${avgAll}${thin ? ' *' : ''}</div>` : '';
+
+  // Riadok za zvolené obdobie — len ak je obdobie nastavené
+  let perLine = '', perTip = '';
+  if (period && per) {
+    if (!per.attempts) {
+      perLine = `<div class="p" style="opacity:.5;">–</div>`;
+      perTip  = ` · za obdobie netrénoval`;
+    } else if (!per.solved) {
+      perLine = `<div class="p" style="opacity:.7;">0/${per.attempts}</div>`;
+      perTip  = ` · za obdobie 0 vyriešených z ${per.attempts} pokusov`;
+    } else {
+      const avgPer = Math.round(per.eloSum / per.solved);
+      const d      = avgAll ? avgPer - avgAll : 0;
+      const arrow  = d > 0 ? `▲${d}` : (d < 0 ? `▼${Math.abs(d)}` : '=');
+      const thinP  = per.solved < THIN_EVIDENCE ? ' *' : '';
+      perLine = `<div class="p">Ø${avgPer}${thinP} <span style="font-weight:600;">${arrow}</span></div>`;
+      perTip  = ` · za obdobie ${per.solved} vyriešených z ${per.attempts} pokusov`
+              + `, priemerné ELO ${avgPer}`
+              + (avgAll ? ` (oproti celku ${d > 0 ? '+' : ''}${d})` : '');
+    }
+  }
+
+  const tip = `${st.solved} vyriešených z ${st.attempts} pokusov`
+            + (avgAll ? ` · priemerné ELO vyriešených ${avgAll}` : '')
+            + (thin ? ' (málo úloh — orientačné)' : '')
+            + perTip;
+
   return `<td class="cell" style="background:${c.bg};color:${c.fg};border:${c.border};" title="${tip}">
-            <div class="n">${st.solved}/${st.attempts}</div>${elo}</td>`;
+            <div class="n">${st.solved}/${st.attempts}</div>${elo}${perLine}</td>`;
 }
 
 // ─── Načítanie ───────────────────────────────────────────────────────────────
@@ -225,13 +299,15 @@ async function loadMap() {
     const players = await fetchPlayers(filter);
     if (!players.length) { setStatus('Táto skupina nemá žiadnych hráčov.', 'error'); return; }
 
-    // Len klasický tréning (source='puzzles') — zručnosti sem nepatria
+    // Len klasický tréning (source='puzzles') — zručnosti sem nepatria.
+    // created_at treba na prepočet zvoleného obdobia priamo v prehliadači.
     const ids = players.map(p => p.id).join(',');
     const log = await sbFetchAll(
-      `training_log?source=eq.puzzles&player_id=in.(${ids})&select=player_id,puzzle_id,result`
+      `training_log?source=eq.puzzles&player_id=in.(${ids})&select=player_id,puzzle_id,result,created_at`
     );
 
-    render(players, log);
+    mapLog = log || [];
+    render(players, mapLog);
     setStatus('');
   } catch (e) {
     setStatus('Chyba pri načítaní: ' + e.message, 'error');
@@ -240,12 +316,21 @@ async function loadMap() {
 
 // ─── Vykreslenie ─────────────────────────────────────────────────────────────
 function render(players, log) {
+  const period = periodBounds();
+
   // stats[playerId][type] = { attempts, solved, eloSum }
-  const stats = {};
-  players.forEach(p => {
-    stats[p.id] = {};
-    egTypes.forEach(t => { stats[p.id][t] = { attempts: 0, solved: 0, eloSum: 0 }; });
-  });
+  function emptyStats() {
+    const s = {};
+    players.forEach(p => {
+      s[p.id] = {};
+      egTypes.forEach(t => { s[p.id][t] = { attempts: 0, solved: 0, eloSum: 0 }; });
+    });
+    return s;
+  }
+
+  const stats    = emptyStats();   // celé obdobie — pokrytie
+  const statsPer = emptyStats();   // zvolené obdobie — len na porovnanie ELA
+
   (log || []).forEach(r => {
     const pz = egPuzzles.get(r.puzzle_id);
     if (!pz || !stats[r.player_id]) return;          // nie je koncovka alebo cudzí hráč
@@ -253,6 +338,15 @@ function render(players, log) {
     if (!s) return;
     s.attempts++;
     if (r.result === 'win') { s.solved++; s.eloSum += pz.elo; }
+
+    if (period) {
+      const t = new Date(r.created_at).getTime();
+      if (t >= period.from && t <= period.to) {
+        const sp = statsPer[r.player_id][pz.type];
+        sp.attempts++;
+        if (r.result === 'win') { sp.solved++; sp.eloSum += pz.elo; }
+      }
+    }
   });
 
   // Hlavička
@@ -272,7 +366,7 @@ function render(players, log) {
   rows.forEach(({ p, tot }) => {
     const nm = `${p.surname || ''} ${p.name || ''}`.trim() || '(bez mena)';
     b += `<tr><td class="name">${nm}</td>`;
-    egTypes.forEach(t => { b += cellHtml(stats[p.id][t]); });
+    egTypes.forEach(t => { b += cellHtml(stats[p.id][t], statsPer[p.id][t], period); });
     const c = coverColor(tot);
     b += `<td class="cell" style="background:${c.bg};color:${c.fg};border:${c.border};"><div class="n">${tot}</div></td></tr>`;
   });
@@ -305,7 +399,13 @@ function render(players, log) {
 
   // Poctivé upozornenie na obmedzenie dát
   document.getElementById('warnLine').innerHTML =
-    `<div class="warn-line">Počítajú sa len tréningy, pri ktorých sa dá spoľahlivo určiť pôvod úlohy.
+    `<div class="warn-line">${period
+       ? `Prvý riadok bunky je <strong>pokrytie za celé obdobie</strong> (vyriešené/pokusy) a pod ním
+          priemerné ELO vyriešených. Tretí riadok je priemerné ELO za <strong>${period.label}</strong>
+          a šípka ukazuje rozdiel oproti celku. Pokrytie sa zámerne neoreže — typ zvládnutý dávnejšie
+          nie je medzera a nemá zmysel ho zadávať znova.<br>`
+       : `Obdobie nie je nastavené — zobrazuje sa len celé obdobie.<br>`}
+     Počítajú sa len tréningy, pri ktorých sa dá spoľahlivo určiť pôvod úlohy.
      Časť starších záznamov sa spätne priradiť nedala, takže skutočné počty môžu byť mierne vyššie.
      Od zavedenia označovania sú všetky nové tréningy započítané presne.
      Hviezdička pri priemernom ELO znamená menej než ${THIN_EVIDENCE} vyriešené úlohy — číslo je len orientačné.</div>`;
@@ -427,6 +527,22 @@ async function init() {
   bn.style.display = '';
 
   document.getElementById('filterCard').style.display = '';
+
+  // Obdobie — predvolene posledné 3 mesiace. Prekreslenie beží nad už načítanými
+  // dátami, takže zmena obdobia nevyvolá nový dotaz do databázy.
+  applyPreset();
+  document.getElementById('periodPreset').addEventListener('change', () => {
+    applyPreset();
+    if (mapPlayers.length) render(mapPlayers, mapLog);
+  });
+  ['dateFrom', 'dateTo'].forEach(id => {
+    document.getElementById(id).addEventListener('change', () => {
+      // Ručná zmena dátumu už nezodpovedá predvoľbe
+      document.getElementById('periodPreset').value = 'custom';
+      if (mapPlayers.length) render(mapPlayers, mapLog);
+    });
+  });
+
   if (IS_ADMIN || IS_HLAVNY_TRENER) {
     const sel = document.getElementById('trenerSelect');
     try {
