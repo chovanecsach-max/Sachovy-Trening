@@ -192,8 +192,12 @@ async function build() {
     const ids = players.map(p => p.id).join(',');
 
     // 2) Aktivita za mesiac
+    // puzzle_id treba na počítanie UNIKÁTNYCH vyriešených úloh (opakované riešenie
+    // tej istej pozície sa počíta ako jeden výsledok), source na oddelenie
+    // klasického tréningu od zručností. POZOR: puzzles.id a skill_puzzles.id sa
+    // prekrývajú, takže úloha je jednoznačná až párom source + puzzle_id.
     const log = await sbFetchAll(
-      `training_log?player_id=in.(${ids})&created_at=gte.${startISO}&created_at=lt.${endISO}&select=player_id,result,time_spent,created_at`
+      `training_log?player_id=in.(${ids})&created_at=gte.${startISO}&created_at=lt.${endISO}&select=player_id,puzzle_id,source,result,time_spent,created_at`
     );
 
     // 3) História ELO do konca mesiaca (na výpočet stavu pred obdobím aj po ňom)
@@ -233,12 +237,32 @@ function eloMoves(pid, hist, startISO) {
 function render(ym, players, log, hist, asg, startISO) {
   const today = new Date().toISOString().substring(0, 10);
 
+  // Aktivita jedného zdroja: pokusy, unikátne vyriešené úlohy a čas.
+  // Vyriešené sa počíta cez množinu puzzle_id, takže opakované riešenie
+  // tej istej pozície zvýši pokusy, ale nie počet vyriešených úloh.
+  function activity(rows) {
+    const solvedIds = new Set();
+    rows.forEach(l => { if (l.result === 'win') solvedIds.add(l.puzzle_id); });
+    return {
+      attempts: rows.length,
+      solved:   solvedIds.size,
+      time:     rows.reduce((s, l) => s + Number(l.time_spent || 0), 0)
+    };
+  }
+
   // Údaje na hráča
   const data = players.map(p => {
-    const rows    = log.filter(l => l.player_id === p.id);
-    const solved  = rows.filter(l => l.result === 'win').length;
-    const time    = rows.reduce((s, l) => s + Number(l.time_spent || 0), 0);
-    const days    = new Set(rows.map(l => l.created_at.substring(0, 10))).size;
+    const all     = log.filter(l => l.player_id === p.id);
+    const classic = activity(all.filter(l => l.source === 'puzzles'));
+    const skills  = activity(all.filter(l => l.source === 'skill_puzzles'));
+    // Staré záznamy bez zdroja sa nedajú priradiť — do štatistík nevstupujú
+    const unknown = all.filter(l => !l.source).length;
+
+    const counted = all.filter(l => l.source === 'puzzles' || l.source === 'skill_puzzles');
+    const rows    = classic.attempts + skills.attempts;
+    const solved  = classic.solved + skills.solved;
+    const time    = classic.time + skills.time;
+    const days    = new Set(counted.map(l => l.created_at.substring(0, 10))).size;
     const moves   = eloMoves(p.id, hist, startISO);
     const mine    = asg.filter(a => a.player_id === p.id);
     const overdue = mine.filter(a => !a.completed_at && a.deadline && a.deadline < today).length;
@@ -248,14 +272,17 @@ function render(ym, players, log, hist, asg, startISO) {
       .map(c => ({ n: c.n, v: Number(p[c.f] ?? DEF_SKILL) }))
       .sort((a, b) => a.v - b.v)[0];
 
-    return { p, rows: rows.length, solved, time, days, moves, mine, overdue, weakest,
+    return { p, rows, solved, time, days, classic, skills, unknown,
+             moves, mine, overdue, weakest,
              name: `${p.surname || ''} ${p.name || ''}`.trim() || '(bez mena)' };
   });
 
   const active  = data.filter(d => d.rows > 0);
   const idle    = data.filter(d => d.rows === 0);
-  const totalS  = data.reduce((s, d) => s + d.solved, 0);
+  const totalC  = data.reduce((s, d) => s + d.classic.solved, 0);
+  const totalS  = data.reduce((s, d) => s + d.skills.solved, 0);
   const totalT  = data.reduce((s, d) => s + d.time, 0);
+  const totalU  = data.reduce((s, d) => s + d.unknown, 0);
   const overdue = data.filter(d => d.overdue > 0);
 
   // Najslabšie zručnosti skupiny (aktuálny stav)
@@ -271,7 +298,7 @@ function render(ym, players, log, hist, asg, startISO) {
   data.sort((a, b) => {
     if ((a.rows === 0) !== (b.rows === 0)) return a.rows === 0 ? -1 : 1;
     if ((a.overdue > 0) !== (b.overdue > 0)) return a.overdue > 0 ? -1 : 1;
-    return a.solved - b.solved;
+    return a.solved - b.solved;   // najmenej vyriešených úloh hore
   });
 
   let h = `<div class="rep-head">
@@ -280,11 +307,17 @@ function render(ym, players, log, hist, asg, startISO) {
     </div>
 
     <div class="tiles">
-      <div class="tile"><div class="n">${totalS}</div><div class="l">Vyriešených úloh</div></div>
+      <div class="tile"><div class="n">${totalC}</div><div class="l">Klasický tréning</div></div>
+      <div class="tile"><div class="n">${totalS}</div><div class="l">Zručnosti</div></div>
       <div class="tile"><div class="n">${fmtTime(totalT)}</div><div class="l">Čas spolu</div></div>
       <div class="tile"><div class="n">${active.length}</div><div class="l">Trénovalo</div></div>
       <div class="tile ${idle.length ? 'warn' : ''}"><div class="n">${idle.length}</div><div class="l">Netrénovalo</div></div>
     </div>
+
+    <div class="focus" style="background:#f8fafc;border-color:#e2e8f0;color:#475569;">
+      Počty sú <strong>unikátne vyriešené úlohy</strong> — opakované riešenie tej istej pozície
+      sa počíta ako pokus, nie ako nová vyriešená úloha.${totalU
+        ? ` Nezahrnutých je ${totalU} starších záznamov bez určeného zdroja.` : ''}</div>
 
     <div class="focus">🎯 <strong>Na čo zamerať tréning:</strong>
       ${colAvg.slice(0, 2).map(c => `${c.n} (${Math.round(c.a)})`).join(', ')} — najnižší priemer v skupine.</div>`;
@@ -314,7 +347,10 @@ function render(ym, players, log, hist, asg, startISO) {
           ? '<span class="pb-tag idle">netrénoval</span>'
           : `<span class="pb-tag ok">${d.days} ${d.days === 1 ? 'deň' : (d.days < 5 ? 'dni' : 'dní')} tréningu</span>`}
       </div>
-      <div class="pb-line"><span class="lbl">Aktivita:</span> ${d.solved} vyriešených z ${d.rows} úloh · ${fmtTime(d.time)}</div>
+      <div class="pb-line"><span class="lbl">Klasický tréning:</span> ${d.classic.solved} vyriešených${
+        d.classic.attempts > d.classic.solved ? ` (${d.classic.attempts} pokusov)` : ''} · ${fmtTime(d.classic.time)}</div>
+      <div class="pb-line"><span class="lbl">Zručnosti:</span> ${d.skills.solved} vyriešených${
+        d.skills.attempts > d.skills.solved ? ` (${d.skills.attempts} pokusov)` : ''} · ${fmtTime(d.skills.time)}</div>
       <div class="pb-line"><span class="lbl">Posun ELO:</span></div>
       ${moves}
       <div class="pb-line"><span class="lbl">Najslabšia zručnosť:</span> ${d.weakest.n} (${d.weakest.v})</div>
