@@ -706,7 +706,7 @@ function goKoncovkyMapa()  { location.href = "koncovky-mapa.html"; }
 
 // Odznak s počtom nesplnených zadaní. Splnenie sa vyhodnocuje rovnako ako na
 // stránke zadania.html: pri cieli na ELO podľa aktuálneho elo_<zručnosť>,
-// pri počte úloh podľa záznamov v elo_history od zadania.
+// pri počte úloh podľa úloh vyriešených na prvý pokus po zadaní.
 async function loadAssignmentBadge() {
   try {
     const player = await getCurrentPlayer();
@@ -717,44 +717,23 @@ async function loadAssignmentBadge() {
     // Má aspoň jedno zadanie — zobraz tlačidlo aj trénerovi/adminovi
     document.getElementById('asgBtn').style.display = 'flex';
 
-    // Zručnostné zadania s počtom úloh — z histórie ELO
-    let history = [];
-    const counts = rows.filter(r => r.target_type === 'count' && !r.endgame_type);
-    if (counts.length) {
-      // Čas z PostgREST končí na "+00:00"; znak "+" sa v URL číta ako medzera,
-      // preto ho normalizujeme cez toISOString() na tvar s "Z".
-      const from = new Date(counts.map(r => r.created_at).sort()[0]).toISOString();
-      history = await sbFetch(`elo_history?player_id=eq.${player.id}&created_at=gte.${from}&select=category,created_at`) || [];
-    }
-
-    // Koncovkové zadania — z vyriešených úloh klasického tréningu
-    let egIds = {}, egLog = [];
-    const egAsg = rows.filter(r => r.endgame_type && !r.completed_at);
-    if (egAsg.length) {
-      const pz = await sbFetch('puzzles?category=eq.Koncovka&select=id,endgame_type') || [];
-      pz.forEach(x => {
-        const t = x.endgame_type || 'Neklasifikované';
-        (egIds[t] = egIds[t] || new Set()).add(x.id);
-      });
-      const from = new Date(egAsg.map(r => r.created_at).sort()[0]).toISOString();
-      egLog = await sbFetch(
-        `training_log?player_id=eq.${player.id}&source=eq.puzzles&result=eq.win&created_at=gte.${from}&select=puzzle_id,created_at`
-      ) || [];
+    // Ciele na počet úloh (vrátane koncoviek) — z training_log, počítajú sa
+    // len úlohy vyriešené na prvý pokus po zadaní. Čas z PostgREST končí na
+    // "+00:00"; znak "+" sa v URL číta ako medzera, preto normalizujeme cez toISOString().
+    let logRows = [], meta = { puzzles: new Map(), skills: new Map() };
+    const needLog = rows.filter(r => (r.target_type === 'count' || r.endgame_type) && !r.completed_at);
+    if (needLog.length) {
+      const from = new Date(needLog.map(r => r.created_at).sort()[0]).toISOString();
+      logRows = await loadAssignmentLog([player.id], from);
+      meta    = await loadAssignmentPuzzleMeta(logRows);
     }
 
     const open = rows.filter(a => {
       if (a.completed_at) return false;                 // ručne uzavreté trénerom
-      if (a.endgame_type) {
-        const ids = egIds[a.endgame_type] || new Set();
-        const n = egLog.filter(r => ids.has(r.puzzle_id) &&
-                    new Date(r.created_at) >= new Date(a.created_at)).length;
-        return n < a.target_value;
-      }
-      if (a.target_type === 'elo') {
+      if (a.target_type === 'elo' && !a.endgame_type) {
         return Number(player['elo_' + a.skill] ?? 1200) < a.target_value;
       }
-      const n = history.filter(r => r.category === a.skill && new Date(r.created_at) >= new Date(a.created_at)).length;
-      return n < a.target_value;
+      return countFirstAttemptWins(logRows, a, meta) < a.target_value;
     }).length;
 
     if (open > 0) {
