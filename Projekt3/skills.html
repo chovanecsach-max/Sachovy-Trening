@@ -588,6 +588,20 @@ let puzzleDone = false;
 let puzzleFailed = false;
 let resultLogged = false;
 let everFailed = false; // true ak hráč raz chyboval/ukázal riešenie — ELO sa nezapočíta
+
+// Úlohy, za ktoré už v tejto session padlo ELO (win aj loss). Spolu so
+// solvedSkillIds (história z training_log) zabraňuje opakovanému získavaniu
+// ELO na tej istej úlohe cez "Skús znova".
+const eloAwardedSkillIds = new Set();
+
+// ELO a agregáty v players sa počítajú len pri PRVOM pokuse o danú úlohu.
+// Opakovanie sa naďalej zapisuje do training_log, ale nemení pokrok.
+function isSkillEloEligible(puzzleId) {
+  if (puzzleId == null) return false;
+  if (eloAwardedSkillIds.has(puzzleId)) return false;
+  if (solvedSkillIds.has(puzzleId)) return false;   // už vyriešená / nedávno neúspešná
+  return true;
+}
 let isAdminMode = false;
 let puzzleCounted = false;
 let puzzleSolvedCounted = false;
@@ -1147,6 +1161,12 @@ async function recordResult(result) {
     return;
   }
 
+  // POZOR: vyhodnoť oprávnenosť SYNCHRÓNNE, ešte pred prvým await.
+  // Volajúci po spustení recordResult('win') hneď pridáva id do solvedSkillIds,
+  // takže po await by sa prvé riešenie javilo ako opakovanie a ELO by nepadlo.
+  const eloEligible = isSkillEloEligible(current.id);
+  if (eloEligible) eloAwardedSkillIds.add(current.id);
+
   // Ulož posledný typ zručnosti pre zobrazenie ELO v menu
   const skillType = new URLSearchParams(window.location.search).get('type') || 'checks_captures';
   localStorage.setItem('lastTrainingMode', 'skill_' + skillType);
@@ -1164,7 +1184,8 @@ async function recordResult(result) {
         player_id: currentPlayer.id,
         puzzle_id: current.id,
         result: result,
-        time_spent: usedTime
+        time_spent: usedTime,
+        source: "skill_puzzles"   // úloha z tabuľky skill_puzzles (tréning zručností)
       })
     });
   } catch(e) {
@@ -1172,7 +1193,13 @@ async function recordResult(result) {
   }
 
   // Aktualizuj ELO (vlastné pre danú zručnosť, v komplexnom režime spoločné),
-  // total_time a štatistiky
+  // total_time a štatistiky — len pri prvom pokuse o túto úlohu.
+  // Opakované riešenie zostáva v training_log, ale pokrok už nemení.
+  if (!eloEligible) {
+    setStatus('Túto úlohu si už riešil — zapísala sa do histórie, ELO sa nemení.', 'info');
+    return;
+  }
+
   try {
     const players = await sbFetch(`players?id=eq.${currentPlayer.id}&limit=1`);
     if (players && players.length) {
@@ -1373,8 +1400,11 @@ const SKILL_RETRY_AFTER_DAYS = 14;   // po tomto počte dní sa nevyriešená (l
 async function loadSolvedSkillIds() {
   if (!currentPlayer) return;
   try {
+    // POZOR na source=eq.skill_puzzles: skill_puzzles.id aj puzzles.id sú int4
+    // od 1, takže sa prekrývajú. Bez tohto filtra by vyriešená klasická úloha
+    // č. N vylúčila z tréningu zručnosť č. N.
     const data = await sbFetch(
-      `training_log?player_id=eq.${currentPlayer.id}&select=puzzle_id,result,created_at&order=created_at.desc`
+      `training_log?player_id=eq.${currentPlayer.id}&source=eq.skill_puzzles&select=puzzle_id,result,created_at&order=created_at.desc`
     );
     const lastByPuzzle = new Map();
     (data || []).forEach(row => {
