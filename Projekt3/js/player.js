@@ -234,10 +234,12 @@ function countFirstAttemptWins(logRows, assignment, meta) {
 
 // ─── Tréneri ────────────────────────────────────────────────────────────────
 
+// Číta z pohľadu trainers_public (len meno a prezývka trénerov), nie z tabuľky
+// profiles — tá je od kroku 2b zavretá pre neprihlásených.
 async function getTrainers() {
   try {
     const data = await sbFetch(
-      "profiles?role=eq.trener&select=id,name,surname,nick_name&order=surname.asc"
+      "trainers_public?select=id,name,surname,nick_name&order=surname.asc"
     );
     return data || [];
   } catch (e) {
