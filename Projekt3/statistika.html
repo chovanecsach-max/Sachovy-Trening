@@ -860,7 +860,7 @@ async function exportPgn() {
 
     // Načítaj všetky chybné záznamy za obdobie (vrátane puzzle_id)
     const logs = await sbFetchAll(
-      `training_log?player_id=eq.${playerId}&result=eq.loss&created_at=gte.${dateFromFull}&created_at=lte.${dateToFull}&select=puzzle_id,created_at&order=created_at.asc,id.asc`
+      `training_log?player_id=eq.${playerId}&result=eq.loss&created_at=gte.${dateFromFull}&created_at=lte.${dateToFull}&select=puzzle_id,source,created_at&order=created_at.asc,id.asc`
     );
 
     if (!logs || !logs.length) {
@@ -868,20 +868,36 @@ async function exportPgn() {
       return;
     }
 
-    // Rozdeľ puzzle_id — skúsime obe tabuľky
-    const puzzleIds = [...new Set(logs.map(l => l.puzzle_id))];
-    const idsParam  = `(${puzzleIds.join(',')})`;
+    // Rozdeľ puzzle_id podľa toho, z ktorej tabuľky záznam pochádza.
+    // POZOR: puzzles.id aj skill_puzzles.id sú int4 od 1, takže sa prekrývajú —
+    // samotné puzzle_id neurčuje úlohu jednoznačne, rozhoduje až source.
+    // Riadky bez source (staré, pred zavedením poľa) skúsime v oboch tabuľkách,
+    // ale klasické puzzles majú prednosť, aby sa nepodstrčila cudzia pozícia.
+    const idsOf = src => [...new Set(logs.filter(l => l.source === src).map(l => l.puzzle_id))];
+    const puzIds   = [...new Set([...idsOf('puzzles'),       ...idsOf(null)])];
+    const skillIds = [...new Set([...idsOf('skill_puzzles'), ...idsOf(null)])];
 
     // Načítaj z puzzles aj skill_puzzles paralelne
     const [puzRows, skillRows] = await Promise.all([
-      sbFetch(`puzzles?id=in.${idsParam}&select=id,title,fen,category,prompt`).catch(() => []),
-      sbFetch(`skill_puzzles?id=in.${idsParam}&select=id,title,fen,skill_type,prompt`).catch(() => [])
+      puzIds.length
+        ? sbFetch(`puzzles?id=in.(${puzIds.join(',')})&select=id,title,fen,category,prompt`).catch(() => [])
+        : [],
+      skillIds.length
+        ? sbFetch(`skill_puzzles?id=in.(${skillIds.join(',')})&select=id,title,fen,skill_type,prompt`).catch(() => [])
+        : []
     ]);
 
-    // Zlúč do jednej mapy id → puzzle
-    const puzzleMap = {};
-    (puzRows  || []).forEach(p => { puzzleMap[p.id] = { ...p, source: 'puzzle'       }; });
-    (skillRows|| []).forEach(p => { puzzleMap[p.id] = { ...p, source: 'skill_puzzle' }; });
+    // Dve oddelené mapy — žiadne prepisovanie medzi tabuľkami
+    const puzzleMap = {}, skillMap = {};
+    (puzRows   || []).forEach(p => { puzzleMap[p.id] = { ...p, source: 'puzzle'       }; });
+    (skillRows || []).forEach(p => { skillMap[p.id]  = { ...p, source: 'skill_puzzle' }; });
+
+    // Vyber správnu úlohu pre záznam z logu
+    const resolvePuzzle = log => {
+      if (log.source === 'puzzles')       return puzzleMap[log.puzzle_id] || null;
+      if (log.source === 'skill_puzzles') return skillMap[log.puzzle_id]  || null;
+      return puzzleMap[log.puzzle_id] || skillMap[log.puzzle_id] || null;  // starý riadok bez source
+    };
 
     // Zostav PGN — jeden záznam na unikátne puzzle
     const seenIds  = new Set();
@@ -889,10 +905,13 @@ async function exportPgn() {
 
     logs.forEach(log => {
       const pid = log.puzzle_id;
-      if (seenIds.has(pid)) return; // každé puzzle max raz
-      seenIds.add(pid);
+      // Kľúč musí obsahovať aj tabuľku — inak by sa chyba na klasickej úlohe
+      // a na zručnosti s rovnakým id zlúčila do jedného záznamu.
+      const key = (log.source || 'neurcene') + ':' + pid;
+      if (seenIds.has(key)) return; // každé puzzle max raz
+      seenIds.add(key);
 
-      const p = puzzleMap[pid];
+      const p = resolvePuzzle(log);
       if (!p) return; // puzzle sa nenašlo (zmazané?)
 
       const date    = log.created_at.substring(0, 10).replace(/-/g, '.');
