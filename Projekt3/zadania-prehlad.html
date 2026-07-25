@@ -156,16 +156,8 @@ function daysLeft(d) {
 function clamp01(x) { return Math.max(0, Math.min(1, x)); }
 
 // ─── Pokrok (rovnaká logika ako na stránke hráča) ───────────────────────────
-function computeProgress(a, player, history, egLog, egIds) {
-  if (a.endgame_type) {
-    const ids = egIds[a.endgame_type] || new Set();
-    const n = egLog.filter(r => r.player_id === a.player_id && ids.has(r.puzzle_id) &&
-                new Date(r.created_at) >= new Date(a.created_at)).length;
-    return { pct: clamp01(n / a.target_value), done: n >= a.target_value,
-             txt: `${n} / ${a.target_value} koncoviek` };
-  }
-
-  if (a.target_type === 'elo') {
+function computeProgress(a, player, logRows, meta) {
+  if (a.target_type === 'elo' && !a.endgame_type) {
     const cur  = Number(player?.['elo_' + a.skill] ?? 1200);
     const base = (a.baseline_elo != null) ? Number(a.baseline_elo) : null;
     const pct  = (base != null && a.target_value > base)
@@ -173,10 +165,12 @@ function computeProgress(a, player, history, egLog, egIds) {
       : (cur >= a.target_value ? 1 : 0);
     return { pct, done: cur >= a.target_value, txt: `${cur} / ${a.target_value}` };
   }
-  const n = history.filter(r =>
-    r.player_id === a.player_id && r.category === a.skill &&
-    new Date(r.created_at) >= new Date(a.created_at)).length;
-  return { pct: clamp01(n / a.target_value), done: n >= a.target_value, txt: `${n} / ${a.target_value} úloh` };
+
+  // Počítajú sa len úlohy vyriešené na prvý pokus po zadaní
+  const n    = countFirstAttemptWins(logRows, a, meta);
+  const unit = a.endgame_type ? 'koncoviek' : 'úloh';
+  return { pct: clamp01(n / a.target_value), done: n >= a.target_value,
+           txt: `${n} / ${a.target_value} ${unit}` };
 }
 
 // ─── Načítanie ───────────────────────────────────────────────────────────────
@@ -198,42 +192,24 @@ async function load() {
     // História pre ciele typu "počet úloh" — jeden dotaz pre všetkých hráčov.
     // Čas normalizujeme cez toISOString(), lebo "+" z PostgREST by sa v URL
     // čítal ako medzera a dotaz by zlyhal.
-    let history = [];
-    const counts = rows.filter(r => r.target_type === 'count');
-    if (counts.length) {
-      const from = new Date(counts.map(r => r.created_at).sort()[0]).toISOString();
-      const ids  = [...new Set(counts.map(r => r.player_id))].join(',');
+    // Pokrok pri cieľoch na počet úloh (vrátane koncoviek) — z training_log.
+    // Načítavajú sa aj neúspechy, inak by sa nedalo rozlíšiť riešenie na prvý
+    // pokus od výhry po chybe.
+    let logRows = [], meta = { puzzles: new Map(), skills: new Map() };
+    const needLog = rows.filter(r => r.target_type === 'count' || r.endgame_type);
+    if (needLog.length) {
+      const from = new Date(needLog.map(r => r.created_at).sort()[0]).toISOString();
+      const pids = [...new Set(needLog.map(r => r.player_id))];
       try {
-        history = await sbFetch(
-          `elo_history?player_id=in.(${ids})&created_at=gte.${from}&select=player_id,category,created_at`
-        ) || [];
+        logRows = await loadAssignmentLog(pids, from);
+        meta    = await loadAssignmentPuzzleMeta(logRows);
       } catch (e) {
         setStatus('Pokrok pri cieľoch „počet úloh" sa nepodarilo načítať.', 'error');
       }
     }
 
-    // Zadania na koncovky — zoznam úloh podľa typu a vyriešené z klasického tréningu
-    let egIds = {}, egLog = [];
-    const egAsg = rows.filter(r => r.endgame_type);
-    if (egAsg.length) {
-      try {
-        const pz = await sbFetch('puzzles?category=eq.Koncovka&select=id,endgame_type') || [];
-        pz.forEach(x => {
-          const t = x.endgame_type || 'Neklasifikované';
-          (egIds[t] = egIds[t] || new Set()).add(x.id);
-        });
-        const from = new Date(egAsg.map(r => r.created_at).sort()[0]).toISOString();
-        const pids = [...new Set(egAsg.map(r => r.player_id))].join(',');
-        egLog = await sbFetch(
-          `training_log?player_id=in.(${pids})&source=eq.puzzles&result=eq.win&created_at=gte.${from}&select=player_id,puzzle_id,created_at`
-        ) || [];
-      } catch (e) {
-        setStatus('Pokrok pri koncovkových zadaniach sa nepodarilo načítať.', 'error');
-      }
-    }
-
     allRows = rows.map(a => {
-      const prog = computeProgress(a, a.player, history, egLog, egIds);
+      const prog = computeProgress(a, a.player, logRows, meta);
       // Ručne uzavreté zadanie sa berie ako splnené bez ohľadu na výpočet
       const done = !!a.completed_at || prog.done;
       const late = !done && a.deadline && daysLeft(a.deadline) < 0;
