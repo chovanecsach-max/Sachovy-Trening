@@ -244,6 +244,9 @@ function setStatus(id, text, type) {
 }
 
 // Načítanie trénerov do dropdown
+// POZOR: číta sa z pohľadu trainers_public, nie z tabuľky profiles. Registrácia
+// beží pred prihlásením a profiles je od kroku 2b zavreté pre neprihlásených —
+// pohľad zverejňuje len meno a prezývku trénerov, nie emaily a role všetkých.
 async function loadTrainerDropdown() {
   const sel = document.getElementById('regTrener');
   // Ak sú options už načítané (okrem prvého "bez trénera"), nekresliť znova
@@ -251,7 +254,7 @@ async function loadTrainerDropdown() {
 
   try {
     const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/profiles?role=eq.trener&select=id,name,surname,nick_name&order=surname.asc`,
+      `${SUPABASE_URL}/rest/v1/trainers_public?select=id,name,surname,nick_name&order=surname.asc`,
       {
         headers: {
           'apikey': SUPABASE_KEY,
