@@ -133,6 +133,105 @@ async function logEloHistory(playerId, mode, newElo) {
   }
 }
 
+// ─── Pokrok zadaní ──────────────────────────────────────────────────────────
+// Zadanie sa plní LEN úlohami vyriešenými na prvý pokus po jeho zadaní.
+// Preto sa načítavajú aj neúspechy — bez nich sa nedá odlíšiť „vyriešil hneď"
+// od „najprv pokazil a potom to dal na druhý raz". Rozhodujúci je prvý záznam
+// o danej úlohe po dátume zadania; staršie neúspechy sa proti hráčovi nerátajú,
+// takže úloha vrátená do výberu po RETRY_AFTER_DAYS má plnú hodnotu.
+
+const BASIC_ASSIGNMENT_CATEGORY = {
+  taktika:   'Taktika',
+  strategia: 'Strategia',
+  koncovka:  'Koncovka'
+};
+
+// Záznamy z training_log (výhry aj prehry) pre daných hráčov od zadaného času
+async function loadAssignmentLog(playerIds, fromISO) {
+  const ids = [...new Set(playerIds)].filter(Boolean).join(',');
+  if (!ids) return [];
+  const PAGE = 1000;
+  let all = [], off = 0;
+  while (true) {
+    const batch = await sbFetch(
+      `training_log?player_id=in.(${ids})&created_at=gte.${fromISO}` +
+      `&select=player_id,puzzle_id,source,result,created_at` +
+      `&order=created_at.asc,id.asc&limit=${PAGE}&offset=${off}`
+    );
+    if (!batch || !batch.length) break;
+    all = all.concat(batch);
+    if (batch.length < PAGE) break;
+    off += PAGE;
+  }
+  return all;
+}
+
+// Kategórie úloh — doťahujú sa len pre id, ktoré sa v logu naozaj vyskytli.
+// POZOR: puzzles.id a skill_puzzles.id sa prekrývajú, preto dve oddelené mapy.
+async function loadAssignmentPuzzleMeta(logRows) {
+  const meta = { puzzles: new Map(), skills: new Map() };
+  const idsOf = src => [...new Set((logRows || [])
+    .filter(r => r.source === src && r.puzzle_id != null)
+    .map(r => r.puzzle_id))];
+
+  async function fetchByIds(table, ids, select, onRow) {
+    const BATCH = 300;   // krátke URL, aby dotaz neprekročil limit dĺžky
+    for (let i = 0; i < ids.length; i += BATCH) {
+      const chunk = ids.slice(i, i + BATCH);
+      try {
+        const rows = await sbFetch(`${table}?id=in.(${chunk.join(',')})&select=${select}`) || [];
+        rows.forEach(onRow);
+      } catch (e) {
+        console.error(`Načítanie kategórií z ${table} zlyhalo:`, e);
+      }
+    }
+  }
+
+  await fetchByIds('puzzles', idsOf('puzzles'), 'id,category,endgame_type',
+    p => meta.puzzles.set(p.id, p));
+  await fetchByIds('skill_puzzles', idsOf('skill_puzzles'), 'id,skill_type',
+    p => meta.skills.set(p.id, p.skill_type));
+
+  return meta;
+}
+
+// Počet úloh vyriešených na prvý pokus po zadaní.
+// logRows musia byť zoradené vzostupne podľa created_at (tak ich vracia
+// loadAssignmentLog) — prvý nájdený záznam o úlohe je ten rozhodujúci.
+function countFirstAttemptWins(logRows, assignment, meta) {
+  const since        = new Date(assignment.created_at);
+  const wantEndgame  = assignment.endgame_type || null;
+  const wantCategory = BASIC_ASSIGNMENT_CATEGORY[assignment.skill] || null;
+
+  const firstByPuzzle = new Map();
+
+  for (const r of (logRows || [])) {
+    // Ak zadanie nesie player_id (trénerský prehľad), filtruj podľa hráča
+    if (assignment.player_id && r.player_id !== assignment.player_id) continue;
+    if (new Date(r.created_at) < since) continue;
+
+    if (wantEndgame) {
+      if (r.source !== 'puzzles') continue;
+      const p = meta.puzzles.get(r.puzzle_id);
+      if (!p || (p.endgame_type || 'Neklasifikované') !== wantEndgame) continue;
+    } else if (wantCategory) {
+      if (r.source !== 'puzzles') continue;
+      const p = meta.puzzles.get(r.puzzle_id);
+      if (!p || p.category !== wantCategory) continue;
+    } else {
+      if (r.source !== 'skill_puzzles') continue;
+      if (meta.skills.get(r.puzzle_id) !== assignment.skill) continue;
+    }
+
+    const key = r.source + ':' + r.puzzle_id;
+    if (!firstByPuzzle.has(key)) firstByPuzzle.set(key, r);
+  }
+
+  let n = 0;
+  firstByPuzzle.forEach(r => { if (r.result === 'win') n++; });
+  return n;
+}
+
 // ─── Tréneri ────────────────────────────────────────────────────────────────
 
 async function getTrainers() {
