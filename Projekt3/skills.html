@@ -1224,7 +1224,15 @@ async function recordResult(result) {
       const player = players[0];
       const eloField = updateEloField();      // konkrétna zručnosť, nie priemer
       const currentElo = Number(player[eloField] || 1500);
-      const puzzleElo = Number(current.elo || 1200);
+      // Stĺpec elo v skill_puzzles nie je mierou náročnosti pozície, ale iba
+      // značkou úrovne, na ktorej bola úloha vygenerovaná (get_elo v
+      // generate_vision.py: „nezávisí od počtu riešení"). Náročnosť určuje ČAS,
+      // a ten sa od zavedenia SKILL_TIME_TABLE počíta z úrovne hráča.
+      // Pri jednotlivej zručnosti výber servíruje úlohu z úrovne hráča, takže
+      // značka aj tak zodpovedá jeho sile a dá sa použiť. V komplexnom tréningu
+      // je pozícia náhodná, takže by sa počítalo proti cudzej úrovni — preto sa
+      // tam porovnáva hráč sám so sebou: úspech +10, neúspech −10.
+      const puzzleElo = isCompleteMode() ? currentElo : Number(current.elo || 1200);
       let change = eloZmena(currentElo, puzzleElo, result);
       // Ak hráč chyboval alebo ukázal riešenie, ELO pri výhre sa nepočíta
       if (everFailed && result === 'win') change = 0;
