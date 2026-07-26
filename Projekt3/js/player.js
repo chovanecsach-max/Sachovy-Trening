@@ -140,6 +140,39 @@ function eloZmena(hracElo, ulohaElo, result) {
                           : Math.min(-1, Math.round(zmena));
 }
 
+// ─── Časový limit pri zručnostiach ──────────────────────────────────────────
+// Čas nie je vlastnosťou úlohy, ale dôsledkom úrovne hráča:
+//     limit = základ + počet_riešení × bonus
+// Aby pozícia s ôsmimi šachmi nemala rovnaký čas ako pozícia s jedným.
+// Úroveň sa určí podľa ELA hráča V DANEJ ZRUČNOSTI — hranica je horná, teda
+// „do 1200" znamená 1200 a menej. Posledná úroveň platí pre všetko nad ňou.
+// Riadok = [horná hranica ELA, základ v sekundách, bonus za jedno riešenie].
+// Uvedené hranice zodpovedajú metodickej tabuľke piatich úrovní; posledná má
+// hranicu Infinity, jej menovité ELO je v komentári.
+const SKILL_TIME_TABLE = {
+  checks:            [[1200, 15, 10], [1400, 15, 5], [1600, 10, 5], [1800, 10, 3], [Infinity,  6, 2]], // 5. úroveň 2000
+  captures:          [[1250, 15, 10], [1450, 15, 5], [1650, 10, 5], [1850, 10, 3], [Infinity,  6, 2]], // 2000
+  pawn_breakthrough: [[1200, 15, 10], [1400, 15, 5], [1600, 10, 5], [1800, 10, 3], [Infinity,  6, 2]], // 2000
+  direct_attack:     [[1250, 15, 10], [1450, 15, 5], [1650, 10, 5], [1850, 10, 3], [Infinity,  6, 2]], // 2000
+  underdefended:     [[1300, 20, 10], [1500, 20, 5], [1700, 10, 5], [1900, 10, 3], [Infinity,  6, 2]], // 2000
+  pin:               [[1250, 15, 10], [1450, 15, 5], [1650, 15, 5], [1850, 10, 3], [Infinity,  6, 2]], // 2000
+  relative_pin:      [[1400, 30, 10], [1600, 30, 5], [1800, 30, 5], [2000, 20, 3], [Infinity, 10, 3]], // 2100
+  fork:              [[1500, 60, 10], [1700, 60, 5], [1900, 40, 5], [2100, 30, 3], [Infinity, 15, 3]], // 2200
+  direct_threat:     [[1400, 60, 10], [1600, 60, 5], [1800, 40, 5], [2000, 30, 3], [Infinity, 15, 3]]  // 2200
+};
+
+// Vráti limit v sekundách, alebo null pri neznámej zručnosti (vtedy sa použije
+// pôvodný čas uložený v úlohe).
+function skillTimeLimit(skillType, playerElo, pocetRieseni) {
+  const tabulka = SKILL_TIME_TABLE[skillType];
+  if (!tabulka) return null;
+  const elo = Number(playerElo);
+  const n = Math.max(1, Number(pocetRieseni) || 1);
+  const riadok = tabulka.find(r => (Number.isFinite(elo) ? elo : 1200) <= r[0])
+              || tabulka[tabulka.length - 1];
+  return Math.max(5, Math.round(riadok[1] + n * riadok[2]));
+}
+
 // ─── Hlásenie tichých zlyhaní zápisu ────────────────────────────────────────
 // Niektoré zápisy (napr. ELO história) zámerne neblokujú tréning — keď zlyhajú,
 // hráč nič nespozoruje. Bez záznamu sa taká chyba hľadá veľmi ťažko (presne to
