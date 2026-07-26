@@ -1224,11 +1224,10 @@ async function recordResult(result) {
       const eloField = updateEloField();      // konkrétna zručnosť, nie priemer
       const currentElo = Number(player[eloField] || 1500);
       const puzzleElo = Number(current.elo || 1200);
-      const diff = puzzleElo - currentElo;
-      let change = result === 'win' ? 10 + diff / 50 : -(10 - diff / 50);
+      let change = eloZmena(currentElo, puzzleElo, result);
       // Ak hráč chyboval alebo ukázal riešenie, ELO pri výhre sa nepočíta
       if (everFailed && result === 'win') change = 0;
-      const newElo = Math.max(100, Math.round(currentElo + change));
+      const newElo = Math.max(100, currentElo + change);
 
       const updates = {
         [eloField]: newElo,
