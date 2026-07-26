@@ -191,8 +191,8 @@ function applyPreset() {
   if (!m) { fromEl.value = ''; toEl.value = ''; return; }   // 0 = celé obdobie
   const now = new Date();
   const start = new Date(now.getFullYear(), now.getMonth() - m, now.getDate());
-  fromEl.value = start.toISOString().substring(0, 10);
-  toEl.value   = now.toISOString().substring(0, 10);
+  fromEl.value = localDay(start);
+  toEl.value   = localDay(now);
 }
 
 function goHome()    { location.href = 'index.html'; }
