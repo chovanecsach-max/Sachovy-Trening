@@ -842,12 +842,13 @@ async function loadLeaderboards(myName) {
   // Načítaj všetkých hráčov raz — potom sortuj lokálne
   let players = [];
   try {
-    const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/players?select=name,surname,elo,elo_taktika,elo_strategia,elo_koncovka,elo_zrucnosti,profile:profiles!user_id(role)`,
-      { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }
-    );
-    players = (await res.json() || [])
-      .filter(p => p.profile?.role !== 'admin');
+    // POZOR: musí ísť cez sbFetch, ktoré pripojí token prihláseného používateľa.
+    // Pôvodne tu bol vlastný fetch s verejným kľúčom v hlavičke Authorization —
+    // dotaz teda odchádzal ako neprihlásený a po zavretí tabuľky players
+    // pre neprihlásených sa rebríček prestal načítavať.
+    players = (await sbFetch(
+      'players?select=name,surname,elo,elo_taktika,elo_strategia,elo_koncovka,elo_zrucnosti,profile:profiles!user_id(role)'
+    ) || []).filter(p => p.profile?.role !== 'admin');
   } catch(e) {
     LB_CATEGORIES.forEach(cat => {
       document.getElementById('lb-' + cat.id).innerHTML =
