@@ -289,14 +289,14 @@ function render() {
          : `${a.deadline} (o ${n} d)`;
     }
     return `<tr class="${cls}">
-      <td>${nm}</td>
+      <td>${escapeHtml(nm)}</td>
       <td>${a.endgame_type ? '♚ ' + a.endgame_type : (SKILL_NAMES[a.skill] || a.skill)}</td>
       <td>${goal}</td>
       <td><div class="bar"><span class="${bcls}" style="width:${Math.round(x.prog.pct * 100)}%"></span></div>
           <div class="prog-txt">${x.prog.txt}</div></td>
       <td>${dl}</td>
       <td>${badge}</td>
-      <td class="note-cell">${a.note ? a.note : ''}</td>
+      <td class="note-cell">${a.note ? escapeHtml(a.note) : ''}</td>
       <td style="white-space:nowrap;">
         ${a.completed_at ? '' : `<button class="act" onclick="closeAsg(${a.id})" title="Označiť ako uzavreté">Uzavrieť</button>`}
         <button class="act del" onclick="deleteAsg(${a.id})" title="Zmazať zadanie">Zmazať</button>
