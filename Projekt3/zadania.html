@@ -102,7 +102,7 @@ function setStatus(text, type = '') {
   el.style.display = text ? '' : 'none';
 }
 
-function todayISO() { return new Date().toISOString().substring(0, 10); }
+function todayISO() { return todayLocal(); }   // miestny čas, nie UTC
 
 function daysLeft(deadline) {
   const d1 = new Date(deadline + 'T00:00:00');
