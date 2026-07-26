@@ -117,6 +117,29 @@ function getEloCategory(mode) {
   return "mix";
 }
 
+// ─── Zmena ELO po vyriešení úlohy ───────────────────────────────────────────
+// Jediné miesto, kde je vzorec. Predtým bol na troch miestach v podobe
+//     zmena = win ? 10 + rozdiel/50 : -(10 - rozdiel/50)
+// ktorá sa pri veľkom rozdiele preklopila: prehra na úlohe o viac než 500
+// bodov ťažšej hráčovi ELO PRIPÍSALA a výhra na úlohe o 600 bodov ľahšej ho
+// ubrala. Tu je štandardný Elo vzorec, ktorý je monotónny už svojou povahou —
+// výhra nikdy neuberie a prehra nikdy nepridá.
+// K = 20 zachováva pôvodné správanie pri rovnakej sile: ±10 bodov.
+const ELO_K = 20;
+
+function eloZmena(hracElo, ulohaElo, result) {
+  const h = Number(hracElo);
+  const u = Number(ulohaElo);
+  if (!Number.isFinite(h) || !Number.isFinite(u)) return 0;
+  // očakávaný výsledok hráča proti úlohe danej sily (0 až 1)
+  const ocakavane = 1 / (1 + Math.pow(10, (u - h) / 400));
+  const skutocne  = result === 'win' ? 1 : 0;
+  const zmena = ELO_K * (skutocne - ocakavane);
+  // aby aj pri extrémnom rozdiele nebola zmena nulová a smer bol vždy jasný
+  return result === 'win' ? Math.max(1, Math.round(zmena))
+                          : Math.min(-1, Math.round(zmena));
+}
+
 // ─── Hlásenie tichých zlyhaní zápisu ────────────────────────────────────────
 // Niektoré zápisy (napr. ELO história) zámerne neblokujú tréning — keď zlyhajú,
 // hráč nič nespozoruje. Bez záznamu sa taká chyba hľadá veľmi ťažko (presne to
@@ -408,9 +431,8 @@ async function updatePlayerElo(playerId, puzzleElo, result, mode) {
 
     const eloField = getEloField(mode);
     const currentElo = Number(player[eloField] || 1500);
-    const diff = Number(puzzleElo) - currentElo;
-    let change = result === "win" ? 10 + diff / 50 : -(10 - diff / 50);
-    const newElo = Math.max(100, Math.round(currentElo + change));
+    const change = eloZmena(currentElo, puzzleElo, result);
+    const newElo = Math.max(100, currentElo + change);
 
     const zmeny = { [eloField]: newElo };
 
