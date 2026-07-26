@@ -651,6 +651,19 @@ async function getAccessToken() {
   return data.session?.access_token || SUPABASE_KEY;
 }
 
+// Ošetrenie textu pred vložením do HTML. Mená a emaily pochádzajú od
+// používateľov a vypisujú sa cez innerHTML — bez tohto by sa dal cez priezvisko
+// prepašovať kód, ktorý sa spustí v prehliadači admina.
+// (Rovnaká funkcia je v js/player.js; admin.html ho nenačítava.)
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 async function sbFetch(path, options = {}) {
   const url = `${SUPABASE_URL}/rest/v1/${path}`;
   const token = await getAccessToken();
@@ -1263,19 +1276,19 @@ function renderUserList(playerMap) {
     const roleStyle = roleColors[u.role] || '';
     const roleLabel = roleLabels[u.role] || u.role;
     const trenerName = (u.role === 'hrac' && playerMap[u.id])
-      ? `<span style="font-size:12px;color:#64748b;"> · 🧑‍🏫 ${trenerNameMap[playerMap[u.id]] || '?'}</span>`
+      ? `<span style="font-size:12px;color:#64748b;"> · 🧑‍🏫 ${escapeHtml(trenerNameMap[playerMap[u.id]] || '?')}</span>`
       : '';
     const displayName = u.nick_name || `${u.name || ''} ${u.surname || ''}`.trim() || u.email;
     return `
       <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border:1px solid #e2e8f0;border-radius:10px;background:white;">
         <div style="flex:1;">
-          <span style="font-weight:bold;">${displayName}</span>
+          <span style="font-weight:bold;">${escapeHtml(displayName)}</span>
           ${trenerName}
-          <div style="font-size:12px;color:#94a3b8;">${u.email}</div>
+          <div style="font-size:12px;color:#94a3b8;">${escapeHtml(u.email)}</div>
         </div>
         <span style="padding:3px 10px;border-radius:999px;font-size:12px;font-weight:bold;${roleStyle}">${roleLabel}</span>
         <button class="secondary" style="padding:6px 12px;font-size:13px;" onclick="openUserEdit('${u.id}')">Upraviť</button>
-        <button class="danger" style="padding:6px 12px;font-size:13px;" onclick="deleteUser('${u.id}', '${displayName.replace(/'/g, '')}')">🗑️</button>
+        <button class="danger" style="padding:6px 12px;font-size:13px;" onclick="deleteUser('${u.id}', '${escapeHtml(displayName).replace(/&#39;/g, '')}')">🗑️</button>
         ${(u.role === 'hrac' || u.role === 'trener') ? validityBadge(u) : ''}
       </div>
     `;
