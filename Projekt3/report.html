@@ -235,7 +235,7 @@ function eloMoves(pid, hist, startISO) {
 }
 
 function render(ym, players, log, hist, asg, startISO) {
-  const today = new Date().toISOString().substring(0, 10);
+  const today = todayLocal();
 
   // Aktivita jedného zdroja: pokusy, unikátne vyriešené úlohy a čas.
   // Vyriešené sa počíta cez množinu puzzle_id, takže opakované riešenie
@@ -262,7 +262,7 @@ function render(ym, players, log, hist, asg, startISO) {
     const rows    = classic.attempts + skills.attempts;
     const solved  = classic.solved + skills.solved;
     const time    = classic.time + skills.time;
-    const days    = new Set(counted.map(l => l.created_at.substring(0, 10))).size;
+    const days    = new Set(counted.map(l => localDay(l.created_at))).size;
     const moves   = eloMoves(p.id, hist, startISO);
     const mine    = asg.filter(a => a.player_id === p.id);
     const overdue = mine.filter(a => !a.completed_at && a.deadline && a.deadline < today).length;
