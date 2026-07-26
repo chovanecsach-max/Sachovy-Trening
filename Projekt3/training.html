@@ -1014,8 +1014,10 @@ async function loadLeaderboard() {
   document.querySelector('#leaderboardCard h3').textContent = `🏆 Top 10 — ${modeLabel}`;
 
   try {
+    // Rebríček číta z pohľadu rebricek, nie priamo z tabuľky players —
+    // ten zverejňuje len meno a ELO, žiadne emaily, a adminov vylučuje sám.
     const data = await sbFetch(
-      `players?select=name,surname,${eloField}&order=${eloField}.desc&limit=10`
+      `rebricek?select=name,surname,${eloField}&order=${eloField}.desc&limit=10`
     );
     renderLeaderboard(data || [], eloField);
   } catch(e) {
