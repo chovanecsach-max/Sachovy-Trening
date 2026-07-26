@@ -365,7 +365,7 @@ function render(players, log) {
   let b = '';
   rows.forEach(({ p, tot }) => {
     const nm = `${p.surname || ''} ${p.name || ''}`.trim() || '(bez mena)';
-    b += `<tr><td class="name">${nm}</td>`;
+    b += `<tr><td class="name">${escapeHtml(nm)}</td>`;
     egTypes.forEach(t => { b += cellHtml(stats[p.id][t], statsPer[p.id][t], period); });
     const c = coverColor(tot);
     b += `<td class="cell" style="background:${c.bg};color:${c.fg};border:${c.border};"><div class="n">${tot}</div></td></tr>`;
@@ -452,7 +452,7 @@ function showBelow() {
   const items = below.map(x => {
     const c = coverColor(x.solved);
     return `<li><label><input type="checkbox" class="pchk" value="${x.id}" checked>
-      <span class="val" style="background:${c.bg};color:${c.fg}">${x.solved}</span>${x.name}</label></li>`;
+      <span class="val" style="background:${c.bg};color:${c.fg}">${x.solved}</span>${escapeHtml(x.name)}</label></li>`;
   }).join('');
 
   el.innerHTML = `
