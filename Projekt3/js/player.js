@@ -33,6 +33,22 @@ async function sbFetch(path, options = {}) {
   return text ? JSON.parse(text) : null;
 }
 
+// ─── Dátumy v miestnom čase ─────────────────────────────────────────────────
+// created_at je uložené v UTC. Keby sa deň bral ako prvých 10 znakov toho
+// reťazca, tréning po polnoci bratislavského času (v lete UTC+2) by spadol do
+// predchádzajúceho dňa. Tieto dve funkcie preto počítajú deň podľa časového
+// pásma prehliadača — teda tak, ako ho vníma hráč aj tréner.
+function localDay(ts) {
+  const d = (ts instanceof Date) ? ts : new Date(ts ?? Date.now());
+  if (isNaN(d.getTime())) return '';
+  return new Date(d.getTime() - d.getTimezoneOffset() * 60000)
+    .toISOString().substring(0, 10);
+}
+
+function todayLocal() {
+  return localDay(new Date());
+}
+
 // ─── Ošetrenie textu pred vložením do HTML ──────────────────────────────────
 // Mená, prezývky a poznámky pochádzajú od používateľov a vkladajú sa do stránok
 // cez innerHTML. Bez ošetrenia by si hráč mohol nastaviť priezvisko na kód
