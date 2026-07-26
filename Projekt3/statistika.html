@@ -715,12 +715,12 @@ function renderTable() {
   empty.style.display = 'none';
 
   statsData.forEach(r => {
-    const trenerCol = (IS_ADMIN || IS_HLAVNY_TRENER) ? `<td>${r.trenerName}</td>` : '';
+    const trenerCol = (IS_ADMIN || IS_HLAVNY_TRENER) ? `<td>${escapeHtml(r.trenerName)}</td>` : '';
 
     // Spoločné bunky (ostatné položky) — rovnaké v oboch pohľadoch
     const commonCells = `
-      <td>${r.name}</td>
-      <td>${r.surname}</td>
+      <td>${escapeHtml(r.name)}</td>
+      <td>${escapeHtml(r.surname)}</td>
       ${trenerCol}
       <td><span class="badge badge-blue">${r.played}</span></td>
       <td><span class="badge badge-green">${r.solved}</span></td>
