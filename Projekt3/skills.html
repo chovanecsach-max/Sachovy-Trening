@@ -644,8 +644,10 @@ function updatePlayerUI() {
 }
 
 // ─── ELO podľa trénovanej zručnosti ──────────────────────────────────────────
-// V komplexnom tréningu sa používa spoločné elo_zrucnosti (ako doteraz),
-// pri jednotlivých zručnostiach ich vlastné ELO (elo_fork, elo_pin, …).
+// Zápis ide vždy do ELA konkrétnej zručnosti (elo_fork, elo_pin, …), a to aj
+// v komplexnom tréningu. Spoločné elo_zrucnosti je odvodený priemer z deviatich
+// zručností a prepočítava sa po každej zmene — zobrazuje sa v hlavičke
+// komplexného tréningu a v rebríčku zručností na úvodnej stránke.
 
 const SKILL_LABELS = {
   'checks':            'Šachy',
@@ -679,14 +681,29 @@ function urlSkillType() {
   return new URLSearchParams(window.location.search).get('type') || '';
 }
 
+// Pole na ZOBRAZENIE v hlavičke a v rebríčku.
+// V komplexnom tréningu zámerne priemer (elo_zrucnosti), nie aktuálna zručnosť —
+// inak by číslo skákalo pri každej podúlohe tej istej pozície.
 function activeEloField() {
   if (isCompleteMode()) return 'elo_zrucnosti';
   return getSkillEloField(urlSkillType());   // z player.js
 }
 
-function activeEloCategory() {
-  if (isCompleteMode()) return 'zrucnosti';
-  const t = urlSkillType();
+// Zručnosť, ktorá sa práve rieši. V komplexnom tréningu sa mení s každou
+// podúlohou (COMPLETE_SKILLS), pri jednotlivom tréningu je daná URL.
+function solvedSkillType() {
+  if (isCompleteMode()) return (current && current.skill_type) || '';
+  return urlSkillType();
+}
+
+// Pole a kategória pre ZÁPIS ELO — vždy konkrétna zručnosť, aj v komplexnom
+// tréningu. elo_zrucnosti sa už samostatne nepočíta, je to odvodený priemer.
+function updateEloField() {
+  return getSkillEloField(solvedSkillType());
+}
+
+function updateEloCategory() {
+  const t = solvedSkillType();
   return SKILL_ELO_TYPES.includes(t) ? t : 'zrucnosti';
 }
 
@@ -1204,7 +1221,7 @@ async function recordResult(result) {
     const players = await sbFetch(`players?id=eq.${currentPlayer.id}&limit=1`);
     if (players && players.length) {
       const player = players[0];
-      const eloField = activeEloField();
+      const eloField = updateEloField();      // konkrétna zručnosť, nie priemer
       const currentElo = Number(player[eloField] || 1500);
       const puzzleElo = Number(current.elo || 1200);
       const diff = puzzleElo - currentElo;
@@ -1222,15 +1239,35 @@ async function recordResult(result) {
         updates.solved = Number(player.solved || 0) + 1;
       }
 
+      // elo_zrucnosti je odvodený priemer — prepočítaj ho v tom istom zápise
+      const kategoria = updateEloCategory();
+      let priemer = null;
+      if (SKILL_ELO_TYPES.includes(kategoria)) {
+        priemer = priemerZrucnosti({ ...player, [eloField]: newElo });
+        if (priemer != null) updates.elo_zrucnosti = priemer;
+      }
+
       await sbFetch(`players?id=eq.${currentPlayer.id}`, {
         method: 'PATCH',
         body: JSON.stringify(updates)
       });
       currentPlayer[eloField] = newElo;
-      // Zaloguj ELO do histórie pre grafy (len ak sa ELO zmenilo)
-      if (change !== 0) await logEloHistory(currentPlayer.id, activeEloCategory(), newElo);
-      // Obnov zobrazenie ELO v UI
-      document.getElementById('playerElo').textContent = newElo + ' (' + activeEloTag() + ')';
+      if (priemer != null) currentPlayer.elo_zrucnosti = priemer;
+
+      // Zaloguj ELO do histórie pre grafy (len ak sa ELO zmenilo).
+      // Priemer sa loguje pod kategóriou 'zrucnosti', aby jej graf nezhasol.
+      if (change !== 0) {
+        await logEloHistory(currentPlayer.id, kategoria, newElo);
+        if (priemer != null && kategoria !== 'zrucnosti') {
+          await logEloHistory(currentPlayer.id, 'zrucnosti', priemer);
+        }
+      }
+
+      // V hlavičke sa v komplexnom tréningu zobrazuje priemer, inak daná zručnosť
+      const zobraz = isCompleteMode()
+        ? (currentPlayer.elo_zrucnosti != null ? currentPlayer.elo_zrucnosti : newElo)
+        : newElo;
+      document.getElementById('playerElo').textContent = zobraz + ' (' + activeEloTag() + ')';
     }
   } catch(e) {
     console.error("Chyba pri aktualizácii ELO zručností:", e);
