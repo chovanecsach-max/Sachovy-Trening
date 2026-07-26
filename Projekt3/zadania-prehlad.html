@@ -149,7 +149,7 @@ function setStatus(text, type = '') {
   el.style.display = text ? '' : 'none';
 }
 
-function todayISO() { return new Date().toISOString().substring(0, 10); }
+function todayISO() { return todayLocal(); }   // miestny čas, nie UTC
 function daysLeft(d) {
   return Math.round((new Date(d + 'T00:00:00') - new Date(todayISO() + 'T00:00:00')) / 86400000);
 }
@@ -173,12 +173,28 @@ function computeProgress(a, player, logRows, meta) {
            txt: `${n} / ${a.target_value} ${unit}` };
 }
 
+// Načítanie po dávkach — Supabase vracia najviac 1000 riadkov na dotaz.
+// Bez toho by po prekročení tisícky najstaršie zadania z prehľadu ticho zmizli.
+async function sbFetchAll(query) {
+  const PAGE = 1000;
+  let all = [], off = 0;
+  while (true) {
+    const sep = query.includes('?') ? '&' : '?';
+    const batch = await sbFetch(`${query}${sep}limit=${PAGE}&offset=${off}`);
+    if (!batch || !batch.length) break;
+    all = all.concat(batch);
+    if (batch.length < PAGE) break;
+    off += PAGE;
+  }
+  return all;
+}
+
 // ─── Načítanie ───────────────────────────────────────────────────────────────
 async function load() {
   setStatus('Načítavam...');
   try {
     const sel = `*,player:players(id,name,surname,${ELO_FIELDS.join(',')})`;
-    const rows = await sbFetch(`assignments?select=${sel}&order=created_at.desc`) || [];
+    const rows = await sbFetchAll(`assignments?select=${sel}&order=created_at.desc`) || [];
 
     if (!rows.length) {
       document.getElementById('tbl').style.display = 'none';
