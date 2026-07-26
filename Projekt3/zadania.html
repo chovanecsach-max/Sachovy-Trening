@@ -163,12 +163,12 @@ function renderCard(a, prog) {
 
   return `<div class="asg ${cls}">
     <div class="asg-top">
-      <span class="asg-skill">${a.endgame_type ? '♚ ' + a.endgame_type : (SKILL_NAMES[a.skill] || a.skill)}</span>
+      <span class="asg-skill">${escapeHtml(a.endgame_type ? '♚ ' + a.endgame_type : (SKILL_NAMES[a.skill] || a.skill))}</span>
       ${badge}
     </div>
     <div class="asg-goal">${prog.text}</div>
     <div class="bar"><span class="${barCls}" style="width:${Math.round(prog.pct * 100)}%"></span></div>
-    ${a.note ? `<div class="asg-note">💬 ${a.note}</div>` : ''}
+    ${a.note ? `<div class="asg-note">💬 ${escapeHtml(a.note)}</div>` : ''}
     <div class="asg-meta">
       <span>${dl}</span>
       ${prog.done ? '' : `<button class="train-btn" onclick='goTrain(${JSON.stringify({skill:a.skill,endgame_type:a.endgame_type})})'>Trénovať →</button>`}
