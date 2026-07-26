@@ -651,12 +651,12 @@ async function computeStreak(playerId) {
 
     // Zisti unikátne dátumy (v lokálnom čase používateľa) vo formáte YYYY-MM-DD
     const days = [...new Set(
-      logs.map(l => new Date(l.created_at).toLocaleDateString('sv-SE'))
+      logs.map(l => localDay(l.created_at))
     )].sort().reverse();  // sv-SE dáva formát YYYY-MM-DD, zostupne
 
     // Počítaj streak spätne od dnes (alebo včera — hráč možno ešte dnes nehrál)
-    const today = new Date().toLocaleDateString('sv-SE');
-    const yesterday = new Date(Date.now() - 86400000).toLocaleDateString('sv-SE');
+    const today = todayLocal();
+    const yesterday = localDay(Date.now() - 86400000);
 
     let streak = 0;
     // Začni od dnes alebo včera
