@@ -962,9 +962,8 @@ function recordResultOnce(result) {
       const _mode   = getTrainingMode();
       const _field  = getEloField(_mode);
       const _curElo = Number(currentPlayer[_field] || 1500);
-      const _diff   = Number(current.elo) - _curElo;
-      const _change = result === 'win' ? 10 + _diff / 50 : -(10 - _diff / 50);
-      currentPlayer[_field] = Math.max(100, Math.round(_curElo + _change));
+      const _change = eloZmena(_curElo, current.elo, result);   // rovnaký vzorec ako v player.js
+      currentPlayer[_field] = Math.max(100, _curElo + _change);
     }
     // Súhrn session zachytáva skutočnú aktivitu, teda aj opakované pokusy
     updateSessionStats(result, usedTime);
