@@ -325,8 +325,8 @@ function render(ym, players, log, hist, asg, startISO) {
   // Upozornenia
   if (idle.length || overdue.length) {
     h += `<div class="warn-box"><strong>Vyžaduje pozornosť</strong><ul>`;
-    if (idle.length)    h += `<li>Celý mesiac netrénovali: ${idle.map(d => d.name).join(', ')}</li>`;
-    if (overdue.length) h += `<li>Zadanie po termíne: ${overdue.map(d => `${d.name} (${d.overdue})`).join(', ')}</li>`;
+    if (idle.length)    h += `<li>Celý mesiac netrénovali: ${idle.map(d => escapeHtml(d.name)).join(', ')}</li>`;
+    if (overdue.length) h += `<li>Zadanie po termíne: ${overdue.map(d => `${escapeHtml(d.name)} (${d.overdue})`).join(', ')}</li>`;
     h += `</ul></div>`;
   }
 
@@ -342,7 +342,7 @@ function render(ym, players, log, hist, asg, startISO) {
 
     return `<div class="pb ${d.rows === 0 ? 'idle' : ''}">
       <div class="pb-top">
-        <span class="pb-name">${d.name}</span>
+        <span class="pb-name">${escapeHtml(d.name)}</span>
         ${d.rows === 0
           ? '<span class="pb-tag idle">netrénoval</span>'
           : `<span class="pb-tag ok">${d.days} ${d.days === 1 ? 'deň' : (d.days < 5 ? 'dni' : 'dní')} tréningu</span>`}
