@@ -481,7 +481,7 @@ function showBelow() {
     const c = cellColor(x.val);
     return `<li><label>
       <input type="checkbox" class="pchk" value="${x.id}" data-val="${x.val}" checked>
-      <span class="val" style="background:${c.bg}">${x.val}</span>${x.name}
+      <span class="val" style="background:${c.bg}">${x.val}</span>${escapeHtml(x.name)}
     </label></li>`;
   }).join('');
 
@@ -672,7 +672,7 @@ function renderRows() {
     const vals = displayValues(p);
     const nm = `${p.surname || ''} ${p.name || ''}`.trim() || '(bez mena)';
     const isOpen = (p.id === openPlayerId);
-    b += `<tr><td class="name${isOpen ? ' open' : ''}" onclick="toggleDetail(${JSON.stringify(p.id)})"><span class="tw">${isOpen ? '▾' : '▸'}</span>${nm}</td>`;
+    b += `<tr><td class="name${isOpen ? ' open' : ''}" onclick="toggleDetail(${JSON.stringify(p.id)})"><span class="tw">${isOpen ? '▾' : '▸'}</span>${escapeHtml(nm)}</td>`;
     vals.forEach((v, ci) => { b += cellHtml(v, { sep: !!activeCols()[ci].info }); });
     b += cellHtml(mean(skillValues(p)), { bold: true, sep: true });
     b += '</tr>';
