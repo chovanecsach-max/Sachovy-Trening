@@ -487,7 +487,7 @@ function showBelow() {
 
   // Predvolený termín: o 14 dní
   const d = new Date(); d.setDate(d.getDate() + 14);
-  const defDeadline = d.toISOString().substring(0, 10);
+  const defDeadline = localDay(d);
 
   el.innerHTML = `
     <div class="below-head">${col.full} — pod prahom ${thr}: ${below.length} z ${mapPlayers.length}</div>
@@ -769,11 +769,11 @@ function renderSkillLineChart(data, days) {
   }
   hideDetailMsg();
 
-  const allDates = [...new Set(skillData.map(d => d.created_at.substring(0, 10)))].sort();
+  const allDates = [...new Set(skillData.map(d => localDay(d.created_at)))].sort();
   const labels = allDates.map(formatDateLabel);
   const datasets = activeCats().map(c => {
     const byDay = {};
-    skillData.filter(d => d.category === c.key).forEach(d => { byDay[d.created_at.substring(0, 10)] = d.elo_value; });
+    skillData.filter(d => d.category === c.key).forEach(d => { byDay[localDay(d.created_at)] = d.elo_value; });
     return {
       label: c.label,
       data: allDates.map(d => byDay[d] ?? null),
