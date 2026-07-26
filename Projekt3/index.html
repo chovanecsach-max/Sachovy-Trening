@@ -846,9 +846,12 @@ async function loadLeaderboards(myName) {
     // Pôvodne tu bol vlastný fetch s verejným kľúčom v hlavičke Authorization —
     // dotaz teda odchádzal ako neprihlásený a po zavretí tabuľky players
     // pre neprihlásených sa rebríček prestal načítavať.
-    players = (await sbFetch(
-      'players?select=name,surname,elo,elo_taktika,elo_strategia,elo_koncovka,elo_zrucnosti,profile:profiles!user_id(role)'
-    ) || []).filter(p => p.profile?.role !== 'admin');
+    // Rebríček číta z pohľadu rebricek — ten zverejňuje len meno a ELO,
+    // žiadne emaily, a adminov vylučuje priamo v databáze, takže sa už
+    // nemusia dočítavať role z tabuľky profiles.
+    players = await sbFetch(
+      'rebricek?select=name,surname,elo,elo_taktika,elo_strategia,elo_koncovka,elo_zrucnosti'
+    ) || [];
   } catch(e) {
     LB_CATEGORIES.forEach(cat => {
       document.getElementById('lb-' + cat.id).innerHTML =
