@@ -33,6 +33,21 @@ async function sbFetch(path, options = {}) {
   return text ? JSON.parse(text) : null;
 }
 
+// ─── Ošetrenie textu pred vložením do HTML ──────────────────────────────────
+// Mená, prezývky a poznámky pochádzajú od používateľov a vkladajú sa do stránok
+// cez innerHTML. Bez ošetrenia by si hráč mohol nastaviť priezvisko na kód
+// v HTML značke, ktorý by sa spustil v prehliadači trénera pri otvorení
+// prehľadu — teda s jeho právami. Escapuje sa aj úvodzovka a apostrof, lebo
+// tie isté hodnoty sa používajú aj v atribútoch (title, onclick).
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 // ─── ELO podľa režimu ───────────────────────────────────────────────────────
 
 // Zručnosti, ktoré majú v tabuľke players vlastný ELO stĺpec (elo_<typ>).
