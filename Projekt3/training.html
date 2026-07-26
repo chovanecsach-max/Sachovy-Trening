@@ -1048,7 +1048,7 @@ function renderLeaderboard(players, eloField) {
         <span style="width:24px;text-align:center;font-size:13px;">${rank}</span>
         <span style="flex:1;font-size:13px;font-weight:${isMe ? '600' : '400'};
           color:${isMe ? '#1d4ed8' : '#334155'};
-          white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${nick}</span>
+          white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(nick)}</span>
         <span style="font-size:13px;font-weight:600;color:#1e3a5f;">${elo}</span>
       </div>`;
   }).join('');
