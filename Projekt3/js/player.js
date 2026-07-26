@@ -92,6 +92,21 @@ function getPlayerEloByMode(player, mode) {
   return Number(player[getEloField(mode)] || 1500);
 }
 
+// ─── Priemerné ELO zručností ────────────────────────────────────────────────
+// elo_zrucnosti sa už nepočíta samostatne — je to odvodený priemer z deviatich
+// zručností. Zapisuje sa doňho po každej zmene ktorejkoľvek zručnosti, takže
+// rebríček, report, štatistika aj pohľad rebricek môžu čítať ten istý stĺpec
+// ako doteraz. Prázdne hodnoty sa do priemeru nezapočítavajú.
+// POZOR: ak niekedy pridáš novú zručnosť, pridaj ju do SKILL_ELO_TYPES vyššie
+// a do pohľadu rebricek — inak sa do priemeru nedostane.
+function priemerZrucnosti(playerRow) {
+  const hodnoty = SKILL_ELO_TYPES
+    .map(t => Number(playerRow['elo_' + t]))
+    .filter(v => Number.isFinite(v) && v > 0);
+  if (!hodnoty.length) return null;
+  return Math.round(hodnoty.reduce((a, b) => a + b, 0) / hodnoty.length);
+}
+
 // Mapovanie mode → kategória pre elo_history
 function getEloCategory(mode) {
   if (mode === "taktika")  return "taktika";
@@ -397,13 +412,24 @@ async function updatePlayerElo(playerId, puzzleElo, result, mode) {
     let change = result === "win" ? 10 + diff / 50 : -(10 - diff / 50);
     const newElo = Math.max(100, Math.round(currentElo + change));
 
+    const zmeny = { [eloField]: newElo };
+
+    // Ak sa menila zručnosť, prepočítaj aj odvodený priemer elo_zrucnosti.
+    // Ide v tom istom zápise, takže to nestojí ďalšiu cestu po sieti.
+    let priemer = null;
+    if (SKILL_ELO_TYPES.includes(mode)) {
+      priemer = priemerZrucnosti({ ...player, [eloField]: newElo });
+      if (priemer != null) zmeny.elo_zrucnosti = priemer;
+    }
+
     await sbFetch(`players?id=eq.${playerId}`, {
       method: "PATCH",
-      body: JSON.stringify({ [eloField]: newElo })
+      body: JSON.stringify(zmeny)
     });
 
     // Zaloguj novú ELO hodnotu do histórie pre grafy
     await logEloHistory(playerId, mode, newElo);
+    if (priemer != null) await logEloHistory(playerId, 'zrucnosti', priemer);
   } catch (e) {
     console.error("Chyba pri aktualizácii ELO:", e);
     reportPlayerError(`aktualizácia ELO zlyhala (režim: ${mode})`, e);
