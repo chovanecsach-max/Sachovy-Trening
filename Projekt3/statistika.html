@@ -631,8 +631,13 @@ async function loadStats() {
     const realPlayers = players.filter(p => !p._isSelf);
 
     // Načítaj training_log za obdobie — pre skutočných hráčov podľa player_id
-    const dateFromFull = dateFrom + 'T00:00:00';
-    const dateToFull   = dateTo   + 'T23:59:59';
+    // Hranice obdobia treba poslať ako presný okamih. Holý zápis bez zóny
+    // (napr. 2026-07-01T00:00:00) si Postgres vyloží vo svojom pásme, teda
+    // v UTC — obdobie by potom začínalo o 02:00 bratislavského času.
+    // new Date('...T00:00:00') sa naopak číta v miestnom pásme prehliadača
+    // a toISOString() z neho spraví správny okamih v UTC.
+    const dateFromFull = new Date(dateFrom + 'T00:00:00').toISOString();
+    const dateToFull   = new Date(dateTo   + 'T23:59:59.999').toISOString();
     const logMap = {};
 
     if (realPlayers.length) {
@@ -855,8 +860,13 @@ async function exportPgn() {
   setStatus('Načítavam chybné pozície...', '');
 
   try {
-    const dateFromFull = dateFrom + 'T00:00:00';
-    const dateToFull   = dateTo   + 'T23:59:59';
+    // Hranice obdobia treba poslať ako presný okamih. Holý zápis bez zóny
+    // (napr. 2026-07-01T00:00:00) si Postgres vyloží vo svojom pásme, teda
+    // v UTC — obdobie by potom začínalo o 02:00 bratislavského času.
+    // new Date('...T00:00:00') sa naopak číta v miestnom pásme prehliadača
+    // a toISOString() z neho spraví správny okamih v UTC.
+    const dateFromFull = new Date(dateFrom + 'T00:00:00').toISOString();
+    const dateToFull   = new Date(dateTo   + 'T23:59:59.999').toISOString();
 
     // Načítaj všetky chybné záznamy za obdobie (vrátane puzzle_id)
     const logs = await sbFetchAll(
@@ -914,7 +924,7 @@ async function exportPgn() {
       const p = resolvePuzzle(log);
       if (!p) return; // puzzle sa nenašlo (zmazané?)
 
-      const date    = log.created_at.substring(0, 10).replace(/-/g, '.');
+      const date    = localDay(log.created_at).replace(/-/g, '.');
       const cat     = p.category || p.skill_type || 'Neznáma';
       const title   = p.title    || `Puzzle ${pid}`;
       const prompt  = p.prompt   || '';
@@ -967,8 +977,8 @@ function initDates() {
   const now      = new Date();
   const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
   const lastDay  = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-  document.getElementById('dateFrom').value = firstDay.toISOString().split('T')[0];
-  document.getElementById('dateTo').value   = lastDay.toISOString().split('T')[0];
+  document.getElementById('dateFrom').value = localDay(firstDay);
+  document.getElementById('dateTo').value   = localDay(lastDay);
 }
 
 init();
@@ -1150,14 +1160,14 @@ function formatDateLabel(isoStr) {
 
 function renderEloChart(data) {
   // Zbier všetky unikátne dátumy (zaokrúhlené na deň) a zoraď ich
-  const allDates = [...new Set(data.map(d => d.created_at.substring(0, 10)))].sort();
+  const allDates = [...new Set(data.map(d => localDay(d.created_at)))].sort();
   const labels = allDates.map(d => formatDateLabel(d));
 
   const datasets = ELO_CATS.map(c => {
     // Pre každý deň vezmi poslednú hodnotu danej kategórie
     const byDay = {};
     data.filter(d => d.category === c.key).forEach(d => {
-      const day = d.created_at.substring(0, 10);
+      const day = localDay(d.created_at);
       byDay[day] = d.elo_value; // posledná hodnota za deň (dáta sú zoradené asc)
     });
     return {
@@ -1237,13 +1247,13 @@ function renderSkillEloChart(data) {
   }
   hideChartMsg('skillEloMsg');
 
-  const allDates = [...new Set(data.map(d => d.created_at.substring(0, 10)))].sort();
+  const allDates = [...new Set(data.map(d => localDay(d.created_at)))].sort();
   const labels = allDates.map(d => formatDateLabel(d));
 
   const datasets = SKILL_CATS.map(c => {
     const byDay = {};
     skillData.filter(d => d.category === c.key).forEach(d => {
-      byDay[d.created_at.substring(0, 10)] = d.elo_value; // posledná hodnota za deň
+      byDay[localDay(d.created_at)] = d.elo_value; // posledná hodnota za deň
     });
     return {
       label:            c.label,
@@ -1312,7 +1322,7 @@ function renderTimeChart(data) {
   // Zoskup sekundy podľa dňa
   const byDay = {};
   data.forEach(row => {
-    const day = row.created_at.substring(0, 10);
+    const day = localDay(row.created_at);
     byDay[day] = (byDay[day] || 0) + Number(row.time_spent || 0);
   });
   const days   = Object.keys(byDay).sort();
@@ -1392,12 +1402,12 @@ function exportChartsXlsx() {
 
   // ── List 1: ELO história ──
   if (lastEloData && lastEloData.length) {
-    const allDates = [...new Set(lastEloData.map(d => d.created_at.substring(0, 10)))].sort();
+    const allDates = [...new Set(lastEloData.map(d => localDay(d.created_at)))].sort();
 
     // Pre každý deň posledná hodnota každej kategórie
     const byDayCat = {};
     lastEloData.forEach(d => {
-      const day = d.created_at.substring(0, 10);
+      const day = localDay(d.created_at);
       if (!byDayCat[day]) byDayCat[day] = {};
       byDayCat[day][d.category] = d.elo_value;
     });
@@ -1422,10 +1432,10 @@ function exportChartsXlsx() {
     const skillKeys = new Set(SKILL_CATS.map(c => c.key));
     const skillRows = lastEloData.filter(d => skillKeys.has(d.category));
     if (skillRows.length) {
-      const allDates = [...new Set(skillRows.map(d => d.created_at.substring(0, 10)))].sort();
+      const allDates = [...new Set(skillRows.map(d => localDay(d.created_at)))].sort();
       const byDayCat = {};
       skillRows.forEach(d => {
-        const day = d.created_at.substring(0, 10);
+        const day = localDay(d.created_at);
         if (!byDayCat[day]) byDayCat[day] = {};
         byDayCat[day][d.category] = d.elo_value;
       });
@@ -1442,7 +1452,7 @@ function exportChartsXlsx() {
   if (lastTimeData && lastTimeData.length) {
     const byDay = {};
     lastTimeData.forEach(row => {
-      const day = row.created_at.substring(0, 10);
+      const day = localDay(row.created_at);
       byDay[day] = (byDay[day] || 0) + Number(row.time_spent || 0);
     });
     const days = Object.keys(byDay).sort();
@@ -1464,8 +1474,8 @@ function exportChartsXlsx() {
   }
 
   // Názov súboru podľa hráča a periódy
-  const end = new Date().toISOString().substring(0, 10);
-  const start = new Date(Date.now() - chartDays * 86400000).toISOString().substring(0, 10);
+  const end = todayLocal();
+  const start = localDay(Date.now() - chartDays * 86400000);
   XLSX.writeFile(wb, `Grafy_${start}_${end}.xlsx`);
 }
 
