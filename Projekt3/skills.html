@@ -608,6 +608,7 @@ let puzzleSolvedCounted = false;
 
 let timerInterval = null;
 let timerRemaining = 0;
+let aktualnyLimit = 0;    // časový limit vypočítaný pre práve načítanú úlohu
 let timerExpired = false;
 
 let stats = { played: 0, solved: 0 };
@@ -1189,7 +1190,7 @@ async function recordResult(result) {
   localStorage.setItem('lastTrainingMode', 'skill_' + skillType);
 
   // Vypočítaj čas strávený na úlohe
-  const puzzleTime = Math.max(0, Math.round(current.time || 120));
+  const puzzleTime = Math.max(0, aktualnyLimit || Math.round(current.time || 120));
   const usedTime = Math.max(0, puzzleTime - Math.max(0, timerRemaining));
 
   // Zaznamenaj do training_log
@@ -1514,6 +1515,15 @@ function loadPuzzle(puzzle) {
   everFailed = false; // reset pre novú úlohu (retryPuzzle ho obnovi)
   selected = null;
 
+  // Časový limit sa počíta z tabuľky: základ + počet riešení × bonus, podľa
+  // ELA hráča v danej zručnosti. Nezávisí teda od toho, aká pozícia sa trafila,
+  // čo je podstatné hlavne v komplexnom tréningu, kde je pozícia náhodná.
+  // Ak by zručnosť v tabuľke nebola, použije sa čas uložený v úlohe.
+  const _skill = puzzle.skill_type || solvedSkillType();
+  const _hracElo = currentPlayer ? Number(currentPlayer[getSkillEloField(_skill)] || 1500) : 1500;
+  aktualnyLimit = skillTimeLimit(_skill, _hracElo, solutions.length)
+               || Math.round(puzzle.time || 120);
+
   const parsed = parseFen(puzzle.fen);
   board = parsed.board;
   meta = parsed.meta;
@@ -1526,7 +1536,7 @@ function loadPuzzle(puzzle) {
   }
   document.getElementById('puzzleId').textContent = puzzle.id ?? '-';
   document.getElementById('puzzleElo').textContent = puzzle.elo ?? '-';
-  document.getElementById('puzzleTime').textContent = formatTime(puzzle.time || 120);
+  document.getElementById('puzzleTime').textContent = formatTime(aktualnyLimit);
 
   const ti = document.getElementById('turnIndicator');
   ti.className = 'turn-indicator ' + (meta.activeColor === 'b' ? 'black' : 'white');
@@ -1534,7 +1544,7 @@ function loadPuzzle(puzzle) {
   updateRemainingUI();
   updateFoundMovesUI();
   render();
-  startTimer(puzzle.time || 120);
+  startTimer(aktualnyLimit);
   setStatus('Pripravené', 'info');
 }
 
