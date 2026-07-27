@@ -1052,7 +1052,7 @@ function handleMoveAttempt(attempted) {
       setStatus('🎉 Výborne! Našiel si všetky ' + getSkillTypeName() + '!', 'success');
     } else {
       playSound('win');
-      setStatus('Správne! Nájdi ďalší ' + getSkillTypeSingular() + '.', 'success');
+      setStatus('Správne! Nájdi ' + skillNazovDalsi() + '.', 'success');
     }
   } else {
     selected = null;
@@ -1064,7 +1064,7 @@ function handleMoveAttempt(attempted) {
       stopTimer();
       recordResult('loss');
     }
-    setStatus('Toto nie je ' + getSkillTypeSingular() + '. Skús znova alebo ukáž riešenie.', 'error');
+    setStatus('Toto nie je ' + skillNazovNom() + '. Skús znova alebo ukáž riešenie.', 'error');
   }
 }
 
@@ -1082,18 +1082,32 @@ function getSkillTypeName() {
   return 'ťahy';
 }
 
-function getSkillTypeSingular() {
-  if (!current) return 'ťah';
-  if (current.skill_type === 'checks') return 'šach';
-  if (current.skill_type === 'checks_both') return 'šach';
-  if (current.skill_type === 'captures') return 'branie';
-  if (current.skill_type === 'direct_attack') return 'branie so ziskom';
-  if (current.skill_type === 'pawn_breakthrough') return 'pešiakový prielom';
-  if (current.skill_type === 'underdefended') return 'slabo pokrytú figúrku';
-  if (current.skill_type === 'pin') return 'viazanú figúrku';
-  if (current.skill_type === 'relative_pin') return 'relatívne viazanú figúrku';
-  if (current.skill_type === 'fork') return 'vidličku';
-  return 'ťah';
+// Názvy zručností v dvoch pádoch. Hláška „Toto nie je …" potrebuje nominatív,
+// hláška „Nájdi …" akuzatív aj so správnym tvarom slova „ďalší". Preto sú tu
+// obidva tvary vypísané — jeden spoločný by v jednej z tých viet vždy škrípal.
+const SKILL_NAZVY = {
+  checks:            { nom: 'šach',                          dalsi: 'ďalší šach' },
+  checks_both:       { nom: 'šach',                          dalsi: 'ďalší šach' },
+  captures:          { nom: 'branie',                        dalsi: 'ďalšie branie' },
+  direct_attack:     { nom: 'branie so ziskom',              dalsi: 'ďalšie branie so ziskom' },
+  pawn_breakthrough: { nom: 'pešiakový prielom',             dalsi: 'ďalší pešiakový prielom' },
+  underdefended:     { nom: 'slabo pokrytá figúrka',         dalsi: 'ďalšiu slabo pokrytú figúrku' },
+  pin:               { nom: 'absolútne viazaná figúrka',     dalsi: 'ďalšiu absolútne viazanú figúrku' },
+  relative_pin:      { nom: 'relatívne viazaná figúrka',     dalsi: 'ďalšiu relatívne viazanú figúrku' },
+  fork:              { nom: 'vidlička',                      dalsi: 'ďalšiu vidličku' },
+  direct_threat:     { nom: 'materiálna hrozba',             dalsi: 'ďalšiu materiálnu hrozbu' }
+};
+
+// „Toto nie je <nominatív>."
+function skillNazovNom() {
+  const z = current && SKILL_NAZVY[current.skill_type];
+  return z ? z.nom : 'ťah';
+}
+
+// „Správne! Nájdi <ďalší/ďalšiu/ďalšie …>."
+function skillNazovDalsi() {
+  const z = current && SKILL_NAZVY[current.skill_type];
+  return z ? z.dalsi : 'ďalší ťah';
 }
 
 // ─── Počítadlo a nájdené ťahy ─────────────────────────────────────────────────
