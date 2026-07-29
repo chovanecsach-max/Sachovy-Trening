@@ -451,6 +451,86 @@ const SKILL_COLS = [
   { field: 'elo_direct_threat',     label: 'Hrozby',        full: 'Priame hrozby' },
 ];
 
+// ─── Riešenie ako ťahy v PGN ────────────────────────────────────────────────
+// Riešenia sú v databáze v súradniciach (e2e4). Do PGN patrí šachová notácia,
+// na prevod treba generovanie ťahov — načítava sa preto chess.js, a to až
+// v okamihu exportu. Ak sa knižnicu nepodarí stiahnuť, riešenie sa zapíše
+// aspoň v súradniciach do poznámky, takže export funguje vždy.
+let _Chess = null;
+let _chessSkusane = false;
+
+async function nacitajChess() {
+  if (_chessSkusane) return _Chess;
+  _chessSkusane = true;
+  try {
+    const mod = await import('https://cdn.jsdelivr.net/npm/chess.js@1.4.0/+esm');
+    _Chess = mod.Chess;
+  } catch (e) {
+    console.warn('chess.js sa nenačítal, riešenie bude v súradniciach:', e);
+    _Chess = null;
+  }
+  return _Chess;
+}
+
+function _uciNaObjekt(uci) {
+  const t = String(uci || '').trim();
+  if (t.length < 4) return null;
+  const o = { from: t.slice(0, 2), to: t.slice(2, 4) };
+  if (t.length > 4) o.promotion = t[4].toLowerCase();
+  return o;
+}
+
+// Rekurzívne poskladá hlavnú líniu; súrodenci na tej istej úrovni sú varianty
+// v zátvorkách — presne ako to očakáva ChessBase aj Lichess.
+function _linia(Chess, fen, uzly, prvyVLinii) {
+  if (!uzly || !uzly.length) return '';
+  const casti = String(fen).split(' ');
+  const biely = casti[1] === 'w';
+  const cislo = parseInt(casti[5], 10) || 1;
+  const predpona = prvy => biely ? (cislo + '. ') : (prvy ? (cislo + '... ') : '');
+
+  const zahraj = uzol => {
+    try {
+      const hra = new Chess(fen);
+      const o = _uciNaObjekt(uzol && uzol.move);
+      if (!o) return null;
+      const m = hra.move(o);
+      return m ? { san: m.san, fen: hra.fen() } : null;
+    } catch (e) { return null; }   // nelegálny ťah v dátach — preskoč
+  };
+
+  const hlavny = zahraj(uzly[0]);
+  if (!hlavny) return '';
+  let txt = predpona(prvyVLinii) + hlavny.san + ' ';
+
+  for (let i = 1; i < uzly.length; i++) {
+    const alt = zahraj(uzly[i]);
+    if (!alt) continue;
+    const v = predpona(true) + alt.san + ' ' +
+              _linia(Chess, alt.fen, uzly[i].next || [], false);
+    txt += '( ' + v.trim() + ' ) ';
+  }
+  txt += _linia(Chess, hlavny.fen, uzly[0].next || [], false);
+  return txt;
+}
+
+// Klasická úloha má strom riešenia, zručnosť zoznam ťahov — tie sa zapíšu ako
+// rovnocenné alternatívy z východiskovej pozície.
+function riesenieDoPgn(Chess, p) {
+  let uzly = null;
+  const strom = p.solution_tree;
+  if (Array.isArray(strom) && strom.length) uzly = strom;
+  else if (Array.isArray(p.solutions) && p.solutions.length)
+    uzly = p.solutions.map(u => ({ move: u, next: [] }));
+  if (!uzly) return '';
+
+  if (!Chess) {
+    return '{ Riešenie (súradnice): ' + uzly.map(u => u.move).join(' ') + ' }';
+  }
+  try { return _linia(Chess, p.fen, uzly, true).trim(); }
+  catch (e) { return ''; }
+}
+
 // ─── Slovenské názvy pre export do PGN ──────────────────────────────────────
 // Odvodené zo SKILL_COLS, aby názvy zručností existovali v súbore len raz.
 const SKILL_NAZVY_SK = {};
@@ -906,10 +986,10 @@ async function exportPgn() {
     // Načítaj z puzzles aj skill_puzzles paralelne
     const [puzRows, skillRows] = await Promise.all([
       puzIds.length
-        ? sbFetch(`puzzles?id=in.(${puzIds.join(',')})&select=id,title,fen,category,prompt`).catch(() => [])
+        ? sbFetch(`puzzles?id=in.(${puzIds.join(',')})&select=id,title,fen,category,prompt,solution_tree`).catch(() => [])
         : [],
       skillIds.length
-        ? sbFetch(`skill_puzzles?id=in.(${skillIds.join(',')})&select=id,title,fen,skill_type,prompt`).catch(() => [])
+        ? sbFetch(`skill_puzzles?id=in.(${skillIds.join(',')})&select=id,title,fen,skill_type,prompt,solutions`).catch(() => [])
         : []
     ]);
 
@@ -926,6 +1006,7 @@ async function exportPgn() {
     };
 
     // Zostav PGN — jeden záznam na unikátne puzzle
+    const Chess    = await nacitajChess();
     const seenIds  = new Set();
     const pgnParts = [];
 
@@ -964,7 +1045,7 @@ async function exportPgn() {
         `[Annotator "${title}"]`,
         `[PuzzleId "${pid}"]`,
         prompt ? `{ ${prompt} }` : '',
-        `*`,
+        (riesenieDoPgn(Chess, p) + ' *').trim(),
         ``  // prázdny riadok medzi partiami
       );
     });
