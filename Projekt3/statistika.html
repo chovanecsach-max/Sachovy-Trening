@@ -451,6 +451,22 @@ const SKILL_COLS = [
   { field: 'elo_direct_threat',     label: 'Hrozby',        full: 'Priame hrozby' },
 ];
 
+// ─── Slovenské názvy pre export do PGN ──────────────────────────────────────
+// Odvodené zo SKILL_COLS, aby názvy zručností existovali v súbore len raz.
+const SKILL_NAZVY_SK = {};
+SKILL_COLS.forEach(c => { SKILL_NAZVY_SK[c.field.replace(/^elo_/, '')] = c.full; });
+
+const KATEGORIE_SK = { 'Taktika': 'Taktika', 'Strategia': 'Stratégia', 'Koncovka': 'Koncovka' };
+
+// Názov kategórie alebo zručnosti po slovensky. Neznáme hodnoty vráti tak,
+// ako prišli z databázy — nech je vidieť, že niečo v zozname chýba.
+function nazovKategorie(p) {
+  if (!p) return 'Neznáma';
+  if (p.category)   return KATEGORIE_SK[p.category] || p.category;
+  if (p.skill_type) return SKILL_NAZVY_SK[p.skill_type] || p.skill_type;
+  return 'Neznáma';
+}
+
 // ─── Inicializácia ───────────────────────────────────────────────────────────
 function init() {
   // Role banner
@@ -925,8 +941,11 @@ async function exportPgn() {
       if (!p) return; // puzzle sa nenašlo (zmazané?)
 
       const date    = localDay(log.created_at).replace(/-/g, '.');
-      const cat     = p.category || p.skill_type || 'Neznáma';
-      const title   = p.title    || `Puzzle ${pid}`;
+      const cat     = nazovKategorie(p);
+      // Úlohy na zručnosti majú v databáze názov „?" — vtedy je užitočnejšie
+      // ukázať názov zručnosti než otáznik.
+      const title   = (p.title && p.title.trim() && p.title.trim() !== '?')
+                        ? p.title : cat;
       const prompt  = p.prompt   || '';
       const fen     = p.fen      || '';
 
@@ -938,7 +957,7 @@ async function exportPgn() {
         `[Site "chovanecsach-max.github.io"]`,
         `[Date "${date}"]`,
         `[White "${playerName}"]`,
-        `[Black "Puzzle ${pid}"]`,
+        `[Black "Úloha #${pid} — ${cat}"]`,
         `[Result "*"]`,
         `[FEN "${safeFen}"]`,
         `[SetUp "1"]`,
