@@ -1008,7 +1008,10 @@ async function exportPgn() {
     // Zostav PGN — jeden záznam na unikátne puzzle
     const Chess    = await nacitajChess();
     const seenIds  = new Set();
-    const pgnParts = [];
+    // Klasický tréning a zručnosti idú do dvoch samostatných súborov —
+    // sú to iné druhy úloh a v jednej databáze v ChessBase sa miešajú zle.
+    const castiKlasika  = [];
+    const castiZrucnosti = [];
 
     logs.forEach(log => {
       const pid = log.puzzle_id;
@@ -1033,7 +1036,10 @@ async function exportPgn() {
       // Sanitizácia FEN pre PGN tag (nesmie obsahovať "]")
       const safeFen = fen.replace(/]/g, '');
 
-      pgnParts.push(
+      const ciel = (log.source === 'skill_puzzles' || p.skill_type)
+                     ? castiZrucnosti : castiKlasika;
+
+      ciel.push(
         `[Event "Šachový tréning — ${cat}"]`,
         `[Site "chovanecsach-max.github.io"]`,
         `[Date "${date}"]`,
@@ -1050,21 +1056,36 @@ async function exportPgn() {
       );
     });
 
-    if (!pgnParts.length) {
+    if (!castiKlasika.length && !castiZrucnosti.length) {
       setStatus('Žiadne pozície sa nenašli v databáze.', 'error');
       return;
     }
 
-    const pgn  = pgnParts.filter(l => l !== null).join('\n');
-    const blob = new Blob([pgn], { type: 'application/x-chess-pgn;charset=utf-8' });
-    const a    = document.createElement('a');
-    a.href     = URL.createObjectURL(blob);
-    a.download = `Chyby_${playerName.replace(/\s+/g,'_')}_${dateFrom}_${dateTo}.pgn`;
-    a.click();
-    URL.revokeObjectURL(a.href);
+    const meno = playerName.replace(/\s+/g, '_');
 
-    const count = seenIds.size;
-    setStatus(`Exportovaných ${count} chybných pozíc${count === 1 ? 'ia' : count < 5 ? 'ie' : 'í'} do PGN. ✓`, 'success');
+    function stiahni(casti, nazov) {
+      if (!casti.length) return 0;
+      const pgn  = casti.filter(l => l !== null).join('\n');
+      const blob = new Blob([pgn], { type: 'application/x-chess-pgn;charset=utf-8' });
+      const a    = document.createElement('a');
+      a.href     = URL.createObjectURL(blob);
+      a.download = nazov;
+      a.click();
+      URL.revokeObjectURL(a.href);
+      // počet partií = počet hlavičiek [Event
+      return casti.filter(l => typeof l === 'string' && l.startsWith('[Event ')).length;
+    }
+
+    const nK = stiahni(castiKlasika,
+                       `Chyby_${meno}_klasicky-trening_${dateFrom}_${dateTo}.pgn`);
+    const nZ = stiahni(castiZrucnosti,
+                       `Chyby_${meno}_zrucnosti_${dateFrom}_${dateTo}.pgn`);
+
+    const kusy = [];
+    if (nK) kusy.push(`klasický tréning: ${nK}`);
+    if (nZ) kusy.push(`zručnosti: ${nZ}`);
+    setStatus(`Exportované do ${kusy.length === 2 ? 'dvoch súborov' : 'súboru'} `
+              + `(${kusy.join(', ')}). ✓`, 'success');
 
   } catch(e) {
     setStatus('Chyba pri exporte PGN: ' + e.message, 'error');
