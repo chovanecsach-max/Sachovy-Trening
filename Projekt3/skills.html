@@ -1012,17 +1012,19 @@ function click(i) {
   const piece = board[selected];
   const toRow = Math.floor(i / 8);
 
-  // Promócia pešiaka
-  if ((piece === 'P' && toRow === 0) || (piece === 'p' && toRow === 7)) {
-    showPromotionPanel(selected, i);
-    return;
-  }
+  // Premena pešiaka sa tu zámerne nerieši: pri zručnostiach sa ťah na šachovnici
+  // neprehráva, iba sa označí ako nájdený, takže výber figúry by nič neurčoval.
+  // Riešením je samotné branie, teda „odkiaľ-kam".
 
   const attempted = name(selected) + name(i);
   handleMoveAttempt(attempted);
 }
 
-function handleMoveAttempt(attempted) {
+function handleMoveAttempt(tah) {
+  // Poistka: aj keby sem prišiel ťah s piatym znakom (premena), porovnáva sa
+  // len „odkiaľ-kam" — rovnako ako sú uložené riešenia.
+  const attempted = String(tah || '').slice(0, 4);
+
   // Skontroluj či ťah je v riešeniach
   const isCorrect = solutions.includes(attempted);
 
@@ -1041,7 +1043,7 @@ function handleMoveAttempt(attempted) {
     foundMoves.push(attempted);
     // X ostane na políčkach po dokončení; obe polia ťahu počítame samostatne
     xInc(attempted.substring(0,2));
-    if (attempted.length === 4) xInc(attempted.substring(2,4));
+    xInc(attempted.substring(2,4));
     selected = null;
     render();
     updateRemainingUI();
@@ -1546,7 +1548,16 @@ function pickPuzzle() {
 
 function loadPuzzle(puzzle) {
   current = puzzle;
-  solutions = Array.isArray(puzzle.solutions) ? puzzle.solutions : [];
+  // Riešenia sa normalizujú na štyri znaky (odkiaľ-kam) a odstránia sa duplikáty.
+  // Braním s premenou pešiaka vzniknú v generátore štyri rovnaké zápisy „d7c8"
+  // — pre túto zručnosť je to však jedna odpoveď; na akú figúru sa pešiak
+  // premení, je iná otázka. Bez toho by úloha čakala štyri odpovede, ktoré sa
+  // nedajú zadať, a nedala by sa dokončiť.
+  solutions = [...new Set(
+    (Array.isArray(puzzle.solutions) ? puzzle.solutions : [])
+      .map(m => String(m || '').slice(0, 4))
+      .filter(m => m.length === 4)
+  )];
   foundMoves = [];
   xMarked = new Map();
   puzzleDone = false;
