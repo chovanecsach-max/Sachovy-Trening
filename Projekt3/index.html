@@ -4,6 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Šachový tréning</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0f1117">
+<link rel="apple-touch-icon" href="ikona-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Šach tréning">
 <link rel="icon" type="image/svg+xml" href="logo2_favicon.svg">
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -882,6 +888,16 @@ async function loadLeaderboards(myName) {
         <span class="lb-elo">${elo}</span>
       </div>`;
     }).join('');
+  });
+}
+</script>
+<script>
+// Registrácia service workera — bez neho prehliadač neponúkne inštaláciu ikony.
+// Chyba pri registrácii nesmie nič zhodiť, preto len tichý zápis do konzoly.
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(e =>
+      console.warn('Service worker sa nezaregistroval:', e));
   });
 }
 </script>
