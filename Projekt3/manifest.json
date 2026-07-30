@@ -1,0 +1,23 @@
+{
+  "name": "Šachový tréning",
+  "short_name": "Šach tréning",
+  "description": "Tréning taktiky, stratégie, koncoviek a šachových zručností.",
+  "lang": "sk",
+  "start_url": "index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#e8eaf0",
+  "theme_color": "#0f1117",
+  "icons": [
+    { "src": "ikona-192.png",          "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "ikona-512.png",          "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "ikona-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Zručnosti", "url": "skills.html?type=checks" },
+    { "name": "Taktika",   "url": "training.html?mode=taktika" },
+    { "name": "Koncovka",  "url": "training.html?mode=koncovka" },
+    { "name": "Moje zadania", "url": "zadania.html" }
+  ]
+}
