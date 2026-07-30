@@ -4,6 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Šachové zručnosti</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0f1117">
+<link rel="apple-touch-icon" href="ikona-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Šach tréning">
 
 <style>
 body {
@@ -1456,6 +1462,12 @@ async function loadPuzzles() {
 // Zoznam ID úloh aktuálne vylúčených z výberu (vyriešené natrvalo + nedávno neúspešné)
 let solvedSkillIds = new Set();
 
+// Úlohy, ktoré už hráč v tomto sedení videl — bez ohľadu na výsledok.
+// solvedSkillIds sa dopĺňa len pri správnom riešení, takže neúspešná úloha by
+// inak zostala v zásobe a výber by ju o niekoľko úloh podal znova. Ochranná
+// lehota SKILL_RETRY_AFTER_DAYS sa uplatní až pri ďalšom otvorení stránky.
+const zobrazeneVSession = new Set();
+
 const SKILL_RETRY_AFTER_DAYS = 14;   // po tomto počte dní sa nevyriešená (loss) úloha vráti do výberu
 
 async function loadSolvedSkillIds() {
@@ -1502,10 +1514,18 @@ function pickPuzzle() {
   // Prednostne nevyriešené úlohy
   let pool = puzzles.filter(p =>
     p.id !== (current ? current.id : -1) &&
-    !solvedSkillIds.has(p.id)
+    !solvedSkillIds.has(p.id) &&
+    !zobrazeneVSession.has(p.id)
   );
 
-  // Ak sú všetky vyriešené, vyber zo všetkých (okrem aktuálnej)
+  // Ak už v tomto sedení padli všetky nevyriešené, pusť aspoň tie zo starších
+  // sedení (v tomto sedení nevidené) — opakovaniu sa tak vyhneme čo najdlhšie
+  if (!pool.length) {
+    pool = puzzles.filter(p =>
+      p.id !== (current ? current.id : -1) && !zobrazeneVSession.has(p.id));
+  }
+
+  // Ak sú všetky vyriešené aj videné, vyber zo všetkých (okrem aktuálnej)
   if (!pool.length) {
     pool = puzzles.filter(p => p.id !== (current ? current.id : -1));
   }
@@ -1541,6 +1561,8 @@ function loadPuzzle(puzzle) {
   // ELA hráča v danej zručnosti. Nezávisí teda od toho, aká pozícia sa trafila,
   // čo je podstatné hlavne v komplexnom tréningu, kde je pozícia náhodná.
   // Ak by zručnosť v tabuľke nebola, použije sa čas uložený v úlohe.
+  if (puzzle && puzzle.id != null) zobrazeneVSession.add(puzzle.id);
+
   const _skill = puzzle.skill_type || solvedSkillType();
   const _hracElo = currentPlayer ? Number(currentPlayer[getSkillEloField(_skill)] || 1500) : 1500;
   aktualnyLimit = skillTimeLimit(_skill, _hracElo, solutions.length)
@@ -1804,6 +1826,16 @@ async function checkAuthAndInit() {
   init();
 }
 checkAuthAndInit();
+</script>
+<script>
+// Registrácia service workera — bez neho prehliadač neponúkne inštaláciu ikony.
+// Chyba pri registrácii nesmie nič zhodiť, preto len tichý zápis do konzoly.
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(e =>
+      console.warn('Service worker sa nezaregistroval:', e));
+  });
+}
 </script>
 </body>
 </html>
