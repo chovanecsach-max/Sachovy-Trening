@@ -1235,12 +1235,15 @@ function uplynulyCasUlohy() {
   return Math.max(0, limit - timerRemaining);
 }
 
+// Vráti true, ak sa úloha naozaj započítala ako nevyriešená — volajúci podľa
+// toho vie napísať hráčovi, čo sa stalo.
 async function opustitUlohu() {
-  if (resultLogged || puzzleDone || !currentPlayer || !current) return;
-  if (uplynulyCasUlohy() < MILOST_SEKUND) return;
+  if (resultLogged || puzzleDone || !currentPlayer || !current) return false;
+  if (uplynulyCasUlohy() < MILOST_SEKUND) return false;
   stopTimer();
   puzzleDone = true;
   await recordResult('loss');
+  return true;
 }
 
 async function recordResult(result) {
@@ -1759,11 +1762,17 @@ async function loadCompleteSkill() {
 async function retryPuzzle() {
   if (!current) return;
   // Aj „Skús znova" je opustenie úlohy — inak by sa dali hodiny resetovať donekonečna
-  await opustitUlohu();
+  const zapocitanaAkoPrehra = await opustitUlohu();
   const wasEverFailed = everFailed; // zachovaj príznak pred resetom
   loadPuzzle(current);
   everFailed = wasEverFailed; // obnov po resete
-  setStatus('Úloha bola resetovaná — ELO sa nezapočíta.', 'info');
+  setStatus(
+    zapocitanaAkoPrehra
+      ? 'Úloha bola resetovaná — započítala sa ako nevyriešená a ELO kleslo.'
+      : (wasEverFailed
+          ? 'Úloha bola resetovaná — správne riešenie sa už do ELO nezapočíta.'
+          : 'Úloha bola resetovaná.'),
+    'info');
 }
 
 // ─── Inicializácia ────────────────────────────────────────────────────────────
