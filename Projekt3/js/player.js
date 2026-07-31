@@ -13,7 +13,10 @@ async function sbFetch(path, options = {}) {
     // neexistuje, ReferenceError sa ticho odchytil a vsetky poziadavky
     // odchadzali s verejnym klucom namiesto tokenu prihlaseneho hraca.
     const { data } = await sbClient.auth.getSession();
-    if (data?.session?.access_token) authToken = data.session.access_token;
+    if (data?.session?.access_token) {
+      authToken = data.session.access_token;
+      _poslednyToken = authToken;      // pre zápisy pri odchode zo stránky
+    }
   } catch(e) {}
   const res = await fetch(url, {
     ...options,
@@ -63,6 +66,31 @@ function escapeHtml(value) {
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
 }
+
+// ─── Zápis, ktorý prežije odchod zo stránky ─────────────────────────────────
+// Pri zatvorení karty alebo obnovení stránky prehliadač bežné volania fetch
+// zruší. Príznak keepalive ho necháva dobehnúť. Token sa nedá získať cez await
+// (na to už nie je čas), preto sa používa ten posledný známy zo sbFetch.
+let _poslednyToken = null;
+
+function _sbOdchod(path, method, telo) {
+  try {
+    fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+      method: method,
+      keepalive: true,
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${_poslednyToken || SUPABASE_KEY}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=minimal'
+      },
+      body: JSON.stringify(telo)
+    });
+  } catch (e) { /* pri odchode zo stránky sa už nedá nič robiť */ }
+}
+
+function sbZapisPriOdchode(path, telo)  { _sbOdchod(path, 'POST',  telo); }
+function sbUpravPriOdchode(path, telo)  { _sbOdchod(path, 'PATCH', telo); }
 
 // ─── ELO podľa režimu ───────────────────────────────────────────────────────
 
