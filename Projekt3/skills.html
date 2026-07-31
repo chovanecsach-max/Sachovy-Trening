@@ -1043,7 +1043,7 @@ function handleMoveAttempt(tah) {
     foundMoves.push(attempted);
     // X ostane na políčkach po dokončení; obe polia ťahu počítame samostatne
     xInc(attempted.substring(0,2));
-    xInc(attempted.substring(2,4));
+    if (attempted.length === 4) xInc(attempted.substring(2,4));
     selected = null;
     render();
     updateRemainingUI();
@@ -1548,15 +1548,20 @@ function pickPuzzle() {
 
 function loadPuzzle(puzzle) {
   current = puzzle;
-  // Riešenia sa normalizujú na štyri znaky (odkiaľ-kam) a odstránia sa duplikáty.
-  // Braním s premenou pešiaka vzniknú v generátore štyri rovnaké zápisy „d7c8"
-  // — pre túto zručnosť je to však jedna odpoveď; na akú figúru sa pešiak
-  // premení, je iná otázka. Bez toho by úloha čakala štyri odpovede, ktoré sa
-  // nedajú zadať, a nedala by sa dokončiť.
+  // Riešenia majú DVA tvary podľa druhu zručnosti:
+  //   • ťah      — „e2e4" (4 znaky); pri premene pešiaka „d7c8q" (5 znakov)
+  //   • políčko  — „d6" (2 znaky) pri slabo pokrytých figúrkach a väzbách,
+  //                kde hráč kliká priamo na figúrku
+  // Z ťahu sa piaty znak odreže: na akú figúru sa pešiak premení, je iná
+  // otázka a v generátore vzniknú štyri rovnaké zápisy „d7c8". Duplikáty sa
+  // odstránia, inak by úloha čakala odpovede, ktoré sa nedajú zadať.
   solutions = [...new Set(
     (Array.isArray(puzzle.solutions) ? puzzle.solutions : [])
-      .map(m => String(m || '').slice(0, 4))
-      .filter(m => m.length === 4)
+      .map(m => {
+        const t = String(m || '').trim();
+        return t.length >= 4 ? t.slice(0, 4) : t;
+      })
+      .filter(m => m.length === 2 || m.length === 4)
   )];
   foundMoves = [];
   xMarked = new Map();
