@@ -1,1 +1,1912 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Šachové zručnosti</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0f1117">
+<link rel="apple-touch-icon" href="ikona-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Šach tréning">
 
+<style>
+body {
+  font-family: Arial, sans-serif;
+  background: #f4f4f6;
+  margin: 0;
+  padding: 10px;
+  color: #111827;
+}
+
+.app {
+  max-width: 1280px;
+  margin: 0 auto;
+  background: white;
+  border-radius: 14px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+  padding: 12px;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 12px;
+  align-items: start;
+}
+
+.board-card, .panel-card, .stats-card {
+  border: 1px solid #d1d5db;
+  border-radius: 12px;
+  background: white;
+}
+
+.board-card { padding: 10px; }
+.panel-card, .stats-card { padding: 10px 12px; }
+
+.board-area {
+  position: relative;
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 auto;
+}
+
+.board-prompt {
+  text-align: center;
+  margin: 0 0 10px 0;
+  font-size: 22px;
+}
+
+.turn-indicator {
+  position: absolute;
+  right: -18px;
+  bottom: 56px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid #111827;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+}
+
+.turn-indicator.white { background: white; }
+.turn-indicator.black { background: #111827; }
+
+.board {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  grid-template-rows: repeat(8, 1fr);
+  width: min(100%, 74vh);
+  max-width: 720px;
+  aspect-ratio: 1 / 1;
+  margin: auto;
+  border: 8px solid #5b4636;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.square {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
+  position: relative;
+  box-sizing: border-box;
+  user-select: none;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.square img.piece-img {
+  width: 85%;
+  height: 85%;
+  object-fit: contain;
+  pointer-events: none;
+  user-select: none;
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.4));
+}
+
+.light { background: #f4e7c7; }
+.dark { background: #7a9b76; }
+
+.square.selected {
+  outline: 3px solid #2563eb;
+  outline-offset: -3px;
+}
+
+.square.legal::after {
+  content: "";
+  position: absolute;
+  width: 22%;
+  height: 22%;
+  border-radius: 50%;
+  background: rgba(34, 197, 94, 0.55);
+}
+
+.square.capture::after {
+  content: "";
+  position: absolute;
+  inset: 6px;
+  border: 4px solid rgba(239, 68, 68, 0.75);
+  border-radius: 50%;
+  box-sizing: border-box;
+}
+
+.square.found-move {
+  box-shadow: inset 0 0 0 9999px rgba(34, 197, 94, 0.35);
+}
+
+.square.found-move-to {
+  box-shadow: inset 0 0 0 9999px rgba(34, 197, 94, 0.50);
+}
+
+.coord-file {
+  position: absolute;
+  right: 4px;
+  bottom: 2px;
+  font-size: 10px;
+  font-weight: bold;
+  opacity: 0.75;
+  z-index: 3;
+}
+
+.coord-rank {
+  position: absolute;
+  left: 4px;
+  top: 2px;
+  font-size: 10px;
+  font-weight: bold;
+  opacity: 0.75;
+  z-index: 3;
+}
+
+/* Panel */
+.panel-card h2 { margin: 0 0 8px 0; font-size: 18px; }
+
+.meta-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.meta-box {
+  border: 1px solid #e5e7eb;
+  background: #f8fafc;
+  border-radius: 10px;
+  padding: 8px;
+}
+
+.meta-label {
+  font-size: 11px;
+  color: #64748b;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.meta-value { font-size: 14px; font-weight: 600; word-break: break-word; }
+
+.badge {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: bold;
+  border: 1px solid #d1d5db;
+  background: #f8fafc;
+  color: #334155;
+}
+
+.badge.player { background: #ecfeff; color: #155e75; border-color: #67e8f9; }
+.badge.elo { background: #eff6ff; color: #1d4ed8; border-color: #93c5fd; }
+.badge.time { background: #f5f3ff; color: #6d28d9; border-color: #c4b5fd; }
+.badge.timer-ok { background: #ecfdf5; color: #166534; border-color: #86efac; }
+.badge.timer-warning { background: #fff7ed; color: #c2410c; border-color: #fdba74; }
+.badge.timer-expired { background: #fef2f2; color: #b91c1c; border-color: #fca5a5; }
+
+/* Počítadlo zostávajúcich ťahov */
+.remaining-box {
+  margin-bottom: 10px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 2px solid #3b82f6;
+  background: #eff6ff;
+  text-align: center;
+}
+
+.remaining-label {
+  font-size: 12px;
+  color: #1d4ed8;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.remaining-count {
+  font-size: 36px;
+  font-weight: bold;
+  color: #1d4ed8;
+  line-height: 1;
+}
+
+.remaining-box.done {
+  border-color: #22c55e;
+  background: #f0fdf4;
+}
+
+.remaining-box.done .remaining-label,
+.remaining-box.done .remaining-count {
+  color: #166534;
+}
+
+/* Zoznam nájdených ťahov */
+.found-list {
+  margin-bottom: 10px;
+}
+
+.found-list-title {
+  font-size: 12px;
+  color: #64748b;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+
+.found-moves {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.found-move-badge {
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: #dcfce7;
+  color: #166534;
+  border: 1px solid #86efac;
+  font-size: 13px;
+  font-family: monospace;
+  font-weight: bold;
+}
+
+/* Tlačidlá */
+.buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+button {
+  padding: 10px 12px;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 14px;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.primary { background: #111827; color: white; }
+.secondary { background: #e5e7eb; color: #111827; }
+.accent { background: #dbeafe; color: #1d4ed8; }
+.danger { background: #fee2e2; color: #991b1b; }
+
+.status {
+  text-align: center;
+  padding: 14px 16px;
+  border: 2px solid #d1d5db;
+  border-radius: 12px;
+  background: #f9fafb;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+}
+
+.status.info    { background: #f8fafc; border-color: #94a3b8; color: #334155; }
+.status.success { background: #f0fdf4; border-color: #4ade80; color: #166534; }
+.status.error   { background: #fef2f2; border-color: #f87171; color: #b91c1c; }
+.status.warning { background: #fff7ed; border-color: #fb923c; color: #c2410c; }
+
+/* Štatistika */
+.stats-card { margin-top: 12px; }
+.stats-card h3 { margin: 0 0 10px 0; font-size: 15px; text-align: center; }
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.stat-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 10px 8px;
+  text-align: center;
+}
+
+.stat-label {
+  display: block;
+  font-size: 11px;
+  color: #64748b;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+}
+
+.stat-value { font-size: 18px; font-weight: bold; color: #0f172a; }
+
+/* ─── Mobil a tablet ──────────────────────────────────────────────────────── */
+@media (max-width: 780px) {
+  body { overflow-x: hidden; }
+  .app { padding: 8px; }
+
+  .layout { grid-template-columns: 1fr; gap: 10px; }
+
+  /* Šachovnica ostáva HORE — hráč ju musí vidieť hneď */
+  .board { width: min(100%, 96vw); border-width: 5px; }
+  .board-prompt { font-size: 17px; margin-bottom: 6px; }
+
+  /* Indikátor na ťahu: presun do rohu nad šachovnicu, nech netrčí mimo displeja */
+  .turn-indicator {
+    right: 2px;
+    top: 0;
+    bottom: auto;
+    width: 16px;
+    height: 16px;
+  }
+
+  /* Panel: preusporiadanie podľa dôležitosti počas riešenia —
+     1. koľko zostáva, 2. stavová hláška, 3. tlačidlá,
+     4. kompaktné info o úlohe, 5. nájdené ťahy */
+  .panel-card { display: flex; flex-direction: column; }
+  .remaining-box { order: 1; }
+  .status        { order: 2; }
+  .buttons       { order: 3; margin-top: 10px; }
+  .meta-grid     { order: 4; margin-top: 10px; margin-bottom: 0; }
+  .found-list    { order: 5; margin-top: 10px; margin-bottom: 0; }
+
+  /* Počítadlo kompaktne na šírku (nie vysoký blok) */
+  .remaining-box {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 8px 12px;
+  }
+  .remaining-label { margin-bottom: 0; font-size: 13px; }
+  .remaining-count { font-size: 26px; }
+
+  /* Info o úlohe: 3 stĺpce drobných boxov = nízke */
+  .meta-grid { grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
+  .meta-box { padding: 6px; }
+  .meta-label { font-size: 10px; }
+  .meta-value { font-size: 12px; }
+  .meta-value .badge { font-size: 11px; padding: 3px 6px; }
+
+  /* Tlačidlá: 2 stĺpce, väčšie dotykové plochy */
+  .buttons { grid-template-columns: 1fr 1fr; }
+  button { min-height: 46px; font-size: 15px; }
+
+  .status { font-size: 15px; padding: 12px 12px; }
+
+  .stats-grid { grid-template-columns: repeat(3, 1fr); }
+}
+
+/* Malé telefóny */
+@media (max-width: 420px) {
+  .app { padding: 6px; }
+  .board-prompt { font-size: 15px; }
+  .board { width: 100%; border-width: 4px; }
+  .stat-value { font-size: 16px; }
+  .promotion-option { width: 58px; height: 58px; }
+  .promotion-modal { padding: 14px; }
+}
+
+/* Promócia */
+.promotion-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 100;
+  align-items: center;
+  justify-content: center;
+}
+.promotion-overlay.active { display: flex; }
+.promotion-modal {
+  background: white;
+  border-radius: 14px;
+  padding: 20px;
+  text-align: center;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+}
+.promotion-modal-title {
+  font-size: 16px;
+  font-weight: bold;
+  margin-bottom: 14px;
+}
+.promotion-modal-options {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+.promotion-option {
+  width: 70px;
+  height: 70px;
+  border: 2px solid #d1d5db;
+  border-radius: 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f8fafc;
+}
+.promotion-option:hover {
+  background: #dbeafe;
+  border-color: #3b82f6;
+}
+.promotion-option img { width: 80%; height: 80%; object-fit: contain; }
+</style>
+</head>
+
+<body oncontextmenu="return false;">
+<div class="app">
+  <div class="layout">
+    <div class="left-column">
+      <div class="board-card">
+        <div class="board-area">
+          <h2 id="promptText" class="board-prompt">Nájdi všetky šachy</h2>
+          <div id="completeProgress" style="display:none; font-size:0.85em; color:#2E75B6; font-weight:600; margin-top:4px;"></div>
+          <div id="board" class="board"></div>
+          <div id="turnIndicator" class="turn-indicator white"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="right-column">
+      <div class="panel-card">
+
+        <div class="meta-grid">
+          <div class="meta-box">
+            <div class="meta-label">Hráč</div>
+            <div class="meta-value"><span id="playerName" class="badge player">-</span></div>
+          </div>
+          <div class="meta-box">
+            <div class="meta-label">ELO hráča</div>
+            <div class="meta-value"><span id="playerElo" class="badge player">-</span></div>
+          </div>
+          <div class="meta-box">
+            <div class="meta-label">ID pozície</div>
+            <div id="puzzleId" class="meta-value">-</div>
+          </div>
+          <div class="meta-box">
+            <div class="meta-label">ELO úlohy</div>
+            <div class="meta-value"><span id="puzzleElo" class="badge elo">-</span></div>
+          </div>
+          <div class="meta-box">
+            <div class="meta-label">Odporúčaný čas</div>
+            <div class="meta-value"><span id="puzzleTime" class="badge time">-</span></div>
+          </div>
+          <div class="meta-box">
+            <div class="meta-label">Zostáva</div>
+            <div class="meta-value"><span id="puzzleTimer" class="badge timer-ok">-</span></div>
+          </div>
+        </div>
+
+        <!-- Počítadlo zostávajúcich ťahov -->
+        <div id="remainingBox" class="remaining-box">
+          <div class="remaining-label" id="remainingLabel">Zostáva nájsť</div>
+          <div class="remaining-count" id="remainingCount">-</div>
+        </div>
+
+        <!-- Nájdené ťahy -->
+        <div class="found-list">
+          <div class="found-list-title">Nájdené ťahy</div>
+          <div id="foundMoves" class="found-moves"></div>
+        </div>
+
+        <div class="buttons">
+          <button class="primary" id="nextBtn" onclick="nextPuzzle()">Ďalšia úloha</button>
+          <button class="accent" id="retryBtn" onclick="retryPuzzle()">Skús znova</button>
+          <button class="accent" id="showSolutionBtn" onclick="showSolution()">Ukáž riešenie</button>
+          <button class="secondary" onclick="goHome()">Menu</button>
+        </div>
+
+        <div id="status" class="status info">Stav: pripravené</div>
+      </div>
+
+      <div class="stats-card">
+        <h3>Štatistika tréningu</h3>
+        <div class="stats-grid">
+          <div class="stat-card">
+            <span class="stat-label">Riešené</span>
+            <div class="stat-value" id="statPlayed">0</div>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">Vyriešené</span>
+            <div class="stat-value" id="statSolved">0</div>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">Úspešnosť</span>
+            <div class="stat-value" id="statAccuracy">0%</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Rebríček Top 10 -->
+      <div class="stats-card" id="leaderboardCard">
+        <h3>🏆 Top 10</h3>
+        <div id="leaderboardList" style="margin-top:8px;">
+          <div style="color:#94a3b8;font-size:13px;font-style:italic;">Načítavam...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Promócia -->
+<div id="promotionOverlay" class="promotion-overlay">
+  <div class="promotion-modal">
+    <div class="promotion-modal-title">Vyber figúru na premenu</div>
+    <div id="promotionOptions" class="promotion-modal-options"></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/auth.js"></script>
+<script src="js/sounds.js"></script>
+<script src="js/player.js"></script>
+<script>
+const files = ['a','b','c','d','e','f','g','h'];
+
+let currentPlayer = null;
+let puzzles = [];
+let board = [];
+let meta = null;
+let current = null;
+let selected = null;
+let xMarked = new Map();  // pole → počet použití (farba krížika podľa počtu)
+let flipped = false;
+
+let pendingPromotion = null;
+let solutions = [];       // všetky správne ťahy
+let foundMoves = [];      // už nájdené ťahy
+// Komplexný sekvenčný režim
+let completeByFen = new Map(); // fen → { fen, puzzlesByKey: {key→puzzle} }
+let completeFens = [];         // pole unikátnych FEN-ov (náhodný výber)
+let completePos = null;        // aktuálna pozícia { fen, puzzlesByKey }
+let completeSkillIdx = 0;      // index v COMPLETE_SKILLS
+const COMPLETE_SKILLS = [
+  { key: 'checks',            label: 'Šachy',              prompt: 'Nájdi všetky šachy za bieleho aj čierneho' },
+  { key: 'captures',          label: 'Brania',             prompt: 'Nájdi všetky brania za bieleho aj čierneho' },
+  { key: 'pawn_breakthrough',  label: 'Pešiakové prielomy',prompt: 'Nájdi všetky pešiakové prielomy za bieleho aj čierneho' },
+  { key: 'direct_attack',     label: 'Brania so ziskom',   prompt: 'Nájdi všetky brania so ziskom (biele aj čierne)' },
+  { key: 'underdefended',     label: 'Slabo pokryté',      prompt: 'Nájdi všetky slabo pokryté figúrky (biele aj čierne)' },
+  { key: 'pin',               label: 'Absolútne väzby',    prompt: 'Nájdi všetky absolútne viazané figúrky (biele aj čierne)' },
+  { key: 'relative_pin',      label: 'Relatívne väzby',    prompt: 'Nájdi všetky relatívne viazané figúrky (biele aj čierne)' },
+  { key: 'fork',              label: 'Vidličky',           prompt: 'Nájdi všetky ťahy, ktoré vytvoria vidličku (biele aj čierne)' },
+  { key: 'direct_threat',     label: 'Priame hrozby',      prompt: 'Nájdi všetky ťahy vytvárajúce priame materiálne hrozby (biele aj čierne)' },
+];
+let puzzleDone = false;
+let puzzleFailed = false;
+let resultLogged = false;
+let everFailed = false; // true ak hráč raz chyboval/ukázal riešenie — ELO sa nezapočíta
+
+// Úlohy, za ktoré už v tejto session padlo ELO (win aj loss). Spolu so
+// solvedSkillIds (história z training_log) zabraňuje opakovanému získavaniu
+// ELO na tej istej úlohe cez "Skús znova".
+const eloAwardedSkillIds = new Set();
+
+// ELO a agregáty v players sa počítajú len pri PRVOM pokuse o danú úlohu.
+// Opakovanie sa naďalej zapisuje do training_log, ale nemení pokrok.
+function isSkillEloEligible(puzzleId) {
+  if (puzzleId == null) return false;
+  if (eloAwardedSkillIds.has(puzzleId)) return false;
+  if (solvedSkillIds.has(puzzleId)) return false;   // už vyriešená / nedávno neúspešná
+  return true;
+}
+let isAdminMode = false;
+let puzzleCounted = false;
+let puzzleSolvedCounted = false;
+
+let timerInterval = null;
+let timerRemaining = 0;
+let aktualnyLimit = 0;    // časový limit vypočítaný pre práve načítanú úlohu
+let timerExpired = false;
+
+let stats = { played: 0, solved: 0 };
+
+// ─── Pomocné funkcie ─────────────────────────────────────────────────────────
+
+async function goHome() {
+  await opustitUlohu();
+  location.href = "index.html";
+}
+
+function formatTime(seconds) {
+  const safe = Math.max(0, Math.floor(seconds));
+  return `${Math.floor(safe/60)}:${String(safe%60).padStart(2,'0')}`;
+}
+
+function setStatus(text, type = 'info') {
+  const el = document.getElementById('status');
+  el.textContent = 'Stav: ' + text;
+  el.className = 'status ' + type;
+}
+
+function updateStatsUI() {
+  const acc = stats.played === 0 ? 0 : Math.round((stats.solved/stats.played)*100);
+  document.getElementById('statPlayed').textContent = stats.played;
+  document.getElementById('statSolved').textContent = stats.solved;
+  document.getElementById('statAccuracy').textContent = acc + '%';
+}
+
+function updatePlayerUI() {
+  if (!currentPlayer) return;
+  document.getElementById('playerName').textContent =
+    currentPlayer.name + (currentPlayer.surname ? ' ' + currentPlayer.surname : '');
+  const field = activeEloField();
+  document.getElementById('playerElo').textContent =
+    (currentPlayer[field] || 1500) + ' (' + activeEloTag() + ')';
+}
+
+// ─── ELO podľa trénovanej zručnosti ──────────────────────────────────────────
+// Zápis ide vždy do ELA konkrétnej zručnosti (elo_fork, elo_pin, …), a to aj
+// v komplexnom tréningu. Spoločné elo_zrucnosti je odvodený priemer z deviatich
+// zručností a prepočítava sa po každej zmene — zobrazuje sa v hlavičke
+// komplexného tréningu a v rebríčku zručností na úvodnej stránke.
+
+const SKILL_LABELS = {
+  'checks':            'Šachy',
+  'checks_both':       'Šachy za obidve strany',
+  'captures':          'Brania',
+  'checks_captures':   'Šachy a brania',
+  'direct_attack':     'Brania so ziskom',
+  'direct_threat':     'Priame hrozby',
+  'pawn_breakthrough': 'Pešiakové prielomy',
+  'underdefended':     'Slabo pokryté',
+  'pin':               'Absolútne väzby',
+  'relative_pin':      'Relatívne väzby',
+  'fork':              'Vidličky',
+};
+
+const SKILL_SHORT = {
+  'checks':            'Šachy',
+  'captures':          'Brania',
+  'pawn_breakthrough': 'Prielomy',
+  'direct_attack':     'Brania so ziskom',
+  'direct_threat':     'Hrozby',
+  'underdefended':     'Slabo pokryté',
+  'pin':               'Abs. väzby',
+  'relative_pin':      'Rel. väzby',
+  'fork':              'Vidličky',
+};
+
+// Typ zručnosti z URL — na rozdiel od getSkillsType() sa v komplexnom
+// režime NEprepína na aktuálnu zručnosť (tam platí spoločné ELO).
+function urlSkillType() {
+  return new URLSearchParams(window.location.search).get('type') || '';
+}
+
+// Pole na ZOBRAZENIE v hlavičke a v rebríčku.
+// V komplexnom tréningu zámerne priemer (elo_zrucnosti), nie aktuálna zručnosť —
+// inak by číslo skákalo pri každej podúlohe tej istej pozície.
+function activeEloField() {
+  if (isCompleteMode()) return 'elo_zrucnosti';
+  return getSkillEloField(urlSkillType());   // z player.js
+}
+
+// Zručnosť, ktorá sa práve rieši. V komplexnom tréningu sa mení s každou
+// podúlohou (COMPLETE_SKILLS), pri jednotlivom tréningu je daná URL.
+function solvedSkillType() {
+  if (isCompleteMode()) return (current && current.skill_type) || '';
+  return urlSkillType();
+}
+
+// Pole a kategória pre ZÁPIS ELO — vždy konkrétna zručnosť, aj v komplexnom
+// tréningu. elo_zrucnosti sa už samostatne nepočíta, je to odvodený priemer.
+function updateEloField() {
+  return getSkillEloField(solvedSkillType());
+}
+
+function updateEloCategory() {
+  const t = solvedSkillType();
+  return SKILL_ELO_TYPES.includes(t) ? t : 'zrucnosti';
+}
+
+function activeEloTag() {
+  if (isCompleteMode()) return 'K';          // komplexný tréning
+  return SKILL_SHORT[urlSkillType()] || 'Z';
+}
+
+function updateTimerUI() {
+  const el = document.getElementById('puzzleTimer');
+  el.textContent = formatTime(timerRemaining);
+  if (timerExpired) { el.className = 'badge timer-expired'; return; }
+  el.className = timerRemaining <= 30 ? 'badge timer-warning' : 'badge timer-ok';
+}
+
+function stopTimer() {
+  if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+}
+
+function startTimer(seconds) {
+  stopTimer();
+  timerRemaining = Math.max(1, Math.round(seconds));
+  timerExpired = false;
+  updateTimerUI();
+  timerInterval = setInterval(() => {
+    if (puzzleDone) return;
+    timerRemaining -= 1;
+    if (timerRemaining <= 0) {
+      timerRemaining = 0;
+      timerExpired = true;
+      stopTimer();
+      updateTimerUI();
+      onTimeExpired();
+      return;
+    }
+    updateTimerUI();
+  }, 1000);
+}
+
+function onTimeExpired() {
+  if (puzzleDone) return;
+  puzzleDone = true;
+  puzzleFailed = true;
+  markPlayed();
+  recordResult('loss');
+  updateRemainingUI();
+  setStatus('Čas vypršal!', 'error');
+  showAllSolutionsOnBoard();
+}
+
+// ─── Šachový engine (parsovanie FEN, render) ─────────────────────────────────
+
+function parseFen(fen) {
+  const parts = fen.trim().split(/\s+/);
+  const rows = parts[0].split('/');
+  const b = [];
+  rows.forEach(r => {
+    for (const c of r) {
+      if (!isNaN(c)) { for (let i=0; i<Number(c); i++) b.push(''); }
+      else b.push(c);
+    }
+  });
+  return {
+    board: b,
+    meta: {
+      activeColor: parts[1] || 'w',
+      castling: parts[2] || '-',
+      enPassant: parts[3] || '-',
+    }
+  };
+}
+
+function name(i) { return files[i%8] + (8 - Math.floor(i/8)); }
+function sqToIndex(sq) { return files.indexOf(sq[0]) + 8*(8-Number(sq[1])); }
+function map(i) { return flipped ? 63-i : i; }
+function isWhitePiece(p) { return p && p === p.toUpperCase(); }
+function pieceColor(p) { if (!p) return ''; return isWhitePiece(p) ? 'w' : 'b'; }
+function rowOf(i) { return Math.floor(i/8); }
+function colOf(i) { return i%8; }
+
+function getPieceImagePath(pieceChar) {
+  const color = isWhitePiece(pieceChar) ? 'w' : 'b';
+  return `img/Pieces/${color}${pieceChar.toUpperCase()}.svg`;
+}
+
+// ─── Render šachovnice ────────────────────────────────────────────────────────
+
+function getLegalTargetsForPiece(fromIndex) {
+  const result = [];
+  const moverColor = pieceColor(board[fromIndex]);
+  for (let ti = 0; ti < 64; ti++) {
+    if (ti === fromIndex) continue;
+    // nemôžeš brať vlastnú figúrku (farba podľa vybranej figúrky, nie podľa strany na ťahu)
+    if (board[ti] && pieceColor(board[ti]) === moverColor) continue;
+    result.push({ index: ti, capture: !!board[ti] });
+  }
+  return result;
+}
+
+// Všetky zručnosti sa riešia za OBIDVE strany — jednostranný režim už neexistuje.
+// (Preto vraciame true vždy; výber figúrok je tým povolený pre bieleho aj čierneho
+//  bez ohľadu na konkrétny skill_type.)
+function isSkillBothSides() {
+  return true;
+}
+
+function canSelectPiece(i) {
+  if (!board[i]) return false;
+  if (isSkillBothSides()) return true;          // biely aj čierny
+  return pieceColor(board[i]) === meta.activeColor;
+}
+
+function drawX(d, color = '#facc15') {
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', '0 0 100 100');
+  svg.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:5;';
+  [['10,10 90,90'], ['90,10 10,90']].forEach(pts => {
+    const sh = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+    sh.setAttribute('points', pts[0]);
+    sh.setAttribute('stroke', 'rgba(0,0,0,0.4)');
+    sh.setAttribute('stroke-width', '6');
+    sh.setAttribute('stroke-linecap', 'round');
+    sh.setAttribute('fill', 'none');
+    svg.appendChild(sh);
+    const ln = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+    ln.setAttribute('points', pts[0]);
+    ln.setAttribute('stroke', color);
+    ln.setAttribute('stroke-width', '3');
+    ln.setAttribute('stroke-linecap', 'round');
+    ln.setAttribute('fill', 'none');
+    svg.appendChild(ln);
+  });
+  d.appendChild(svg);
+}
+
+// Farba krížika podľa počtu použití poľa: 1×=žltá, 2×=modrá, 3+×=červená
+function xColor(count) {
+  if (count >= 3) return '#ef4444';   // červená
+  if (count === 2) return '#3b82f6';  // modrá
+  return '#facc15';                   // žltá
+}
+
+// Inkrementuj počítadlo použití poľa
+function xInc(sq) {
+  xMarked.set(sq, (xMarked.get(sq) || 0) + 1);
+}
+
+// Cache 64 DOM elementov šachovnice — vytvoria sa raz, ďalej sa len aktualizujú
+// (zabraňuje "preblikávaniu" pri každom kliku spôsobenému úplným innerHTML rebuild)
+let _squareEls = null;       // pole 64 <div class="square"> v poradí i=0..63 (pred mapom)
+let _squareImgEls = null;    // pole 64 <img> alebo null, zarovnané s _squareEls
+let _squareCoordF = null;    // pole 8 <span class="coord-file"> pre spodný rad (index podľa stĺpca c)
+let _squareCoordR = null;    // pole 8 <span class="coord-rank"> pre ľavý stĺpec (index podľa riadku r)
+
+function _buildBoardSkeleton(el) {
+  el.innerHTML = '';
+  _squareEls = new Array(64);
+  _squareImgEls = new Array(64).fill(null);
+  _squareCoordF = new Array(8).fill(null);
+  _squareCoordR = new Array(8).fill(null);
+
+  for (let i = 0; i < 64; i++) {
+    const r = Math.floor(i/8);
+    const c = i%8;
+    const d = document.createElement('div');
+    d.className = 'square ' + ((r+c)%2===0 ? 'light' : 'dark');
+    if (r === 7) {
+      const f = document.createElement('span');
+      f.className = 'coord-file';
+      d.appendChild(f);
+      _squareCoordF[c] = f;
+    }
+    if (c === 0) {
+      const rk = document.createElement('span');
+      rk.className = 'coord-rank';
+      d.appendChild(rk);
+      _squareCoordR[r] = rk;
+    }
+    _squareEls[i] = d;
+    el.appendChild(d);
+  }
+}
+
+function render() {
+  const el = document.getElementById('board');
+
+  // Vytvor štruktúru 64 polí len raz (alebo ak bola appka medzitým inde prekreslená)
+  if (!_squareEls || el.children.length !== 64) {
+    _buildBoardSkeleton(el);
+  }
+
+  for (let i = 0; i < 64; i++) {
+    const bi = map(i);
+    const d = _squareEls[i];
+    const r = Math.floor(i/8);
+    const c = i%8;
+
+    // Reset tried na základ (svetlé/tmavé pole), ostatné stavové triedy odstránime
+    d.className = 'square ' + ((r+c)%2===0 ? 'light' : 'dark');
+    d.dataset.boardIndex = bi;
+
+    // Rozrobený výber (selected) — zvýrazni rámčekom
+    if (selected === bi) d.classList.add('selected');
+
+    foundMoves.forEach(move => {
+      const fi = sqToIndex(move.substring(0,2));
+      const ti = sqToIndex(move.substring(2,4));
+      if (bi === fi) d.classList.add('found-move');
+      if (bi === ti) d.classList.add('found-move-to');
+    });
+
+    // Figúrka — aktualizuj existujúci <img> namiesto jeho zničenia a znovuvytvorenia,
+    // aby prehliadač nemusel obrázok znova dekódovať (hlavná príčina bliknutia)
+    const piece = board[bi];
+    let img = _squareImgEls[i];
+    if (piece) {
+      const newSrc = getPieceImagePath(piece);
+      if (!img) {
+        img = document.createElement('img');
+        img.className = 'piece-img';
+        img.draggable = false;
+        d.appendChild(img);
+        _squareImgEls[i] = img;
+      }
+      if (img.alt !== piece) {
+        img.src = newSrc;
+        img.alt = piece;
+      }
+    } else if (img) {
+      img.remove();
+      _squareImgEls[i] = null;
+    }
+
+    // Odstráň prípadný starý SVG krížik z predošlého renderu (polia sa teraz recyklujú)
+    const oldSvg = d.querySelector('svg');
+    if (oldSvg) oldSvg.remove();
+
+    // X na rozrobenom výbere aj na dokončených označeniach (ostáva do novej úlohy)
+    const nm = name(bi);
+    if (selected === bi) {
+      drawX(d);   // rozrobený výber — vždy žltá
+    } else if (xMarked.has(nm)) {
+      // Dokončené označenie — farba podľa počtu použití
+      // (väzby a slabo pokryté používajú vždy žltú = počet sa neráta)
+      const st = current ? current.skill_type : '';
+      const noCount = (st === 'pin' || st === 'relative_pin' || st === 'underdefended');
+      drawX(d, noCount ? '#facc15' : xColor(xMarked.get(nm)));
+    }
+
+    if (r === 7) {
+      _squareCoordF[c].innerText = files[flipped ? 7-c : c];
+    }
+    if (c === 0) {
+      _squareCoordR[r].innerText = flipped ? (1+r) : (8-r);
+    }
+
+    d.onclick = () => click(bi);
+  }
+}
+
+// ─── Klikanie na šachovnicu ───────────────────────────────────────────────────
+
+function click(i) {
+  if (puzzleDone) return;
+
+  const skillType = getSkillsType();
+
+  // Pre underdefended a pin — hráč kliká priamo na figúrku (jednoklik).
+  // Za obidve strany: dovolíme kliknúť na figúrku ktorejkoľvek farby.
+  if (skillType === 'underdefended' || skillType === 'pin' || skillType === 'relative_pin') {
+    if (!board[i]) return setStatus('Klikni na figúrku', 'info');
+    handleMoveAttempt(name(i));
+    return;
+  }
+
+  if (selected === null) {
+    if (!board[i]) return setStatus('Vyber figúrku', 'info');
+    if (!canSelectPiece(i)) return setStatus('Vyber správnu stranu', 'warning');
+    selected = i;
+    render();
+    return setStatus('Vybraná figúrka: ' + name(i), 'info');
+  }
+
+  if (selected === i) {
+    selected = null;
+    render();
+    return setStatus('Výber zrušený', 'info');
+  }
+
+  // Klikol na inú figúrku ROVNAKEJ farby ako vybraná → prevýber.
+  // (Klik na figúrku opačnej farby sa berie ako pokus o ťah/branie.)
+  if (board[i] && pieceColor(board[i]) === pieceColor(board[selected])) {
+    selected = i;
+    render();
+    return setStatus('Vybraná figúrka: ' + name(i), 'info');
+  }
+
+  // Pokus o ťah
+  const piece = board[selected];
+  const toRow = Math.floor(i / 8);
+
+  // Premena pešiaka sa tu zámerne nerieši: pri zručnostiach sa ťah na šachovnici
+  // neprehráva, iba sa označí ako nájdený, takže výber figúry by nič neurčoval.
+  // Riešením je samotné branie, teda „odkiaľ-kam".
+
+  const attempted = name(selected) + name(i);
+  handleMoveAttempt(attempted);
+}
+
+function handleMoveAttempt(tah) {
+  // Poistka: aj keby sem prišiel ťah s piatym znakom (premena), porovnáva sa
+  // len „odkiaľ-kam" — rovnako ako sú uložené riešenia.
+  const attempted = String(tah || '').slice(0, 4);
+
+  // Skontroluj či ťah je v riešeniach
+  const isCorrect = solutions.includes(attempted);
+
+  // Skontroluj či už bol nájdený
+  const alreadyFound = foundMoves.includes(attempted);
+
+  if (alreadyFound) {
+    selected = null;
+    render();
+    return setStatus('Tento ťah si už našiel!', 'warning');
+  }
+
+  markPlayed();
+
+  if (isCorrect) {
+    foundMoves.push(attempted);
+    // X ostane na políčkach po dokončení; obe polia ťahu počítame samostatne
+    xInc(attempted.substring(0,2));
+    if (attempted.length === 4) xInc(attempted.substring(2,4));
+    selected = null;
+    render();
+    updateRemainingUI();
+    updateFoundMovesUI();
+
+    if (foundMoves.length === solutions.length) {
+      // Všetky nájdené!
+      puzzleDone = true;
+      stopTimer();
+      markSolved();
+      recordResult('win');
+      if (current) solvedSkillIds.add(current.id); // označ ako vyriešenú
+      playSound('win');
+      setStatus('🎉 Výborne! Našiel si všetky ' + getSkillTypeName() + '!', 'success');
+    } else {
+      playSound('win');
+      setStatus('Správne! Nájdi ' + skillNazovDalsi() + '.', 'success');
+    }
+  } else {
+    selected = null;
+    render();
+    // Chybný ťah — zaznamenaj neúspech a nastav everFailed
+    if (!puzzleFailed) {
+      puzzleFailed = true;
+      everFailed = true;
+      stopTimer();
+      recordResult('loss');
+    }
+    setStatus('Toto nie je ' + skillNazovNom() + '. Skús znova alebo ukáž riešenie.', 'error');
+  }
+}
+
+function getSkillTypeName() {
+  if (!current) return 'ťahy';
+  if (current.skill_type === 'checks') return 'šachy';
+  if (current.skill_type === 'checks_both') return 'šachy za obidve strany';
+  if (current.skill_type === 'captures') return 'brania';
+  if (current.skill_type === 'direct_attack') return 'brania so ziskom';
+  if (current.skill_type === 'pawn_breakthrough') return 'pešiakové prielomy';
+  if (current.skill_type === 'underdefended') return 'slabo pokryté figúrky';
+  if (current.skill_type === 'pin') return 'viazané figúrky';
+  if (current.skill_type === 'relative_pin') return 'relatívne viazané figúrky';
+  if (current.skill_type === 'fork') return 'vidličky';
+  return 'ťahy';
+}
+
+// Názvy zručností v dvoch pádoch. Hláška „Toto nie je …" potrebuje nominatív,
+// hláška „Nájdi …" akuzatív aj so správnym tvarom slova „ďalší". Preto sú tu
+// obidva tvary vypísané — jeden spoločný by v jednej z tých viet vždy škrípal.
+const SKILL_NAZVY = {
+  checks:            { nom: 'šach',                          dalsi: 'ďalší šach' },
+  checks_both:       { nom: 'šach',                          dalsi: 'ďalší šach' },
+  captures:          { nom: 'branie',                        dalsi: 'ďalšie branie' },
+  direct_attack:     { nom: 'branie so ziskom',              dalsi: 'ďalšie branie so ziskom' },
+  pawn_breakthrough: { nom: 'pešiakový prielom',             dalsi: 'ďalší pešiakový prielom' },
+  underdefended:     { nom: 'slabo pokrytá figúrka',         dalsi: 'ďalšiu slabo pokrytú figúrku' },
+  pin:               { nom: 'absolútne viazaná figúrka',     dalsi: 'ďalšiu absolútne viazanú figúrku' },
+  relative_pin:      { nom: 'relatívne viazaná figúrka',     dalsi: 'ďalšiu relatívne viazanú figúrku' },
+  fork:              { nom: 'vidlička',                      dalsi: 'ďalšiu vidličku' },
+  direct_threat:     { nom: 'materiálna hrozba',             dalsi: 'ďalšiu materiálnu hrozbu' }
+};
+
+// „Toto nie je <nominatív>."
+function skillNazovNom() {
+  const z = current && SKILL_NAZVY[current.skill_type];
+  return z ? z.nom : 'ťah';
+}
+
+// „Správne! Nájdi <ďalší/ďalšiu/ďalšie …>."
+function skillNazovDalsi() {
+  const z = current && SKILL_NAZVY[current.skill_type];
+  return z ? z.dalsi : 'ďalší ťah';
+}
+
+// ─── Počítadlo a nájdené ťahy ─────────────────────────────────────────────────
+
+function updateRemainingUI() {
+  const total = solutions.length;
+  const found = foundMoves.length;
+  const remaining = total - found;
+  const box = document.getElementById('remainingBox');
+  const count = document.getElementById('remainingCount');
+  const label = document.getElementById('remainingLabel');
+
+  count.textContent = remaining;
+
+  if (remaining === 0) {
+    box.className = 'remaining-box done';
+    label.textContent = 'Všetky nájdené!';
+  } else {
+    box.className = 'remaining-box';
+    label.textContent = 'Zostáva nájsť';
+  }
+}
+
+function updateFoundMovesUI() {
+  const el = document.getElementById('foundMoves');
+  el.innerHTML = '';
+  foundMoves.forEach(move => {
+    const badge = document.createElement('span');
+    badge.className = 'found-move-badge';
+    badge.textContent = move;
+    el.appendChild(badge);
+  });
+}
+
+// ─── Riešenie ────────────────────────────────────────────────────────────────
+
+function showSolution() {
+  if (puzzleDone) return;
+  stopTimer();
+  markPlayed();
+  everFailed = true; // videl riešenie — ELO sa nezapočíta ani po "Skús znova"
+  recordResult('loss');
+  puzzleDone = true;
+  puzzleFailed = true;
+
+  // Ukáž všetky riešenia
+  foundMoves = [...solutions];
+  render();
+  updateRemainingUI();
+  updateFoundMovesUI();
+  setStatus('Riešenie: ' + solutions.join(', '), 'warning');
+}
+
+function showAllSolutionsOnBoard() {
+  foundMoves = [...solutions];
+  render();
+  updateFoundMovesUI();
+}
+
+// ─── Štatistika ──────────────────────────────────────────────────────────────
+
+function markPlayed() {
+  if (puzzleCounted) return;
+  puzzleCounted = true;
+  stats.played += 1;
+  updateStatsUI();
+}
+
+function markSolved() {
+  if (puzzleSolvedCounted) return;
+  puzzleSolvedCounted = true;
+  stats.solved += 1;
+  updateStatsUI();
+}
+
+// Zatvorenie karty alebo obnovenie stránky — rovnaké pravidlo, ale zápis musí
+// prežiť odchod, preto keepalive. Priemer elo_zrucnosti sa prepočíta z lokálne
+// známych hodnôt, aby stačil jediný zápis.
+window.addEventListener('pagehide', function (e) {
+  if (e.persisted) return;
+  if (resultLogged || puzzleDone || !currentPlayer || !current) return;
+  const cas = uplynulyCasUlohy();
+  if (cas < MILOST_SEKUND) return;
+
+  sbZapisPriOdchode('training_log', {
+    player_id: currentPlayer.id, puzzle_id: current.id,
+    result: 'loss', time_spent: Math.round(cas), source: 'skill_puzzles'
+  });
+
+  if (isSkillEloEligible(current.id)) {
+    const pole = updateEloField();
+    const stare = Number(currentPlayer[pole] || 1500);
+    const nove = Math.max(100, stare + eloZmena(stare, Number(current.elo || 1200), 'loss'));
+    const zmeny = { [pole]: nove };
+    const priemer = priemerZrucnosti({ ...currentPlayer, [pole]: nove });
+    if (priemer != null && SKILL_ELO_TYPES.includes(updateEloCategory())) {
+      zmeny.elo_zrucnosti = priemer;
+    }
+    sbUpravPriOdchode(`players?id=eq.${currentPlayer.id}`, zmeny);
+  }
+});
+
+// ─── Opustenie úlohy ────────────────────────────────────────────────────────
+// Ak hráč úlohu opustí po tom, čo hodiny bežia dlhšie než MILOST_SEKUND, počíta
+// sa to ako nevyriešená úloha — rovnako ako v klasickom tréningu. Bez toho by
+// stačilo pred vypršaním času kliknúť na Ďalšia úloha, Menu alebo Skús znova
+// a ELO by nikdy neklesalo. Čiastočne vyriešená úloha (napr. 4 z 5 nájdených)
+// sa počíta rovnako ako nevyriešená — úloha znie nájsť VŠETKY.
+const MILOST_SEKUND = 10;
+
+function uplynulyCasUlohy() {
+  const limit = Number(aktualnyLimit) || 0;
+  if (!limit) return 0;
+  return Math.max(0, limit - timerRemaining);
+}
+
+async function opustitUlohu() {
+  if (resultLogged || puzzleDone || !currentPlayer || !current) return;
+  if (uplynulyCasUlohy() < MILOST_SEKUND) return;
+  stopTimer();
+  puzzleDone = true;
+  await recordResult('loss');
+}
+
+async function recordResult(result) {
+  if (resultLogged || !currentPlayer || !current) return;
+  resultLogged = true;
+
+  // V admin testovacom režime nezapisujeme štatistiky
+  if (isAdminMode) {
+    setStatus('Admin testovací režim — výsledok sa nezapisuje', 'info');
+    return;
+  }
+
+  // POZOR: vyhodnoť oprávnenosť SYNCHRÓNNE, ešte pred prvým await.
+  // Volajúci po spustení recordResult('win') hneď pridáva id do solvedSkillIds,
+  // takže po await by sa prvé riešenie javilo ako opakovanie a ELO by nepadlo.
+  const eloEligible = isSkillEloEligible(current.id);
+  if (eloEligible) eloAwardedSkillIds.add(current.id);
+
+  // Ulož posledný typ zručnosti pre zobrazenie ELO v menu
+  const skillType = new URLSearchParams(window.location.search).get('type') || 'checks_captures';
+  localStorage.setItem('lastTrainingMode', 'skill_' + skillType);
+
+  // Vypočítaj čas strávený na úlohe
+  const puzzleTime = Math.max(0, aktualnyLimit || Math.round(current.time || 120));
+  const usedTime = Math.max(0, puzzleTime - Math.max(0, timerRemaining));
+
+  // Zaznamenaj do training_log
+  try {
+    await sbFetch("training_log", {
+      method: "POST",
+      prefer: "return=minimal",
+      body: JSON.stringify({
+        player_id: currentPlayer.id,
+        puzzle_id: current.id,
+        result: result,
+        time_spent: usedTime,
+        source: "skill_puzzles"   // úloha z tabuľky skill_puzzles (tréning zručností)
+      })
+    });
+  } catch(e) {
+    console.error("Chyba pri zápise logu:", e);
+  }
+
+  // Aktualizuj ELO (vlastné pre danú zručnosť, v komplexnom režime spoločné),
+  // total_time a štatistiky — len pri prvom pokuse o túto úlohu.
+  // Opakované riešenie zostáva v training_log, ale pokrok už nemení.
+  if (!eloEligible) {
+    setStatus('Túto úlohu si už riešil — zapísala sa do histórie, ELO sa nemení.', 'info');
+    return;
+  }
+
+  try {
+    const players = await sbFetch(`players?id=eq.${currentPlayer.id}&limit=1`);
+    if (players && players.length) {
+      const player = players[0];
+      const eloField = updateEloField();      // konkrétna zručnosť, nie priemer
+      const currentElo = Number(player[eloField] || 1500);
+      // Stĺpec elo v skill_puzzles nie je mierou náročnosti pozície, ale iba
+      // značkou úrovne, na ktorej bola úloha vygenerovaná (get_elo v
+      // generate_vision.py: „nezávisí od počtu riešení"). Náročnosť určuje ČAS,
+      // a ten sa od zavedenia SKILL_TIME_TABLE počíta z úrovne hráča.
+      // Pri jednotlivej zručnosti výber servíruje úlohu z úrovne hráča, takže
+      // značka aj tak zodpovedá jeho sile a dá sa použiť. V komplexnom tréningu
+      // je pozícia náhodná, takže by sa počítalo proti cudzej úrovni — preto sa
+      // tam porovnáva hráč sám so sebou: úspech +10, neúspech −10.
+      const puzzleElo = isCompleteMode() ? currentElo : Number(current.elo || 1200);
+      let change = eloZmena(currentElo, puzzleElo, result);
+      // Ak hráč chyboval alebo ukázal riešenie, ELO pri výhre sa nepočíta
+      if (everFailed && result === 'win') change = 0;
+      const newElo = Math.max(100, currentElo + change);
+
+      const updates = {
+        [eloField]: newElo,
+        played: Number(player.played || 0) + 1,
+        total_time: Number(player.total_time || 0) + usedTime
+      };
+      if (result === 'win') {
+        updates.solved = Number(player.solved || 0) + 1;
+      }
+
+      // elo_zrucnosti je odvodený priemer — prepočítaj ho v tom istom zápise
+      const kategoria = updateEloCategory();
+      let priemer = null;
+      if (SKILL_ELO_TYPES.includes(kategoria)) {
+        priemer = priemerZrucnosti({ ...player, [eloField]: newElo });
+        if (priemer != null) updates.elo_zrucnosti = priemer;
+      }
+
+      await sbFetch(`players?id=eq.${currentPlayer.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(updates)
+      });
+      currentPlayer[eloField] = newElo;
+      if (priemer != null) currentPlayer.elo_zrucnosti = priemer;
+
+      // Zaloguj ELO do histórie pre grafy (len ak sa ELO zmenilo).
+      // Priemer sa loguje pod kategóriou 'zrucnosti', aby jej graf nezhasol.
+      if (change !== 0) {
+        await logEloHistory(currentPlayer.id, kategoria, newElo);
+        if (priemer != null && kategoria !== 'zrucnosti') {
+          await logEloHistory(currentPlayer.id, 'zrucnosti', priemer);
+        }
+      }
+
+      // V hlavičke sa v komplexnom tréningu zobrazuje priemer, inak daná zručnosť
+      const zobraz = isCompleteMode()
+        ? (currentPlayer.elo_zrucnosti != null ? currentPlayer.elo_zrucnosti : newElo)
+        : newElo;
+      document.getElementById('playerElo').textContent = zobraz + ' (' + activeEloTag() + ')';
+    }
+  } catch(e) {
+    console.error("Chyba pri aktualizácii ELO zručností:", e);
+  }
+}
+
+// sbFetch je dostupný z player.js
+
+function getSkillsType() {
+  const params = new URLSearchParams(window.location.search);
+  const urlType = params.get("type") || "checks_captures";
+  // V komplexnom režime vráti aktuálnu zručnosť (nie 'complete')
+  if (urlType === 'complete' && current && current.skill_type) {
+    return current.skill_type;
+  }
+  return urlType;
+}
+
+function isCompleteMode() {
+  const params = new URLSearchParams(window.location.search);
+  return params.get("type") === 'complete';
+}
+
+// ─── Rebríček Top 10 ─────────────────────────────────────────────────────────
+
+async function loadLeaderboard() {
+  const type = getSkillsType();
+  const label = isCompleteMode()
+    ? 'Komplexný tréning'
+    : (SKILL_LABELS[type] || 'Zručnosti');
+  document.querySelector('#leaderboardCard h3').textContent = `🏆 Top 10 — ${label}`;
+
+  const eloField = activeEloField();
+  try {
+    // Rebríček číta z pohľadu rebricek, nie priamo z tabuľky players —
+    // ten zverejňuje len meno a ELO, žiadne emaily, a adminov vylučuje sám.
+    const data = await sbFetch(
+      `rebricek?select=name,surname,${eloField}&order=${eloField}.desc&limit=10`
+    );
+    renderLeaderboard(data || [], eloField);
+  } catch(e) {
+    document.getElementById('leaderboardList').innerHTML =
+      '<div style="color:#94a3b8;font-size:13px;">Chyba načítania</div>';
+  }
+}
+
+function renderLeaderboard(players, eloField) {
+  const field = eloField || activeEloField();
+  const el = document.getElementById('leaderboardList');
+  if (!players.length) {
+    el.innerHTML = '<div style="color:#94a3b8;font-size:13px;font-style:italic;">Žiadni hráči</div>';
+    return;
+  }
+  const medals = ['🥇','🥈','🥉'];
+  const myNick = currentPlayer
+    ? `${currentPlayer.name || ''} ${currentPlayer.surname || ''}`.trim()
+    : null;
+
+  el.innerHTML = players.map((p, i) => {
+    const nick = `${p.name || ''} ${p.surname || ''}`.trim() || '?';
+    const elo  = p[field] || 1500;
+    const isMe = myNick && nick === myNick;
+    const rank = medals[i] || `${i + 1}.`;
+    return `
+      <div style="display:flex;align-items:center;gap:8px;padding:5px 6px;border-radius:8px;
+        background:${isMe ? '#eff6ff' : 'transparent'};
+        border:${isMe ? '1px solid #bfdbfe' : '1px solid transparent'};
+        margin-bottom:3px;">
+        <span style="width:24px;text-align:center;font-size:13px;">${rank}</span>
+        <span style="flex:1;font-size:13px;font-weight:${isMe ? '600' : '400'};
+          color:${isMe ? '#1d4ed8' : '#334155'};
+          white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(nick)}</span>
+        <span style="font-size:13px;font-weight:600;color:#1e3a5f;">${elo}</span>
+      </div>`;
+  }).join('');
+}
+
+async function loadPuzzles() {
+  const type = getSkillsType();
+
+  // Komplexný sekvenčný režim — načíta zo skill_puzzles a zoskupí podľa FEN
+  if (isCompleteMode()) {
+    // Supabase má default limit 1000 na dopyt — pri 10 000+ záznamoch treba
+    // stiahnuť VŠETKY dávkovo, inak sa nenájdu prekrývajúce sa zručnosti
+    // (ID sú prideľované po blokoch podľa zručnosti, takže pri obmedzenom
+    // limite sa vôbec nedostaneme k neskorším zručnostiam ako vidličky).
+    // OPTIMALIZÁCIA: na zoskupenie stačia ľahké stĺpce (id, fen, skill_type)
+    // — plné puzzle (s riešeniami) sa doťahuje lenivo podľa ID až pri hraní.
+    // Šetrí to ~90 % objemu dát pri štarte komplexného režimu.
+    let data = [];
+    let offset = 0;
+    const batchSize = 1000;
+    while (true) {
+      const batch = await sbFetch(`skill_puzzles?select=id,fen,skill_type&order=id.asc&limit=${batchSize}&offset=${offset}`);
+      if (!batch || !batch.length) break;
+      data = data.concat(batch);
+      if (batch.length < batchSize) break;
+      offset += batchSize;
+    }
+    if (!data.length) throw new Error('Žiadne úlohy v skill_puzzles');
+    completeByFen = new Map();
+    const skillKeys = new Set(COMPLETE_SKILLS.map(s => s.key));
+    for (const p of data) {
+      if (!skillKeys.has(p.skill_type)) continue;
+      if (!completeByFen.has(p.fen)) {
+        completeByFen.set(p.fen, { fen: p.fen, puzzlesByKey: {} });
+      }
+      const entry = completeByFen.get(p.fen);
+      if (!entry.puzzlesByKey[p.skill_type]) {
+        entry.puzzlesByKey[p.skill_type] = p;
+      }
+    }
+    // Ponechaj len FEN-y s aspoň 4 rôznymi zručnosťami
+    const MIN_COMPLETE_SKILLS = 4;
+    completeFens = [...completeByFen.keys()].filter(
+      f => Object.keys(completeByFen.get(f).puzzlesByKey).length >= MIN_COMPLETE_SKILLS
+    );
+    if (!completeFens.length) throw new Error(`Žiadne pozície s aspoň ${MIN_COMPLETE_SKILLS} zručnosťami v skill_puzzles`);
+    return [];
+  }
+
+  let filter = "";
+  if (type === "checks_captures") {
+    filter = "skill_type=in.(checks,captures)";
+  } else if (type === "checks") {
+    filter = "skill_type=eq.checks";
+  } else if (type === "checks_both") {
+    filter = "skill_type=eq.checks_both";
+  } else if (type === "captures") {
+    filter = "skill_type=eq.captures";
+  } else if (type === "direct_attack") {
+    filter = "skill_type=eq.direct_attack";
+  } else if (type === "direct_threat") {
+    filter = "skill_type=eq.direct_threat";
+  } else if (type === "pawn_breakthrough") {
+    filter = "skill_type=eq.pawn_breakthrough";
+  } else if (type === "underdefended") {
+    filter = "skill_type=eq.underdefended";
+  } else if (type === "pin") {
+    filter = "skill_type=eq.pin";
+  } else if (type === "relative_pin") {
+    filter = "skill_type=eq.relative_pin";
+  } else if (type === "fork") {
+    filter = "skill_type=eq.fork";
+  }
+  const baseQuery = filter ? `skill_puzzles?${filter}&order=id.asc` : "skill_puzzles?order=id.asc";
+  // Dávkové načítanie — jedna zručnosť môže mať viac ako 1000/2000 záznamov
+  let data = [];
+  let offset = 0;
+  const batchSize = 1000;
+  while (true) {
+    const batch = await sbFetch(`${baseQuery}&limit=${batchSize}&offset=${offset}`);
+    if (!batch || !batch.length) break;
+    data = data.concat(batch);
+    if (batch.length < batchSize) break;
+    offset += batchSize;
+  }
+  if (!data.length) throw new Error("Žiadne úlohy v databáze pre tento typ");
+  return data;
+}
+
+// ─── Výber úlohy ─────────────────────────────────────────────────────────────
+
+// Zoznam ID úloh aktuálne vylúčených z výberu (vyriešené natrvalo + nedávno neúspešné)
+let solvedSkillIds = new Set();
+
+// Úlohy, ktoré už hráč v tomto sedení videl — bez ohľadu na výsledok.
+// solvedSkillIds sa dopĺňa len pri správnom riešení, takže neúspešná úloha by
+// inak zostala v zásobe a výber by ju o niekoľko úloh podal znova. Ochranná
+// lehota SKILL_RETRY_AFTER_DAYS sa uplatní až pri ďalšom otvorení stránky.
+const zobrazeneVSession = new Set();
+
+const SKILL_RETRY_AFTER_DAYS = 14;   // po tomto počte dní sa nevyriešená (loss) úloha vráti do výberu
+
+async function loadSolvedSkillIds() {
+  if (!currentPlayer) return;
+  try {
+    // POZOR na source=eq.skill_puzzles: skill_puzzles.id aj puzzles.id sú int4
+    // od 1, takže sa prekrývajú. Bez tohto filtra by vyriešená klasická úloha
+    // č. N vylúčila z tréningu zručnosť č. N.
+    const data = await sbFetch(
+      `training_log?player_id=eq.${currentPlayer.id}&source=eq.skill_puzzles&select=puzzle_id,result,created_at&order=created_at.desc`
+    );
+    const lastByPuzzle = new Map();
+    (data || []).forEach(row => {
+      if (!lastByPuzzle.has(row.puzzle_id)) {
+        lastByPuzzle.set(row.puzzle_id, row);
+      }
+    });
+
+    const now = Date.now();
+    const cutoffMs = SKILL_RETRY_AFTER_DAYS * 24 * 60 * 60 * 1000;
+    const excluded = new Set();
+
+    lastByPuzzle.forEach((row, puzzleId) => {
+      if (row.result === 'win') {
+        excluded.add(puzzleId);   // vyriešené — natrvalo vylúčené
+      } else {
+        const age = now - new Date(row.created_at).getTime();
+        if (age < cutoffMs) excluded.add(puzzleId);   // nedávno neúspešné — dočasne vylúčené
+      }
+    });
+
+    solvedSkillIds = excluded;
+  } catch(e) {
+    console.error('Chyba načítania histórie úloh:', e);
+  }
+}
+
+function pickPuzzle() {
+  if (!puzzles.length) return null;
+
+  // Vyber ELO hráča — vlastné ELO danej zručnosti (v komplexnom režime spoločné)
+  const playerElo = Number(currentPlayer?.[activeEloField()] || 1500);
+
+  // Prednostne nevyriešené úlohy
+  let pool = puzzles.filter(p =>
+    p.id !== (current ? current.id : -1) &&
+    !solvedSkillIds.has(p.id) &&
+    !zobrazeneVSession.has(p.id)
+  );
+
+  // Ak už v tomto sedení padli všetky nevyriešené, pusť aspoň tie zo starších
+  // sedení (v tomto sedení nevidené) — opakovaniu sa tak vyhneme čo najdlhšie
+  if (!pool.length) {
+    pool = puzzles.filter(p =>
+      p.id !== (current ? current.id : -1) && !zobrazeneVSession.has(p.id));
+  }
+
+  // Ak sú všetky vyriešené aj videné, vyber zo všetkých (okrem aktuálnej)
+  if (!pool.length) {
+    pool = puzzles.filter(p => p.id !== (current ? current.id : -1));
+  }
+
+  // Vyber úlohu blízku ELO hráča
+  function filterByRange(arr, range) {
+    return arr.filter(p => Math.abs((p.elo || 1200) - playerElo) <= range);
+  }
+
+  let candidates = filterByRange(pool, 150);
+  if (!candidates.length) candidates = filterByRange(pool, 300);
+  if (!candidates.length) candidates = pool;
+
+  return candidates[Math.floor(Math.random() * candidates.length)] || null;
+}
+
+// ─── Načítanie úlohy ─────────────────────────────────────────────────────────
+
+function loadPuzzle(puzzle) {
+  current = puzzle;
+  // Riešenia majú DVA tvary podľa druhu zručnosti:
+  //   • ťah      — „e2e4" (4 znaky); pri premene pešiaka „d7c8q" (5 znakov)
+  //   • políčko  — „d6" (2 znaky) pri slabo pokrytých figúrkach a väzbách,
+  //                kde hráč kliká priamo na figúrku
+  // Z ťahu sa piaty znak odreže: na akú figúru sa pešiak premení, je iná
+  // otázka a v generátore vzniknú štyri rovnaké zápisy „d7c8". Duplikáty sa
+  // odstránia, inak by úloha čakala odpovede, ktoré sa nedajú zadať.
+  solutions = [...new Set(
+    (Array.isArray(puzzle.solutions) ? puzzle.solutions : [])
+      .map(m => {
+        const t = String(m || '').trim();
+        return t.length >= 4 ? t.slice(0, 4) : t;
+      })
+      .filter(m => m.length === 2 || m.length === 4)
+  )];
+  foundMoves = [];
+  xMarked = new Map();
+  puzzleDone = false;
+  puzzleFailed = false;
+  resultLogged = false;
+  puzzleCounted = false;
+  puzzleSolvedCounted = false;
+  everFailed = false; // reset pre novú úlohu (retryPuzzle ho obnovi)
+  selected = null;
+
+  // Časový limit sa počíta z tabuľky: základ + počet riešení × bonus, podľa
+  // ELA hráča v danej zručnosti. Nezávisí teda od toho, aká pozícia sa trafila,
+  // čo je podstatné hlavne v komplexnom tréningu, kde je pozícia náhodná.
+  // Ak by zručnosť v tabuľke nebola, použije sa čas uložený v úlohe.
+  if (puzzle && puzzle.id != null) zobrazeneVSession.add(puzzle.id);
+
+  const _skill = puzzle.skill_type || solvedSkillType();
+  const _hracElo = currentPlayer ? Number(currentPlayer[getSkillEloField(_skill)] || 1500) : 1500;
+  aktualnyLimit = skillTimeLimit(_skill, _hracElo, solutions.length)
+               || Math.round(puzzle.time || 120);
+
+  const parsed = parseFen(puzzle.fen);
+  board = parsed.board;
+  meta = parsed.meta;
+
+  flipped = meta.activeColor === 'b';
+
+  // UI
+  if (!isCompleteMode()) {
+    document.getElementById('promptText').textContent = puzzle.prompt || 'Nájdi všetky šachy';
+  }
+  document.getElementById('puzzleId').textContent = puzzle.id ?? '-';
+  document.getElementById('puzzleElo').textContent = puzzle.elo ?? '-';
+  document.getElementById('puzzleTime').textContent = formatTime(aktualnyLimit);
+
+  const ti = document.getElementById('turnIndicator');
+  ti.className = 'turn-indicator ' + (meta.activeColor === 'b' ? 'black' : 'white');
+
+  updateRemainingUI();
+  updateFoundMovesUI();
+  render();
+  startTimer(aktualnyLimit);
+  setStatus('Pripravené', 'info');
+}
+
+async function nextPuzzle() {
+  await opustitUlohu();
+  if (isCompleteMode()) { loadCompleteNext(); return; }
+  const puzzle = pickPuzzle();
+  if (!puzzle) return setStatus('Žiadne ďalšie úlohy', 'warning');
+  loadPuzzle(puzzle);
+}
+
+// ─── Komplexný sekvenčný režim ───────────────────────────────────────────────
+
+function loadCompleteNext() {
+  // Hľadaj ďalšiu zručnosť v aktuálnej pozícii
+  if (completePos) {
+    for (let i = completeSkillIdx + 1; i < COMPLETE_SKILLS.length; i++) {
+      const key = COMPLETE_SKILLS[i].key;
+      if (completePos.puzzlesByKey[key]) {
+        completeSkillIdx = i;
+        loadCompleteSkill();
+        return;
+      }
+    }
+  }
+  // Všetky zručnosti hotové — načítaj novú pozíciu
+  loadCompletePosition();
+}
+
+function completeFenSolved(fen) {
+  // FEN sa považuje za "vybavený" ak sú všetky jeho zručnosti buď vyriešené,
+  // alebo nedávno (< 14 dní) neúspešné — teda momentálne vylúčené z výberu.
+  // Po uplynutí 14 dní sa neúspešné zručnosti vrátia do hry a FEN sa znova stane kandidátom.
+  const entry = completeByFen.get(fen);
+  if (!entry) return true;
+  const ids = Object.values(entry.puzzlesByKey).map(p => p.id);
+  return ids.every(id => solvedSkillIds.has(id));
+}
+
+function loadCompletePosition() {
+  if (!completeFens.length) { setStatus('Žiadne ďalšie pozície', 'info'); return; }
+
+  // Prednostne FEN-y, ktoré ešte nie sú úplne vyriešené (a nie sú aktuálne)
+  let pool = completeFens.filter(f =>
+    f !== (completePos ? completePos.fen : null) && !completeFenSolved(f)
+  );
+  // Ak sú všetky vyriešené, vyber zo všetkých (okrem aktuálnej)
+  if (!pool.length) {
+    pool = completeFens.filter(f => f !== (completePos ? completePos.fen : null));
+  }
+  if (!pool.length) pool = completeFens;
+
+  const fen = pool[Math.floor(Math.random() * pool.length)];
+  completePos = completeByFen.get(fen);
+  completeSkillIdx = -1;
+  for (let i = 0; i < COMPLETE_SKILLS.length; i++) {
+    if (completePos.puzzlesByKey[COMPLETE_SKILLS[i].key]) {
+      completeSkillIdx = i;
+      break;
+    }
+  }
+  if (completeSkillIdx === -1) {
+    completeFens = completeFens.filter(f => f !== fen);
+    loadCompletePosition();
+    return;
+  }
+  loadCompleteSkill();
+}
+
+let _completeLoadSeq = 0;   // ochrana proti pretekaniu pri rýchlom preklikávaní
+
+async function loadCompleteSkill() {
+  const sk = COMPLETE_SKILLS[completeSkillIdx];
+  let puzzle = completePos.puzzlesByKey[sk.key];
+  const found = COMPLETE_SKILLS.filter(s => completePos.puzzlesByKey[s.key]);
+  const posInFound = found.findIndex(s => s.key === sk.key);
+  // Nastav prompt a progress
+  document.getElementById('promptText').textContent = sk.prompt;
+  const el = document.getElementById('completeProgress');
+  if (el) el.textContent = `Zručnosť ${posInFound + 1} / ${found.length}: ${sk.label}`;
+
+  // Lenivé dotiahnutie plného puzzle (zoznam obsahuje len id/fen/skill_type)
+  if (puzzle && puzzle.solutions === undefined) {
+    const mySeq = ++_completeLoadSeq;
+    try {
+      const rows = await sbFetch(`skill_puzzles?id=eq.${puzzle.id}&limit=1`);
+      if (mySeq !== _completeLoadSeq) return;   // medzitým sa načítala iná úloha
+      if (rows && rows.length) {
+        puzzle = rows[0];
+        completePos.puzzlesByKey[sk.key] = puzzle;   // cache — retry nefetchuje znova
+      }
+    } catch(e) {
+      setStatus('Chyba pri načítaní úlohy: ' + e.message, 'error');
+      return;
+    }
+  }
+  loadPuzzle(puzzle);
+}
+
+async function retryPuzzle() {
+  if (!current) return;
+  // Aj „Skús znova" je opustenie úlohy — inak by sa dali hodiny resetovať donekonečna
+  await opustitUlohu();
+  const wasEverFailed = everFailed; // zachovaj príznak pred resetom
+  loadPuzzle(current);
+  everFailed = wasEverFailed; // obnov po resete
+  setStatus('Úloha bola resetovaná — ELO sa nezapočíta.', 'info');
+}
+
+// ─── Inicializácia ────────────────────────────────────────────────────────────
+
+function isWhitePiecePromo(p) { return p && p === p.toUpperCase(); }
+
+function showPromotionPanel(fromIdx, toIdx) {
+  pendingPromotion = { fromIdx, toIdx };
+  const piece = board[fromIdx];
+  const isWhite = piece === 'P';
+  const overlay = document.getElementById('promotionOverlay');
+  const options = document.getElementById('promotionOptions');
+  options.innerHTML = '';
+  ['q', 'r', 'b', 'n'].forEach(code => {
+    const div = document.createElement('div');
+    div.className = 'promotion-option';
+    const color = isWhite ? 'w' : 'b';
+    div.innerHTML = `<img src="img/Pieces/${color}${code.toUpperCase()}.svg" alt="${code}">`;
+    div.onclick = () => {
+      overlay.classList.remove('active');
+      const attempted = name(fromIdx) + name(toIdx) + code;
+      pendingPromotion = null;
+      selected = null;
+      handleMoveAttempt(attempted);
+    };
+    options.appendChild(div);
+  });
+  overlay.classList.add('active');
+  setStatus('Vyber figúru na premenu', 'info');
+}
+
+async function init() {
+  currentPlayer = await getCurrentPlayer();
+  if (!currentPlayer) {
+    alert("Najprv vyber hráča.");
+    location.href = "index.html";
+    return;
+  }
+
+  updatePlayerUI();
+  loadLeaderboard(); // načítaj rebríček
+
+  // Nastav názov podľa typu
+  const type = getSkillsType();
+  if (isCompleteMode()) {
+    document.title = "Komplexný board-vision tréning";
+    document.getElementById('promptText').textContent = 'Načítavam pozície...';
+    document.getElementById('completeProgress').style.display = 'block';
+  } else if (type === "checks") {
+    document.title = "Šachy";
+    document.getElementById("promptText").textContent = "Nájdi všetky šachy za bieleho aj čierneho";
+  } else if (type === "checks_both") {
+    document.title = "Šachy za obidve strany";
+    document.getElementById("promptText").textContent = "Nájdi všetky šachy za bieleho aj čierneho";
+  } else if (type === "captures") {
+    document.title = "Brania";
+    document.getElementById("promptText").textContent = "Nájdi všetky brania za bieleho aj čierneho";
+  } else if (type === "direct_attack") {
+    document.title = "Brania so ziskom";
+    document.getElementById("promptText").textContent = "Nájdi všetky brania so ziskom (biele aj čierne)";
+  } else if (type === "pawn_breakthrough") {
+    document.title = "Pešiakové prielomy";
+    document.getElementById("promptText").textContent = "Nájdi všetky pešiakové prielomy za bieleho aj čierneho";
+  } else if (type === "underdefended") {
+    document.title = "Slabo pokryté figúrky";
+    document.getElementById("promptText").textContent = "Nájdi všetky slabo pokryté figúrky (biele aj čierne)";
+  } else if (type === "pin") {
+    document.title = "Absolútne väzby";
+    document.getElementById("promptText").textContent = "Nájdi všetky absolútne viazané figúrky (biele aj čierne)";
+  } else if (type === "relative_pin") {
+    document.title = "Relatívne väzby";
+    document.getElementById("promptText").textContent = "Nájdi všetky relatívne viazané figúrky (biele aj čierne)";
+  } else if (type === "fork") {
+    document.title = "Vidličky";
+    document.getElementById("promptText").textContent = "Nájdi všetky ťahy, ktoré vytvoria vidličku (biele aj čierne)";
+  } else if (type === "direct_threat") {
+    document.title = "Priame hrozby";
+    document.getElementById("promptText").textContent = "Nájdi všetky ťahy vytvárajúce priame materiálne hrozby (biele aj čierne)";
+  } else {
+    document.title = "Šachy a brania";
+    document.getElementById("promptText").textContent = "Nájdi všetky šachy a brania";
+  }
+
+  try {
+    setStatus('Načítavam úlohy...', 'info');
+    puzzles = await loadPuzzles();
+
+    // Načítaj skôr vyriešené úlohy
+    await loadSolvedSkillIds();
+
+    // Skontroluj či prišiel z admin panelu (testovací režim)
+    const adminSkillId = localStorage.getItem('adminSkillId');
+    if (adminSkillId) {
+      localStorage.removeItem('adminSkillId');
+      localStorage.removeItem('adminSkillType');
+      isAdminMode = true;
+      const adminPuzzle = puzzles.find(p => Number(p.id) === Number(adminSkillId));
+      if (adminPuzzle) {
+        setStatus(`Admin testovací režim — úloha ID ${adminSkillId} (bez zápisu do štatistiky)`, 'info');
+        loadPuzzle(adminPuzzle);
+        return;
+      }
+    }
+
+    setStatus(`Načítaných ${puzzles.length} úloh`, 'success');
+  } catch(e) {
+    setStatus('Chyba pri načítaní: ' + e.message, 'error');
+    return;
+  }
+
+  // Komplexný sekvenčný režim
+  if (isCompleteMode()) {
+    setStatus(`Načítaných ${completeFens.length} pozícií`, 'success');
+    loadCompletePosition();
+    return;
+  }
+
+  const puzzle = pickPuzzle();
+  if (!puzzle) {
+    setStatus('Žiadne úlohy v databáze', 'error');
+    return;
+  }
+  loadPuzzle(puzzle);
+}
+
+
+// Kontrola prihlásenia
+async function checkAuthAndInit() {
+  const ok = await refreshSession();
+  if (!ok) { location.href = 'login.html'; return; }
+  init();
+}
+checkAuthAndInit();
+</script>
+<script>
+// Registrácia service workera — bez neho prehliadač neponúkne inštaláciu ikony.
+// Chyba pri registrácii nesmie nič zhodiť, preto len tichý zápis do konzoly.
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(e =>
+      console.warn('Service worker sa nezaregistroval:', e));
+  });
+}
+</script>
+</body>
+</html>
