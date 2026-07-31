@@ -978,12 +978,14 @@ function uplynulyCasUlohy() {
   return Math.max(0, normalizeTimeValue(current.time) - timerRemaining);
 }
 
+// Vráti true, ak sa úloha naozaj započítala ako nevyriešená.
 async function opustitUlohu() {
-  if (resultLogged || !currentPlayer || !current) return;
-  if (currentPuzzleIsAdmin || solved || failed) return;
-  if (uplynulyCasUlohy() < MILOST_SEKUND) return;
+  if (resultLogged || !currentPlayer || !current) return false;
+  if (currentPuzzleIsAdmin || solved || failed) return false;
+  if (uplynulyCasUlohy() < MILOST_SEKUND) return false;
   stopPuzzleTimer();
   await recordResultOnce('loss');
+  return true;
 }
 
 // POZOR: funkcia je asynchrónna a zápisy sa čakajú. Je to preto, aby sa stihli
@@ -2139,12 +2141,17 @@ async function restart() {
 async function retryPuzzle() {
   if (!current || isAnimatingSolution || dragState.active || pendingPromotion) return;
   // Aj „Skús znova" je opustenie úlohy — inak by sa dali hodiny resetovať donekonečna
-  await opustitUlohu();
+  const zapocitanaAkoPrehra = await opustitUlohu();
   // Zachovaj everFailed — hráč už raz chyboval, ELO sa nezapočíta
   const wasEverFailed = everFailed;
   loadPuzzleObject(current, currentPuzzleIsAdmin);
   everFailed = wasEverFailed; // obnov príznak po resete
-  setStatus(currentPuzzleIsAdmin ? 'Admin úloha bola resetovaná' : 'Úloha bola resetovaná', 'info');
+  setStatus(
+    currentPuzzleIsAdmin ? 'Admin úloha bola resetovaná'
+    : zapocitanaAkoPrehra ? 'Úloha bola resetovaná — započítala sa ako nevyriešená a ELO kleslo.'
+    : wasEverFailed ? 'Úloha bola resetovaná — správne riešenie sa už do ELO nezapočíta.'
+    : 'Úloha bola resetovaná.',
+    'info');
 }
 
 async function showSolution() {
