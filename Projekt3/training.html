@@ -1307,16 +1307,60 @@ function inside(r, c) {
   return r >= 0 && r < 8 && c >= 0 && c < 8;
 }
 
+// Cache 64 DOM elementov šachovnice — vytvoria sa raz a ďalej sa len
+// aktualizujú. Predtým sa pri každom vykreslení celá šachovnica zbúrala
+// (innerHTML = '') a postavila nanovo, takže prehliadač musel znova dekódovať
+// všetkých 32 obrázkov figúrok — a to bolo vidieť ako preblikávanie.
+// Rovnaké riešenie je v skills.html.
+let _squareEls = null;       // 64 <div class="square"> v poradí i=0..63 (pred mapom)
+let _squareImgEls = null;    // 64 <img> alebo null, zarovnané s _squareEls
+let _squareCoordF = null;    // 8 <span class="coord-file"> pre spodný rad (index podľa stĺpca)
+let _squareCoordR = null;    // 8 <span class="coord-rank"> pre ľavý stĺpec (index podľa riadku)
+
+function _buildBoardSkeleton(el) {
+  el.innerHTML = '';
+  _squareEls = new Array(64);
+  _squareImgEls = new Array(64).fill(null);
+  _squareCoordF = new Array(8).fill(null);
+  _squareCoordR = new Array(8).fill(null);
+
+  for (let i = 0; i < 64; i++) {
+    const r = Math.floor(i / 8);
+    const c = i % 8;
+    const d = document.createElement('div');
+    d.className = 'square ' + ((r + c) % 2 === 0 ? 'light' : 'dark');
+    if (r === 7) {
+      const f = document.createElement('span');
+      f.className = 'coord-file';
+      d.appendChild(f);
+      _squareCoordF[c] = f;
+    }
+    if (c === 0) {
+      const rk = document.createElement('span');
+      rk.className = 'coord-rank';
+      d.appendChild(rk);
+      _squareCoordR[r] = rk;
+    }
+    _squareEls[i] = d;
+    el.appendChild(d);
+  }
+}
+
 function render() {
   const el = document.getElementById('board');
-  el.innerHTML = '';
+
+  // Štruktúra 64 polí sa vytvorí len raz
+  if (!_squareEls || el.children.length !== 64) {
+    _buildBoardSkeleton(el);
+  }
 
   for (let i = 0; i < 64; i++) {
     const bi = map(i);
-    const d = document.createElement('div');
+    const d = _squareEls[i];
     const r = Math.floor(i / 8);
     const c = i % 8;
 
+    // Reset na základnú farbu poľa, stavové triedy sa pridajú nižšie
     d.className = 'square ' + ((r + c) % 2 === 0 ? 'light' : 'dark');
     d.dataset.boardIndex = bi;
 
@@ -1328,32 +1372,39 @@ function render() {
     const legalInfo = legalTargets.find(x => x.index === bi);
     if (legalInfo) d.classList.add(legalInfo.capture ? 'capture' : 'legal');
 
-    if (board[bi]) {
-      const img = document.createElement('img');
-      img.src = getPieceImagePath(board[bi]);
-      img.className = 'piece-img';
-      img.alt = board[bi];
-      img.draggable = false;
-      d.appendChild(img);
+    // Figúrka — existujúci <img> sa recykluje a src sa mení LEN keď sa naozaj
+    // zmenila figúrka. Práve opakované nastavovanie src spôsobovalo bliknutie.
+    const piece = board[bi];
+    let img = _squareImgEls[i];
+    if (piece) {
+      if (!img) {
+        img = document.createElement('img');
+        img.className = 'piece-img';
+        img.draggable = false;
+        d.appendChild(img);
+        _squareImgEls[i] = img;
+      }
+      if (img.alt !== piece) {
+        img.src = getPieceImagePath(piece);
+        img.alt = piece;
+      }
+    } else if (img) {
+      img.remove();
+      _squareImgEls[i] = null;
     }
 
-    if (r === 7) {
-      const f = document.createElement('span');
-      f.className = 'coord-file';
-      f.innerText = files[flipped ? 7 - c : c];
-      d.appendChild(f);
+    // Popisy sa menia len pri otočení šachovnice
+    if (r === 7 && _squareCoordF[c]) {
+      const t = files[flipped ? 7 - c : c];
+      if (_squareCoordF[c].innerText !== t) _squareCoordF[c].innerText = t;
     }
-
-    if (c === 0) {
-      const rk = document.createElement('span');
-      rk.className = 'coord-rank';
-      rk.innerText = flipped ? (1 + r) : (8 - r);
-      d.appendChild(rk);
+    if (c === 0 && _squareCoordR[r]) {
+      const t = String(flipped ? (1 + r) : (8 - r));
+      if (_squareCoordR[r].innerText !== t) _squareCoordR[r].innerText = t;
     }
 
     d.onmousedown = (e) => startDrag(e, bi);
     d.onclick = () => click(bi);
-    el.appendChild(d);
   }
 }
 
