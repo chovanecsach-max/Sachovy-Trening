@@ -650,7 +650,7 @@ function updatePlayerUI() {
     currentPlayer.name + (currentPlayer.surname ? ' ' + currentPlayer.surname : '');
   const field = activeEloField();
   document.getElementById('playerElo').textContent =
-    (currentPlayer[field] || 1500) + ' (' + activeEloTag() + ')';
+    eloHodnota(currentPlayer[field]) + ' (' + activeEloTag() + ')';
 }
 
 // ─── ELO podľa trénovanej zručnosti ──────────────────────────────────────────
@@ -1413,7 +1413,7 @@ function renderLeaderboard(players, eloField) {
 
   el.innerHTML = players.map((p, i) => {
     const nick = `${p.name || ''} ${p.surname || ''}`.trim() || '?';
-    const elo  = p[field] || 1500;
+    const elo  = eloHodnota(p[field]);
     const isMe = myNick && nick === myNick;
     const rank = medals[i] || `${i + 1}.`;
     return `
@@ -1566,7 +1566,7 @@ function pickPuzzle() {
   if (!puzzles.length) return null;
 
   // Vyber ELO hráča — vlastné ELO danej zručnosti (v komplexnom režime spoločné)
-  const playerElo = Number(currentPlayer?.[activeEloField()] || 1500);
+  const playerElo = eloHodnota(currentPlayer?.[activeEloField()]);
 
   // Prednostne nevyriešené úlohy
   let pool = puzzles.filter(p =>
