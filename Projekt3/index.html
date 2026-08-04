@@ -553,17 +553,17 @@ async function initPage() {
       let eloVal, eloLabel;
 
       if (lastMode === 'taktika') {
-        eloVal = player.elo_taktika || 1000; eloLabel = 'ELO Taktika';
+        eloVal = eloHodnota(player.elo_taktika); eloLabel = 'ELO Taktika';
       } else if (lastMode === 'strategia') {
-        eloVal = player.elo_strategia || 1000; eloLabel = 'ELO Stratégia';
+        eloVal = eloHodnota(player.elo_strategia); eloLabel = 'ELO Stratégia';
       } else if (lastMode === 'koncovka') {
-        eloVal = player.elo_koncovka || 1000; eloLabel = 'ELO Koncovka';
+        eloVal = eloHodnota(player.elo_koncovka); eloLabel = 'ELO Koncovka';
       } else if (lastMode.startsWith('skill_')) {
         // Zo zručností ukazujeme na menu vždy ELO komplexného tréningu (elo_zrucnosti).
         // Jednotlivé zručnosti majú vlastné ELO — to nájdeš v štatistike, nie tu.
-        eloVal = player.elo_zrucnosti || 1000; eloLabel = 'ELO Zručnosti';
+        eloVal = eloHodnota(player.elo_zrucnosti); eloLabel = 'ELO Zručnosti';
       } else {
-        eloVal = player.elo || 1000; eloLabel = 'ELO Mix';
+        eloVal = eloHodnota(player.elo); eloLabel = 'ELO Mix';
       }
 
       document.getElementById('statElo').textContent    = eloVal;
@@ -868,7 +868,7 @@ async function loadLeaderboards(myName) {
 
   LB_CATEGORIES.forEach(cat => {
     const sorted = [...players]
-      .sort((a, b) => (b[cat.field] || 1000) - (a[cat.field] || 1000))
+      .sort((a, b) => eloHodnota(b[cat.field]) - eloHodnota(a[cat.field]))
       .slice(0, 10);
 
     const el = document.getElementById('lb-' + cat.id);
@@ -879,7 +879,7 @@ async function loadLeaderboards(myName) {
 
     el.innerHTML = sorted.map((p, i) => {
       const name = `${p.name || ''} ${p.surname || ''}`.trim() || '?';
-      const elo  = p[cat.field] || 1000;
+      const elo  = eloHodnota(p[cat.field]);
       const isMe = myName && name === myName;
       const rank = MEDALS[i] || `${i + 1}.`;
       return `<div class="lb-row${isMe ? ' me' : ''}">
