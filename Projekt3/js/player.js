@@ -116,8 +116,19 @@ function getEloField(mode) {
   return "elo";
 }
 
+// Náhradná hodnota, keď hráč nemá ELO vyplnené (NULL alebo 0 v databáze).
+// MUSÍ byť jedna pre celý projekt: predtým sa líšila podľa obrazovky —
+// tréning bral 1500, rebríček na úvodnej stránke 1000 — a tá istá hodnota
+// tak vyzerala na dvoch miestach inak.
+const ELO_DEFAULT = 1500;
+
+function eloHodnota(v) {
+  const n = Number(v);
+  return (Number.isFinite(n) && n > 0) ? n : ELO_DEFAULT;
+}
+
 function getPlayerEloByMode(player, mode) {
-  return Number(player[getEloField(mode)] || 1500);
+  return eloHodnota(player[getEloField(mode)]);
 }
 
 // ─── Priemerné ELO zručností ────────────────────────────────────────────────
