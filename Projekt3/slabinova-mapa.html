@@ -271,6 +271,12 @@ let colSet = 'skills';
 function activeCols()    { return colSet === 'basic' ? BASIC_COLS : SKILL_COLS; }
 function activeCats()    { return colSet === 'basic' ? BASIC_CATS : SKILL_CATS; }
 function targetCols()    { return activeCols().filter(c => !c.info); }   // bez Mixu
+// Popis pre nadpis detailu a graf — musí sledovať prepínač Zručnosti /
+// Základné kategórie, inak pri základných kategóriách svieti „Progres zručností"
+function activeLabel()   { return colSet === 'basic' ? 'základných kategórií' : 'zručností'; }
+function activeLabel1()  { return colSet === 'basic' ? 'V kategórii' : 'V zručnosti'; }
+// akuzatív — po predložke „pre": pre zručnosti / pre základné kategórie
+function activeLabelAk() { return colSet === 'basic' ? 'základné kategórie' : 'zručnosti'; }
 function activeDefault() { return colSet === 'basic' ? 1000 : 1200; }    // východiskové ELO
 
 // Kategórie v elo_history (activeEloCategory v skills.html) + farby čiar
@@ -472,7 +478,7 @@ function showBelow() {
     .sort((a, b) => a.val - b.val);
 
   if (!below.length) {
-    el.innerHTML = `<div class="below-none">✅ V zručnosti <strong>${col.full}</strong> nie je pod prahom ${thr} nikto zo skupiny.</div>`;
+    el.innerHTML = `<div class="below-none">✅ ${activeLabel1()} <strong>${col.full}</strong> nie je pod prahom ${thr} nikto zo skupiny.</div>`;
     el.style.display = '';
     return;
   }
@@ -679,14 +685,14 @@ function renderRows() {
     if (isOpen) {
       b += `<tr class="detail-row"><td colspan="${colspan}">
         <div class="detail-head">
-          <span class="detail-title">Progres zručností — ${nm}</span>
+          <span class="detail-title">Progres ${activeLabel()} — ${nm}</span>
           <div class="period" id="detailPeriod">
             <button data-days="30">30 dní</button>
             <button data-days="90">90 dní</button>
             <button data-days="365">Rok</button>
           </div>
         </div>
-        <div class="detail-chart-wrap"><canvas id="detailChart" role="img" aria-label="Graf progresu ELO zručností hráča">Progres ELO zručností</canvas></div>
+        <div class="detail-chart-wrap"><canvas id="detailChart" role="img" aria-label="Graf progresu ELO ${activeLabel()} hráča">Progres ELO ${activeLabel()}</canvas></div>
         <div id="detailMsg" class="detail-msg" style="display:none;"></div>
       </td></tr>`;
     }
@@ -764,7 +770,7 @@ function renderSkillLineChart(data, days) {
   const existing = Chart.getChart('detailChart'); if (existing) existing.destroy();
 
   if (!skillData.length) {
-    showDetailMsg('Zatiaľ žiadne dáta pre jednotlivé zručnosti v tomto období.');
+    showDetailMsg('Zatiaľ žiadne dáta pre ' + activeLabelAk() + ' v tomto období.');
     return;
   }
   hideDetailMsg();
