@@ -2160,6 +2160,33 @@ function loadPuzzleObject(puzzle, isAdmin = false) {
   }
 }
 
+// Správa, keď sa nedá ponúknuť ďalšia úloha. Rozlišuje, či kategória je
+// prázdna, alebo či v nej hráč už všetko vyriešil — druhý prípad nastáva
+// bežne pri úzkych filtroch, napríklad pri type koncovky s pár úlohami.
+function oznamZiadnaUloha() {
+  const mode = getTrainingMode();
+  const endgame = new URLSearchParams(window.location.search).get('endgame');
+  const kde = endgame ? `v koncovkách typu „${endgame}"`
+            : mode === 'taktika'   ? 'v taktike'
+            : mode === 'strategia' ? 'v stratégii'
+            : mode === 'koncovka'  ? 'v koncovkách'
+            : 'v tomto tréningu';
+
+  let sprava;
+  if (poslednyDovodVyberu === 'prazdna-kategoria') {
+    sprava = `Zatiaľ tu nie sú žiadne úlohy ${kde}.`;
+  } else if (poslednyDovodVyberu === 'chyba') {
+    sprava = 'Úlohu sa nepodarilo načítať. Skús to prosím znova.';
+  } else {
+    sprava = `V tejto kategórii nie sú ďalšie nové pozície — ${kde} si už vyriešil všetko.`
+           + `\n\nNevyriešené úlohy sa vrátia do výberu po ${typeof RETRY_AFTER_DAYS !== 'undefined' ? RETRY_AFTER_DAYS : 14} dňoch.`;
+  }
+
+  stopPuzzleTimer();
+  setStatus(sprava.split('\n')[0], 'info');
+  alert(sprava);
+}
+
 async function loadPuzzleForPlayer() {
   currentPlayer = await getCurrentPlayer();
   if (!currentPlayer) {
@@ -2170,7 +2197,7 @@ async function loadPuzzleForPlayer() {
 
   const puzzle = await pickPuzzleForPlayer(currentPlayer, puzzles);
   if (!puzzle) {
-    alert("Nenašla sa žiadna úloha.");
+    oznamZiadnaUloha();
     return;
   }
 
