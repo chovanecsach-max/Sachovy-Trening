@@ -354,7 +354,36 @@ button:disabled { opacity: 0.6; cursor: not-allowed; }
 .stat-value { font-size: 18px; font-weight: bold; color: #0f172a; }
 
 /* ─── Mobil a tablet ──────────────────────────────────────────────────────── */
+/* ── Časomiera nad šachovnicou (len mobil) ──────────────────────────────────
+   Na mobile je poradie: šachovnica, hláška, tlačidlá a až potom políčko so
+   zostávajúcim časom — to je pod ohybom obrazovky a hráč ho počas riešenia
+   nevidí. Preto sa čas zopakuje tesne nad šachovnicou, kam sa hráč aj tak
+   pozerá. Nad ňou je voľné miesto, takže nič neprekryje. */
+.mobile-timer {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin: 0 0 6px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  font-size: 17px;
+  font-weight: bold;
+  font-variant-numeric: tabular-nums;
+  border: 1px solid #bfdbfe;
+  background: #eff6ff;
+  color: #1e3a5f;
+}
+.mobile-timer .mt-label { font-size: 11px; font-weight: bold; text-transform: uppercase; opacity: .7; }
+.mobile-timer .mt-sep { width: 1px; height: 18px; background: currentColor; opacity: .25; }
+.mobile-timer.found   { background: #f0fdf4; border-color: #86efac; color: #166534; }
+.mobile-timer.warn    { background: #fffbeb; border-color: #fde68a; color: #92400e; }
+.mobile-timer.expired { background: #fef2f2; border-color: #fca5a5; color: #b91c1c; }
+
 @media (max-width: 780px) {
+/* Časomiera nad šachovnicou — na mobile je tá v paneli pod ohybom */
+  .mobile-timer { display: flex; }
+
   body { overflow-x: hidden; }
   .app { padding: 8px; }
 
@@ -474,6 +503,7 @@ button:disabled { opacity: 0.6; cursor: not-allowed; }
       <div class="board-card">
         <div class="board-area">
           <h2 id="promptText" class="board-prompt">Nájdi všetky šachy</h2>
+          <div id="mobileTimer" class="mobile-timer"><span class="mt-label">Zostáva</span><span id="mobileTimerValue">-</span><span class="mt-sep"></span><span class="mt-label">Nájsť</span><span id="mobileFindValue">-</span></div>
           <div id="completeProgress" style="display:none; font-size:0.85em; color:#2E75B6; font-weight:600; margin-top:4px;"></div>
           <div id="board" class="board"></div>
           <div id="turnIndicator" class="turn-indicator white"></div>
@@ -760,11 +790,39 @@ function activeEloTag() {
   return SKILL_SHORT[urlSkillType()] || 'Z';
 }
 
+// Zopakuje čas do pruhu nad šachovnicou (viditeľný len na mobile).
+function updateMobileTimer(stav) {
+  const box = document.getElementById('mobileTimer');
+  const val = document.getElementById('mobileTimerValue');
+  if (!box || !val) return;
+  val.textContent = formatTime(timerRemaining);
+  box.className = 'mobile-timer' + (stav ? ' ' + stav : '');
+  updateMobileFind();
+}
+
+// Koľko riešení ešte treba nájsť — pri zručnostiach je to počas riešenia
+// rovnako dôležité ako čas a v paneli je to tiež pod ohybom obrazovky.
+function updateMobileFind() {
+  const el  = document.getElementById('mobileFindValue');
+  const box = document.getElementById('mobileTimer');
+  if (!el) return;
+  const zostava = Math.max(0, solutions.length - foundMoves.length);
+  el.textContent = zostava;
+  // Zelený pruh len keď hráč naozaj našiel všetko sám. Po vypršaní času ani po
+  // kliknutí na „Ukáž riešenie" sa riešenia tiež doplnia do foundMoves, ale to
+  // nie je úspech — vtedy zostáva červený, resp. pôvodná farba.
+  if (box && zostava === 0 && solutions.length > 0 && !puzzleFailed && !timerExpired) {
+    box.className = 'mobile-timer found';
+  }
+}
+
 function updateTimerUI() {
   const el = document.getElementById('puzzleTimer');
   el.textContent = formatTime(timerRemaining);
-  if (timerExpired) { el.className = 'badge timer-expired'; return; }
-  el.className = timerRemaining <= 30 ? 'badge timer-warning' : 'badge timer-ok';
+  if (timerExpired) { el.className = 'badge timer-expired'; updateMobileTimer('expired'); return; }
+  const nizky = timerRemaining <= 30;
+  el.className = nizky ? 'badge timer-warning' : 'badge timer-ok';
+  updateMobileTimer(nizky ? 'warn' : '');
 }
 
 function stopTimer() {
@@ -1179,6 +1237,7 @@ function updateRemainingUI() {
     box.className = 'remaining-box';
     label.textContent = 'Zostáva nájsť';
   }
+  updateMobileFind();
 }
 
 function updateFoundMovesUI() {
