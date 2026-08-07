@@ -496,7 +496,34 @@ button:disabled {
 }
 
 /* ─── Mobil a tablet ──────────────────────────────────────────────────────── */
+/* ── Časomiera nad šachovnicou (len mobil) ──────────────────────────────────
+   Na mobile je poradie: šachovnica, hláška, tlačidlá a až potom políčko so
+   zostávajúcim časom — to je pod ohybom obrazovky a hráč ho počas riešenia
+   nevidí. Preto sa čas zopakuje tesne nad šachovnicou, kam sa hráč aj tak
+   pozerá. Nad ňou je voľné miesto, takže nič neprekryje. */
+.mobile-timer {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin: 0 0 6px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  font-size: 17px;
+  font-weight: bold;
+  font-variant-numeric: tabular-nums;
+  border: 1px solid #bfdbfe;
+  background: #eff6ff;
+  color: #1e3a5f;
+}
+.mobile-timer .mt-label { font-size: 11px; font-weight: bold; text-transform: uppercase; opacity: .7; }
+.mobile-timer.warn    { background: #fffbeb; border-color: #fde68a; color: #92400e; }
+.mobile-timer.expired { background: #fef2f2; border-color: #fca5a5; color: #b91c1c; }
+
 @media (max-width: 780px) {
+/* Časomiera nad šachovnicou — na mobile je tá v paneli pod ohybom */
+  .mobile-timer { display: flex; }
+
   body { overflow-x: hidden; padding: 6px; }
   .app { padding: 8px; }
 
@@ -557,6 +584,7 @@ button:disabled {
       <div class="board-card">
         <div class="board-area">
           <h2 id="promptText" class="board-prompt">Nájdi najlepší ťah</h2>
+          <div id="mobileTimer" class="mobile-timer"><span class="mt-label">Zostáva</span><span id="mobileTimerValue">-</span></div>
           <div id="board" class="board"></div>
           <div id="turnIndicator" class="turn-indicator white" aria-label="Na ťahu"></div>
         </div>
@@ -899,18 +927,30 @@ async function updatePlayerUI(skipFetch = false) {
   document.getElementById('playerElo').textContent = getPlayerEloByMode(currentPlayer, mode) + ' (' + eloLabel + ')';
 }
 
+// Zopakuje čas do pruhu nad šachovnicou (viditeľný len na mobile).
+function updateMobileTimer(stav) {
+  const box = document.getElementById('mobileTimer');
+  const val = document.getElementById('mobileTimerValue');
+  if (!box || !val) return;
+  val.textContent = formatTime(timerRemaining);
+  box.className = 'mobile-timer' + (stav ? ' ' + stav : '');
+}
+
 function updateTimerUI() {
   const el = document.getElementById('puzzleTimer');
   el.textContent = formatTime(timerRemaining);
 
   if (timerExpired) {
     el.className = 'timer-big timer-expired';
+    updateMobileTimer('expired');
     return;
   }
   if (timerRemaining <= 30) {
     el.className = 'timer-big timer-warning';
+    updateMobileTimer('warn');
   } else {
     el.className = 'timer-big timer-ok';
+    updateMobileTimer('');
   }
 }
 
