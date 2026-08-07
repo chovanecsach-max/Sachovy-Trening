@@ -200,6 +200,12 @@ body {
 }
 
 .badge.player { background: #ecfeff; color: #155e75; border-color: #67e8f9; }
+/* Zmena ELO po vyriešení úlohy. Hráč si nepamätá, aké ELO mal pred úlohou,
+   takže samotné nové číslo mu nič nepovie — tento štítok ukáže rozdiel. */
+.badge.delta { margin-left: 6px; padding: 4px 7px; }
+.badge.delta.up   { background: #dcfce7; color: #166534; border-color: #86efac; }
+.badge.delta.down { background: #fee2e2; color: #b91c1c; border-color: #fca5a5; }
+
 .badge.elo { background: #eff6ff; color: #1d4ed8; border-color: #93c5fd; }
 .badge.time { background: #f5f3ff; color: #6d28d9; border-color: #c4b5fd; }
 .badge.timer-ok { background: #ecfdf5; color: #166534; border-color: #86efac; }
@@ -485,7 +491,7 @@ button:disabled { opacity: 0.6; cursor: not-allowed; }
           </div>
           <div class="meta-box">
             <div class="meta-label">ELO hráča</div>
-            <div class="meta-value"><span id="playerElo" class="badge player">-</span></div>
+            <div class="meta-value"><span id="playerElo" class="badge player">-</span><span id="eloDelta" class="badge delta" style="display:none;"></span></div>
           </div>
           <div class="meta-box">
             <div class="meta-label">ID pozície</div>
@@ -655,6 +661,25 @@ function updateStatsUI() {
   document.getElementById('statPlayed').textContent = stats.played;
   document.getElementById('statSolved').textContent = stats.solved;
   document.getElementById('statAccuracy').textContent = acc + '%';
+}
+
+// Ukáže „+8" alebo „−12" vedľa ELO hráča. Skryje sa pri načítaní ďalšej úlohy.
+function ukazZmenuElo(zmena) {
+  const el = document.getElementById('eloDelta');
+  if (!el) return;
+  const z = Math.round(Number(zmena) || 0);
+  if (!z) { el.style.display = 'none'; el.textContent = ''; return; }
+  // znak mínus, nie spojovník — v čísle vyzerá lepšie
+  el.textContent = z > 0 ? ('+' + z) : ('\u2212' + Math.abs(z));
+  el.className = 'badge delta ' + (z > 0 ? 'up' : 'down');
+  el.title = z > 0 ? 'Za túto úlohu ti pribudlo ' + z + ' bodov'
+                   : 'Za túto úlohu ti ubudlo ' + Math.abs(z) + ' bodov';
+  el.style.display = '';
+}
+
+function skryZmenuElo() {
+  const el = document.getElementById('eloDelta');
+  if (el) { el.style.display = 'none'; el.textContent = ''; }
 }
 
 function updatePlayerUI() {
@@ -1372,6 +1397,10 @@ async function recordResult(result) {
         ? (currentPlayer.elo_zrucnosti != null ? currentPlayer.elo_zrucnosti : newElo)
         : newElo;
       document.getElementById('playerElo').textContent = zobraz + ' (' + activeEloTag() + ')';
+      // Zmena sa vzťahuje na ELO KONKRÉTNEJ zručnosti, aj v komplexnom tréningu,
+      // kde sa v hlavičke zobrazuje priemer — inak by pri +10 v jednej zručnosti
+      // hráč videl priemer o bod vyšší a nechápal by, odkiaľ sa to vzalo.
+      ukazZmenuElo(newElo - currentElo);
     }
   } catch(e) {
     console.error("Chyba pri aktualizácii ELO zručností:", e);
@@ -1639,6 +1668,7 @@ function loadPuzzle(puzzle) {
   )];
   foundMoves = [];
   skutocneNajdene = new Set();
+  skryZmenuElo();
   xMarked = new Map();
   puzzleDone = false;
   puzzleFailed = false;
