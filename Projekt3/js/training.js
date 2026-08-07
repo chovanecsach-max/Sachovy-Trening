@@ -70,7 +70,15 @@ function getTrainingMode() {
   return params.get("mode");
 }
 
+// Prečo pickPuzzleForPlayer nič nevrátil. Volajúci podľa toho vie napísať
+// hráčovi zmysluplnú správu namiesto všeobecného „nenašla sa úloha".
+//   'ziadne-nove'      — v kategórii sú úlohy, ale všetky už vyriešil
+//   'prazdna-kategoria'— v kategórii nie sú žiadne úlohy
+//   'chyba'            — nepodarilo sa načítať
+let poslednyDovodVyberu = null;
+
 async function pickPuzzleForPlayer(player, puzzles) {
+  poslednyDovodVyberu = null;
   const excluded = await getExcludedPuzzleIds(player.id);
   const mode = getTrainingMode();
 
@@ -83,12 +91,12 @@ async function pickPuzzleForPlayer(player, puzzles) {
   } else if (mode === "koncovka") {
     filtered = puzzles.filter(p => p.category === "Koncovka");
     // Nepovinné spresnenie: ?endgame=Vežové vyberie len daný typ koncovky.
-    // Ak by pre daný typ nezostala žiadna úloha, ponecháme všetky koncovky,
-    // nech tréning nikdy neskončí hláškou "nenašla sa úloha".
+    // Prázdny výsledok sa už zámerne NEOBCHÁDZA doplnením všetkých koncoviek —
+    // hráč, ktorý si vybral konkrétny typ, má dostať jasnú správu, nie tichú
+    // náhradu za niečo iné.
     const wanted = new URLSearchParams(window.location.search).get("endgame");
     if (wanted) {
-      const narrowed = filtered.filter(p => p.endgame_type === wanted);
-      if (narrowed.length) filtered = narrowed;
+      filtered = filtered.filter(p => p.endgame_type === wanted);
     }
   }
 
@@ -101,14 +109,26 @@ async function pickPuzzleForPlayer(player, puzzles) {
     return pool.filter(p => Math.abs(p.elo - playerElo) <= range);
   }
 
+  if (!filtered.length) {
+    poslednyDovodVyberu = 'prazdna-kategoria';
+    return null;
+  }
+  if (!unsolved.length) {
+    // Všetko v kategórii je vyriešené (alebo v ochrannej lehote po neúspechu).
+    // Predtým sa tu siahlo po už vyriešených úlohách, takže hráč dookola
+    // dostával tie isté pozície — a keďže ELO padá len za prvé riešenie,
+    // nemalo to ani tréningový, ani bodový zmysel.
+    poslednyDovodVyberu = 'ziadne-nove';
+    return null;
+  }
+
   let pool = filterByRange(unsolved, 100);
   if (!pool.length) pool = filterByRange(unsolved, 200);
   if (!pool.length) pool = filterByRange(unsolved, 300);
   if (!pool.length) pool = unsolved;
-  if (!pool.length) pool = filtered.length ? filtered : puzzles;
 
   const picked = pool[Math.floor(Math.random() * pool.length)];
-  if (!picked) return null;
+  if (!picked) { poslednyDovodVyberu = 'ziadne-nove'; return null; }
 
   // Lenivé dotiahnutie plného záznamu — zoznam v pamäti obsahuje len
   // ľahké stĺpce (id, category, elo) potrebné na výber. Riešenie (solution_tree)
@@ -131,6 +151,7 @@ async function pickPuzzleForPlayer(player, puzzles) {
     };
   } catch (e) {
     console.error("Chyba pri načítaní úlohy:", e);
+    poslednyDovodVyberu = 'chyba';
     return null;
   }
 }
