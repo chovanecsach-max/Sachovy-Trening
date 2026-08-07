@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Časová mapa</title>
+<style>
+body { font-family: Arial, sans-serif; background: #f4f4f6; margin: 0; padding: 12px; color: #111827; }
+.app { max-width: 1150px; margin: 0 auto; background: white; border-radius: 14px;
+       box-shadow: 0 10px 30px rgba(0,0,0,0.08); padding: 20px; }
+h1 { margin: 0 0 6px 0; text-align: center; font-size: 26px; }
+.subtitle { text-align: center; color: #475569; margin: 0 0 18px 0; }
+
+.role-banner { padding: 10px 14px; border-radius: 10px; margin-bottom: 16px; font-size: 14px; text-align: center; }
+.role-banner.trener        { background: #f0fdf4; border: 1px solid #86efac; color: #166534; }
+.role-banner.hlavny_trener { background: #faf5ff; border: 1px solid #d8b4fe; color: #6b21a8; }
+.role-banner.admin         { background: #fff7ed; border: 1px solid #fdba74; color: #c2410c; }
+
+.filter-card { border: 1px solid #d1d5db; border-radius: 12px; padding: 14px; margin-bottom: 14px; background: #f8fafc; }
+.filter-row { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; }
+.filter-field { display: flex; flex-direction: column; gap: 4px; }
+.filter-field label { font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: bold; }
+select { padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px; background: white; min-width: 190px; }
+input[type="number"] { padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px; background: white; width: 110px; }
+button { padding: 10px 16px; border: none; border-radius: 10px; cursor: pointer; font-size: 14px; }
+.secondary { background: #e5e7eb; color: #111827; }
+
+.seg { display: inline-flex; border: 1px solid #d1d5db; border-radius: 8px; overflow: hidden; background: white; }
+.seg button { border: none; background: white; padding: 8px 12px; font-size: 13px; cursor: pointer; color: #334155; }
+.seg button.active { background: #1e3a5f; color: white; font-weight: bold; }
+
+.status { margin: 12px 0; padding: 10px; border-radius: 10px; border: 1px solid #d1d5db;
+          background: #f8fafc; color: #334155; font-size: 14px; }
+.status.error { background: #fef2f2; border-color: #fca5a5; color: #b91c1c; }
+
+.focus-line { margin: 4px 0 12px; padding: 12px 14px; border-radius: 10px;
+              background: #eff6ff; border: 1px solid #bfdbfe; color: #1e3a5f; font-size: 14px; display: none; }
+.focus-line strong { color: #1d4ed8; }
+.warn-line { margin: 0 0 12px; padding: 10px 14px; border-radius: 10px; background: #fffbeb;
+             border: 1px solid #fde68a; color: #92400e; font-size: 13px; }
+
+.map-legend { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; font-size: 12px; color: #64748b; margin: 6px 0 10px; }
+.map-legend .box { width: 13px; height: 13px; border-radius: 3px; display: inline-block; vertical-align: -2px; margin-right: 5px; }
+
+.map-wrap { overflow-x: auto; }
+table.map { border-collapse: separate; border-spacing: 3px; font-size: 12px; width: 100%; min-width: 780px; }
+table.map th { padding: 4px 3px; color: #64748b; font-weight: bold; font-size: 11px; line-height: 1.2; vertical-align: bottom; text-align: center; }
+table.map th.name-h { text-align: left; padding-left: 8px; }
+table.map td.name { padding: 7px 8px; white-space: nowrap; color: #111827; }
+table.map td.cell { text-align: center; padding: 6px 5px; border-radius: 5px; line-height: 1.25; }
+table.map td.cell .n { font-weight: bold; font-size: 13px; }
+table.map td.cell .u { font-size: 10px; opacity: .8; }
+table.map td.cell .d { font-size: 10px; font-weight: 700; margin-top: 2px; opacity: .95; }
+table.map td.last { text-align: center; padding: 6px 8px; border-radius: 5px; white-space: nowrap; font-size: 12px; }
+
+.below-result { margin-top: 12px; border-top: 1px solid #e2e8f0; padding-top: 12px; }
+.below-head { font-size: 14px; font-weight: bold; margin-bottom: 8px; }
+.below-list { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.below-list li { background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 6px 10px; font-size: 13px; }
+.below-list .val { font-weight: bold; padding: 2px 7px; border-radius: 5px; margin-right: 6px; }
+.below-none { font-size: 13px; color: #166534; background: #f0fdf4; border: 1px solid #86efac; border-radius: 8px; padding: 10px 12px; }
+.action-card { border: 1px solid #d1d5db; border-radius: 12px; padding: 14px; margin-bottom: 14px; background: #fff; }
+</style>
+</head>
+
+<body oncontextmenu="return false;">
+<div class="app">
+  <h1>⏱ Časová mapa</h1>
+  <p class="subtitle">Koľko času hráči venujú tréningu — a či trénujú pravidelne.</p>
+
+  <div id="roleBanner" class="role-banner" style="display:none;"></div>
+
+  <div class="filter-card" id="filterCard" style="display:none;">
+    <div class="filter-row">
+      <div class="filter-field" id="groupField">
+        <label>Skupina (tréner)</label>
+        <select id="trenerSelect"><option value="all">Všetci hráči</option></select>
+      </div>
+      <div class="filter-field">
+        <label>Denný cieľ (minúty)</label>
+        <input type="number" id="dennyCiel" min="1" max="240" step="5" value="20">
+      </div>
+      <div class="filter-field">
+        <label>Farby</label>
+        <div class="seg" id="scaleSeg">
+          <button type="button" data-scale="limit" class="active">Podľa cieľa</button>
+          <button type="button" data-scale="group">V rámci skupiny</button>
+        </div>
+      </div>
+      <button class="secondary" onclick="goSlabiny()">← Slabinová mapa</button>
+      <button class="secondary" onclick="goKoncovky()">Mapa koncoviek</button>
+      <button class="secondary" onclick="goHome()">Späť do menu</button>
+    </div>
+  </div>
+
+  <div id="status" class="status">Načítavam...</div>
+  <div id="focusLine" class="focus-line"></div>
+  <div id="warnLine"></div>
+
+  <div class="map-legend" id="mapLegend" style="display:none;">
+    <span><span class="box" style="background:#fff;border:1px dashed #cbd5e1;"></span>netrénoval</span>
+    <span><span class="box" style="background:#fee2e2;border:1px solid #fca5a5;"></span>pod tretinou cieľa</span>
+    <span><span class="box" style="background:#fed7aa;border:1px solid #fdba74;"></span>pod dvomi tretinami</span>
+    <span><span class="box" style="background:#fef08a;border:1px solid #fde047;"></span>tesne pod cieľom</span>
+    <span><span class="box" style="background:#bbf7d0;border:1px solid #86efac;"></span>cieľ splnený</span>
+    <span style="color:#94a3b8;">v bunke: čas · počet úloh · dni s cieľom</span>
+  </div>
+
+  <div class="action-card" id="actionCard" style="display:none;">
+    <div class="filter-row">
+      <div class="filter-field">
+        <label>Obdobie</label>
+        <select id="thrPeriod"></select>
+      </div>
+      <button class="secondary" onclick="showBelow()">Kto je pod cieľom</button>
+    </div>
+    <div id="belowResult" class="below-result" style="display:none;"></div>
+  </div>
+
+  <div class="map-wrap">
+    <table class="map" id="mapTable" style="display:none;">
+      <thead id="mapHead"></thead>
+      <tbody id="mapBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/auth.js"></script>
+<script src="js/player.js"></script>
+<script>
+const USER_ROLE        = sessionStorage.getItem('user_role') || '';
+const USER_ID          = sessionStorage.getItem('user_id') || '';
+const USER_NICK        = sessionStorage.getItem('user_nick') || sessionStorage.getItem('user_name') || '';
+const IS_ADMIN         = USER_ROLE === 'admin';
+const IS_TRENER        = USER_ROLE === 'trener';
+const IS_HLAVNY_TRENER = USER_ROLE === 'hlavny_trener';
+const IS_HRAC          = USER_ROLE === 'hrac';
+const STAFF_ROLES      = ['trener', 'hlavny_trener', 'admin'];
+
+// Obdobia v stĺpcoch mapy. dni = dĺžka okna, podľa ktorej sa počíta,
+// koľko dní mal hráč na splnenie denného cieľa.
+const OBDOBIA = [
+  { key: '7',   label: '7 dní',    dni: 7   },
+  { key: '30',  label: 'Mesiac',   dni: 30  },
+  { key: '90',  label: '3 mesiace',dni: 90  },
+  { key: '180', label: 'Polrok',   dni: 180 },
+  { key: '365', label: 'Rok',      dni: 365 },
+];
+
+const CIEL_KEY = 'casovaMapaDennyCiel';
+
+let mapPlayers = [];
+let mapLog     = [];    // surové záznamy z training_log — prepočet bez nového dotazu
+let scaleMode  = 'limit';
+
+// ─── Pomôcky ────────────────────────────────────────────────────────────────
+function goHome()      { location.href = 'index.html'; }
+function goSlabiny()   { location.href = 'slabinova-mapa.html'; }
+function goKoncovky()  { location.href = 'koncovky-mapa.html'; }
+
+function setStatus(t, type = '') {
+  const el = document.getElementById('status');
+  el.textContent = t; el.className = 'status' + (type ? ' ' + type : '');
+  el.style.display = t ? '' : 'none';
+}
+
+async function sbFetchAll(query) {
+  const PAGE = 1000; let all = [], off = 0;
+  while (true) {
+    const sep = query.includes('?') ? '&' : '?';
+    const b = await sbFetch(`${query}${sep}limit=${PAGE}&offset=${off}`);
+    if (!b || !b.length) break;
+    all = all.concat(b);
+    if (b.length < PAGE) break;
+    off += PAGE;
+  }
+  return all;
+}
+
+function dennyCiel() {
+  const v = Number(document.getElementById('dennyCiel').value);
+  return (Number.isFinite(v) && v > 0) ? v : 20;
+}
+
+// Čas v sekundách na čitateľný tvar
+function fmtCas(sek) {
+  const s = Math.max(0, Math.round(Number(sek) || 0));
+  if (s < 60) return s + ' s';
+  const m = Math.round(s / 60);
+  if (m < 60) return m + ' min';
+  const h = Math.floor(m / 60), zv = m % 60;
+  return zv ? `${h} h ${zv} min` : `${h} h`;
+}
+
+function fmtDatum(d) {
+  return d.toLocaleDateString('sk-SK', { day: 'numeric', month: 'numeric' });
+}
+
+// ─── Výpočet ────────────────────────────────────────────────────────────────
+// Pre každého hráča a každé obdobie: čas, počet úloh a počet dní, v ktorých
+// splnil denný cieľ. Pravidelnosť je pri tréningu cennejšia než objem — kto
+// odtrénuje dve hodiny raz za týždeň, má rovnaký čas ako ten, kto trénuje
+// dvadsať minút denne, ale návyk si nevybuduje.
+function spocitaj(players, log) {
+  const ciel = dennyCiel() * 60;                 // v sekundách
+  const teraz = Date.now();
+  const stats = {};
+
+  players.forEach(p => {
+    stats[p.id] = { posledny: null };
+    OBDOBIA.forEach(o => { stats[p.id][o.key] = { cas: 0, uloh: 0, poDnoch: {} }; });
+  });
+
+  (log || []).forEach(r => {
+    const s = stats[r.player_id];
+    if (!s) return;
+    const t = new Date(r.created_at).getTime();
+    if (isNaN(t)) return;
+    const cas = Math.max(0, Number(r.time_spent) || 0);
+    const den = localDay(r.created_at);
+
+    if (!s.posledny || t > s.posledny) s.posledny = t;
+
+    OBDOBIA.forEach(o => {
+      if (teraz - t > o.dni * 86400000) return;
+      const c = s[o.key];
+      c.cas  += cas;
+      c.uloh += 1;
+      c.poDnoch[den] = (c.poDnoch[den] || 0) + cas;
+    });
+  });
+
+  // dni so splneným cieľom
+  players.forEach(p => OBDOBIA.forEach(o => {
+    const c = stats[p.id][o.key];
+    c.dniCiel = Object.values(c.poDnoch).filter(x => x >= ciel).length;
+    c.dniAktivne = Object.keys(c.poDnoch).length;
+  }));
+
+  return stats;
+}
+
+// ─── Farby ──────────────────────────────────────────────────────────────────
+// „Podľa cieľa" porovnáva s tým, čo tréner očakáva — na to sa pýta najčastejšie.
+// „V rámci skupiny" porovnáva hráčov navzájom; vtedy je ale najhorší vždy
+// červený, aj keď trénujú všetci dobre, a naopak.
+function farba(podiel, ziadnaAktivita) {
+  if (ziadnaAktivita) return { bg: '#fff', fg: '#94a3b8', border: '1px dashed #cbd5e1' };
+  if (podiel >= 1)    return { bg: '#bbf7d0', fg: '#14532d', border: '1px solid #86efac' };
+  if (podiel >= 0.66) return { bg: '#fef08a', fg: '#713f12', border: '1px solid #fde047' };
+  if (podiel >= 0.33) return { bg: '#fed7aa', fg: '#7c2d12', border: '1px solid #fdba74' };
+  return { bg: '#fee2e2', fg: '#7f1d1d', border: '1px solid #fca5a5' };
+}
+
+function bunka(c, o, maxVSkupine) {
+  const ciel = dennyCiel();
+  const podiel = scaleMode === 'group'
+    ? (maxVSkupine > 0 ? c.cas / maxVSkupine : 0)
+    : (o.dni > 0 ? c.dniCiel / o.dni : 0);
+
+  const f = farba(podiel, c.uloh === 0);
+  if (!c.uloh) {
+    return `<td class="cell" style="background:${f.bg};color:${f.fg};border:${f.border};"
+            title="V tomto období netrénoval">–</td>`;
+  }
+
+  const priemerNaUlohu = Math.round(c.cas / c.uloh);
+  const tip = `${fmtCas(c.cas)} · ${c.uloh} úloh · priemer ${fmtCas(priemerNaUlohu)} na úlohu`
+            + ` · aktívnych dní ${c.dniAktivne}`
+            + ` · dní so splneným cieľom ${c.dniCiel} z ${o.dni} (cieľ ${ciel} min)`;
+
+  return `<td class="cell" style="background:${f.bg};color:${f.fg};border:${f.border};" title="${tip}">
+            <div class="n">${fmtCas(c.cas)}</div>
+            <div class="u">${c.uloh} úloh</div>
+            <div class="d">${c.dniCiel}/${o.dni} dní</div></td>`;
+}
+
+// ─── Vykreslenie ────────────────────────────────────────────────────────────
+function render(players, log) {
+  const stats = spocitaj(players, log);
+  const ciel  = dennyCiel();
+
+  // maximum v skupine pre režim „V rámci skupiny"
+  const maxy = {};
+  OBDOBIA.forEach(o => {
+    maxy[o.key] = Math.max(0, ...players.map(p => stats[p.id][o.key].cas));
+  });
+
+  let h = '<tr><th class="name-h">Hráč</th>';
+  OBDOBIA.forEach(o => { h += `<th>${o.label}</th>`; });
+  h += '<th>Naposledy</th></tr>';
+  document.getElementById('mapHead').innerHTML = h;
+
+  // Zoradenie: najmenej aktívni za posledný týždeň hore — tréner rieši ich
+  const zoradeni = [...players].sort((a, b) =>
+    stats[a.id]['7'].cas - stats[b.id]['7'].cas);
+
+  let b = '';
+  zoradeni.forEach(p => {
+    const nm = `${p.surname || ''} ${p.name || ''}`.trim() || '(bez mena)';
+    b += `<tr><td class="name">${escapeHtml(nm)}</td>`;
+    OBDOBIA.forEach(o => { b += bunka(stats[p.id][o.key], o, maxy[o.key]); });
+
+    // posledný tréning
+    const pos = stats[p.id].posledny;
+    if (!pos) {
+      b += `<td class="last" style="background:#fff;color:#94a3b8;border:1px dashed #cbd5e1;">nikdy</td>`;
+    } else {
+      const dni = Math.floor((Date.now() - pos) / 86400000);
+      const f = dni <= 2 ? { bg:'#bbf7d0', fg:'#14532d', bd:'#86efac' }
+              : dni <= 7 ? { bg:'#fef08a', fg:'#713f12', bd:'#fde047' }
+              : dni <= 21 ? { bg:'#fed7aa', fg:'#7c2d12', bd:'#fdba74' }
+              : { bg:'#fee2e2', fg:'#7f1d1d', bd:'#fca5a5' };
+      const txt = dni === 0 ? 'dnes' : dni === 1 ? 'včera' : `pred ${dni} dňami`;
+      b += `<td class="last" style="background:${f.bg};color:${f.fg};border:1px solid ${f.bd};"
+              title="${fmtDatum(new Date(pos))}">${txt}</td>`;
+    }
+    b += '</tr>';
+  });
+  document.getElementById('mapBody').innerHTML = b;
+  document.getElementById('mapTable').style.display = '';
+  document.getElementById('mapLegend').style.display = '';
+  document.getElementById('actionCard').style.display = '';
+
+  // Zhrnutie za skupinu — za posledných 7 dní
+  const t7 = players.reduce((s, p) => s + stats[p.id]['7'].cas, 0);
+  const u7 = players.reduce((s, p) => s + stats[p.id]['7'].uloh, 0);
+  const netrenovali = players.filter(p => stats[p.id]['7'].uloh === 0);
+  const fl = document.getElementById('focusLine');
+  fl.innerHTML = `Za posledných 7 dní skupina odtrénovala <strong>${fmtCas(t7)}</strong>`
+    + ` na <strong>${u7}</strong> úlohách`
+    + (players.length ? ` · priemer na hráča <strong>${fmtCas(t7 / players.length)}</strong>` : '')
+    + (netrenovali.length ? ` · <strong>netrénovali:</strong> ${netrenovali.map(p =>
+        escapeHtml(`${p.surname || ''} ${p.name || ''}`.trim())).join(', ')}` : '');
+  fl.style.display = '';
+
+  document.getElementById('warnLine').innerHTML =
+    `<div class="warn-line">Čas je súčet toho, čo hráč strávil nad úlohami — vrátane úloh,
+     ktoré nestihol. Preto sa vždy pozeraj aj na počet úloh vedľa neho: samotný čas sa dá
+     nazbierať aj tak, že úloha zostane otvorená. Tretí riadok hovorí, v koľkých dňoch
+     hráč naozaj splnil denný cieľ ${ciel} min — pravidelnosť je pri tréningu cennejšia
+     než jednorazový objem.</div>`;
+
+  // výber obdobia pre zoznam pod cieľom
+  const sel = document.getElementById('thrPeriod');
+  if (!sel.options.length) {
+    OBDOBIA.forEach(o => {
+      const opt = document.createElement('option');
+      opt.value = o.key; opt.textContent = o.label;
+      sel.appendChild(opt);
+    });
+    sel.value = '7';
+  }
+
+  window._stats = stats;   // pre showBelow
+  setStatus('');
+}
+
+// ─── Kto je pod cieľom ──────────────────────────────────────────────────────
+function showBelow() {
+  const stats = window._stats;
+  if (!stats) return;
+  const key = document.getElementById('thrPeriod').value;
+  const o   = OBDOBIA.find(x => x.key === key);
+  const ciel = dennyCiel();
+  const el = document.getElementById('belowResult');
+
+  const pod = mapPlayers
+    .map(p => ({
+      meno: `${p.surname || ''} ${p.name || ''}`.trim() || '(bez mena)',
+      c: stats[p.id][key]
+    }))
+    .filter(x => x.c.dniCiel < o.dni)
+    .sort((a, b) => a.c.dniCiel - b.c.dniCiel);
+
+  if (!pod.length) {
+    el.innerHTML = `<div class="below-none">✅ Za obdobie „${o.label}" splnili denný cieľ
+                    ${ciel} min všetci zo skupiny.</div>`;
+    el.style.display = '';
+    return;
+  }
+
+  el.innerHTML = `<div class="below-head">Nesplnili denný cieľ ${ciel} min každý deň
+                  za obdobie „${o.label}" (${pod.length} z ${mapPlayers.length})</div>`
+    + '<ul class="below-list">' + pod.map(x => {
+        const f = farba(o.dni ? x.c.dniCiel / o.dni : 0, x.c.uloh === 0);
+        return `<li><span class="val" style="background:${f.bg};color:${f.fg};">`
+             + `${x.c.dniCiel}/${o.dni} dní</span>${escapeHtml(x.meno)}`
+             + `<span style="color:#64748b;"> · ${fmtCas(x.c.cas)} · ${x.c.uloh} úloh</span></li>`;
+      }).join('') + '</ul>';
+  el.style.display = '';
+}
+
+// ─── Načítanie ──────────────────────────────────────────────────────────────
+async function fetchPlayers(trenerFilter) {
+  const cols = 'id,name,surname,profile:profiles!user_id(role)';
+  let q = `players?select=${cols}&order=surname.asc,name.asc`;
+  if (IS_TRENER)                                   q += `&trener_id=eq.${USER_ID}`;
+  else if (trenerFilter && trenerFilter !== 'all') q += `&trener_id=eq.${trenerFilter}`;
+  const rows = await sbFetchAll(q);
+  return (rows || []).filter(p => !STAFF_ROLES.includes(p.profile?.role));
+}
+
+async function loadMap() {
+  setStatus('Načítavam...');
+  document.getElementById('mapTable').style.display = 'none';
+  document.getElementById('belowResult').style.display = 'none';
+  try {
+    const filter  = document.getElementById('trenerSelect').value;
+    const players = await fetchPlayers(filter);
+    if (!players.length) { setStatus('Táto skupina nemá žiadnych hráčov.', 'error'); return; }
+
+    // Najdlhšie zobrazované obdobie je rok — starší záznam netreba sťahovať.
+    const od = new Date(Date.now() - 366 * 86400000).toISOString();
+    const ids = players.map(p => p.id).join(',');
+
+    // Berie sa SÚČET training_log, nie players.total_time. Ten sa totiž počíta
+    // len za prvý pokus o úlohu (aby opakovanie neskresľovalo pokrok), kým tu
+    // ide o skutočne odrobený čas vrátane opakovaní.
+    const log = await sbFetchAll(
+      `training_log?player_id=in.(${ids})&created_at=gte.${od}&select=player_id,time_spent,created_at`
+    );
+
+    mapPlayers = players;
+    mapLog     = log || [];
+    render(mapPlayers, mapLog);
+  } catch (e) {
+    console.error(e);
+    setStatus('Chyba pri načítaní: ' + e.message, 'error');
+  }
+}
+
+// ─── Inicializácia ──────────────────────────────────────────────────────────
+async function init() {
+  if (!requireLogin()) return;
+  if (IS_HRAC) { alert('Časová mapa je dostupná len pre trénerov a administrátorov.'); goHome(); return; }
+
+  const bn = document.getElementById('roleBanner');
+  if (IS_TRENER)             { bn.textContent = `🧑‍🏫 Tréner ${USER_NICK} — moja skupina`; bn.className = 'role-banner trener'; }
+  else if (IS_HLAVNY_TRENER) { bn.textContent = `👑 Hlavný tréner ${USER_NICK} — všetci hráči`; bn.className = 'role-banner hlavny_trener'; }
+  else if (IS_ADMIN)         { bn.textContent = '🔧 Admin — všetci hráči'; bn.className = 'role-banner admin'; }
+  bn.style.display = '';
+
+  document.getElementById('filterCard').style.display = '';
+
+  // Denný cieľ si pamätáme, aby ho tréner nemusel nastavovať pri každom otvorení
+  const ulozeny = localStorage.getItem(CIEL_KEY);
+  if (ulozeny) document.getElementById('dennyCiel').value = ulozeny;
+
+  document.getElementById('dennyCiel').addEventListener('change', () => {
+    localStorage.setItem(CIEL_KEY, String(dennyCiel()));
+    if (mapPlayers.length) render(mapPlayers, mapLog);
+  });
+
+  document.querySelectorAll('#scaleSeg button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#scaleSeg button').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      scaleMode = btn.dataset.scale;
+      if (mapPlayers.length) render(mapPlayers, mapLog);
+    });
+  });
+
+  if (IS_ADMIN || IS_HLAVNY_TRENER) {
+    const sel = document.getElementById('trenerSelect');
+    try {
+      const tr = await sbFetch('profiles?role=eq.trener&select=id,name,surname,nick_name&order=surname.asc') || [];
+      tr.forEach(t => {
+        const o = document.createElement('option');
+        o.value = t.id;
+        o.textContent = t.nick_name || `${t.surname || ''} ${t.name || ''}`.trim();
+        sel.appendChild(o);
+      });
+    } catch (e) {}
+    sel.addEventListener('change', loadMap);
+  } else {
+    document.getElementById('groupField').style.display = 'none';
+  }
+
+  loadMap();
+}
+
+init();
+</script>
+<script>
+// Registrácia service workera — bez neho prehliadač neponúkne inštaláciu ikony.
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(e =>
+      console.warn('Service worker sa nezaregistroval:', e));
+  });
+}
+</script>
+</body>
+</html>
