@@ -427,6 +427,9 @@ body {
     <button class="sub-btn" onclick="goKoncovkyMapa()">
       <div class="sub-icon i-koncovka">♚</div>Mapa koncoviek
     </button>
+    <button class="sub-btn" onclick="goCasovaMapa()">
+      <div class="sub-icon i-mix">⏱</div>Časová mapa
+    </button>
     <button class="sub-btn" onclick="goPrehlad()">
       <div class="sub-icon i-strategia">📋</div>Prehľad zadaní
     </button>
@@ -709,6 +712,7 @@ function goPrehlad()       { location.href = "zadania-prehlad.html"; }
 function goReport()        { location.href = "report.html"; }
 function goKoncovky()      { location.href = "koncovky-analyza.html"; }
 function goKoncovkyMapa()  { location.href = "koncovky-mapa.html"; }
+function goCasovaMapa()   { location.href = 'casova-mapa.html'; }
 
 // Odznak s počtom nesplnených zadaní. Splnenie sa vyhodnocuje rovnako ako na
 // stránke zadania.html: pri cieli na ELO podľa aktuálneho elo_<zručnosť>,
