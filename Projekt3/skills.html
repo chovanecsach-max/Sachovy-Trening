@@ -269,6 +269,15 @@ body {
   font-weight: bold;
 }
 
+/* Riešenie, ktoré hráč nenašiel — ukáže sa až po vypršaní času alebo po
+   kliknutí na „Ukáž riešenie". Červená, aby bolo na prvý pohľad jasné,
+   čo prehliadol. */
+.found-move-badge.missed {
+  background: #fee2e2;
+  color: #b91c1c;
+  border-color: #fca5a5;
+}
+
 /* Tlačidlá */
 .buttons {
   display: grid;
@@ -573,7 +582,11 @@ let flipped = false;
 
 let pendingPromotion = null;
 let solutions = [];       // všetky správne ťahy
-let foundMoves = [];      // už nájdené ťahy
+let foundMoves = [];      // ťahy zobrazené v zozname
+// Ťahy, ktoré hráč naozaj našiel sám. Pri odhalení riešenia sa foundMoves
+// doplní o zvyšok, takže bez tejto množiny by sa stratila informácia, čo
+// prehliadol — a práve tú chceme ukázať červenou.
+let skutocneNajdene = new Set();
 // Komplexný sekvenčný režim
 let completeByFen = new Map(); // fen → { fen, puzzlesByKey: {key→puzzle} }
 let completeFens = [];         // pole unikátnych FEN-ov (náhodný výber)
@@ -1044,6 +1057,7 @@ function handleMoveAttempt(tah) {
 
   if (isCorrect) {
     foundMoves.push(attempted);
+    skutocneNajdene.add(attempted);
     // X ostane na políčkach po dokončení; obe polia ťahu počítame samostatne
     xInc(attempted.substring(0,2));
     if (attempted.length === 4) xInc(attempted.substring(2,4));
@@ -1145,10 +1159,15 @@ function updateRemainingUI() {
 function updateFoundMovesUI() {
   const el = document.getElementById('foundMoves');
   el.innerHTML = '';
-  foundMoves.forEach(move => {
+  // Najprv nájdené (zelené), potom prehliadnuté (červené) — tak sa dá
+  // na prvý pohľad prečítať, čoho sa treba nabudúce chytiť.
+  const najdene   = foundMoves.filter(m =>  skutocneNajdene.has(m));
+  const zmeskane  = foundMoves.filter(m => !skutocneNajdene.has(m));
+  [...najdene, ...zmeskane].forEach(move => {
     const badge = document.createElement('span');
-    badge.className = 'found-move-badge';
+    badge.className = 'found-move-badge' + (skutocneNajdene.has(move) ? '' : ' missed');
     badge.textContent = move;
+    badge.title = skutocneNajdene.has(move) ? 'Našiel si' : 'Toto si nenašiel';
     el.appendChild(badge);
   });
 }
@@ -1619,6 +1638,7 @@ function loadPuzzle(puzzle) {
       .filter(m => m.length === 2 || m.length === 4)
   )];
   foundMoves = [];
+  skutocneNajdene = new Set();
   xMarked = new Map();
   puzzleDone = false;
   puzzleFailed = false;
