@@ -413,6 +413,61 @@ function countFirstWinsByPlayer(logRows, kategoria, odISO, doISO, meta) {
   return podlaHraca;
 }
 
+// Rozpis pokusov jedného hráča v období súťaže — pre každú úlohu, ktorej sa
+// dotkol, hovorí, či sa započítala a prečo prípadne nie. Slúži na to, aby sa
+// hráč nemusel pýtať „prečo mi to nepribudlo".
+//
+// Vracia pole { puzzle_id, source, cas, zapocitane, dovod } zoradené od
+// najnovšieho pokusu.
+function sutazRozpis(logRows, kategoria, odISO, doISO, meta, playerId) {
+  const od  = new Date(odISO).getTime();
+  const doo = new Date(doISO).getTime();
+  const wantCategory = BASIC_ASSIGNMENT_CATEGORY[kategoria] || null;
+
+  // Zoradiť od najstaršieho — o započítaní rozhoduje PRVÝ pokus o úlohu
+  const riadky = (logRows || [])
+    .filter(r => r.player_id === playerId)
+    .slice()
+    .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+
+  const videne = new Map();      // 'source:puzzle' → poradie pokusu
+  const vysledok = [];
+
+  for (const r of riadky) {
+    const t = new Date(r.created_at).getTime();
+    if (isNaN(t) || t < od || t > doo) continue;
+
+    // patrí úloha do súťažnej kategórie?
+    let patri = false;
+    if (wantCategory) {
+      const p = r.source === 'puzzles' ? meta.puzzles.get(r.puzzle_id) : null;
+      patri = !!(p && p.category === wantCategory);
+    } else {
+      patri = r.source === 'skill_puzzles' && meta.skills.get(r.puzzle_id) === kategoria;
+    }
+    if (!patri) continue;        // iná kategória sa v rozpise vôbec neukazuje
+
+    const key = r.source + ':' + r.puzzle_id;
+    const poradie = (videne.get(key) || 0) + 1;
+    videne.set(key, poradie);
+
+    let zapocitane = false, dovod = '';
+    if (poradie > 1) {
+      dovod = 'opakovanie tej istej úlohy';
+    } else if (r.result !== 'win') {
+      dovod = 'úloha nebola vyriešená';
+    } else {
+      zapocitane = true;
+    }
+    vysledok.push({
+      puzzle_id: r.puzzle_id, source: r.source,
+      cas: r.created_at, zapocitane, dovod
+    });
+  }
+
+  return vysledok.reverse();     // najnovšie hore
+}
+
 // ELO stĺpec pre kategóriu súťaže
 function sutazEloStlpec(kategoria) {
   if (kategoria === 'taktika')   return 'elo_taktika';
