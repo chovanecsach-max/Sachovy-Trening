@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Moje súťaže</title>
+<style>
+body { font-family: Arial, sans-serif; background: #f4f4f6; margin: 0; padding: 12px; color: #111827; }
+.app { max-width: 860px; margin: 0 auto; background: white; border-radius: 14px;
+       box-shadow: 0 10px 30px rgba(0,0,0,0.08); padding: 20px; }
+h1 { margin: 0 0 6px 0; text-align: center; font-size: 26px; }
+.subtitle { text-align: center; color: #475569; margin: 0 0 18px 0; }
+
+button { padding: 10px 16px; border: none; border-radius: 10px; cursor: pointer; font-size: 14px; }
+.secondary { background: #e5e7eb; color: #111827; }
+.go-btn { background: #1e3a5f; color: white; font-weight: bold; padding: 8px 14px; font-size: 13px; }
+.go-btn:hover { background: #2b4d7a; }
+
+.status { margin: 12px 0; padding: 10px; border-radius: 10px; border: 1px solid #d1d5db;
+          background: #f8fafc; color: #334155; font-size: 14px; }
+.status.error { background: #fef2f2; border-color: #fca5a5; color: #b91c1c; }
+
+.topbar { display: flex; justify-content: space-between; align-items: center; gap: 10px;
+          flex-wrap: wrap; margin-bottom: 8px; }
+
+/* Upozornenie na novú súťaž */
+.novinka { background: #fffbeb; border: 1px solid #fbbf24; border-radius: 10px;
+           padding: 12px 14px; margin-bottom: 14px; font-size: 14px; color: #92400e; display: none; }
+.novinka strong { color: #78350f; }
+
+.comp { border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px 16px; margin-bottom: 12px; background: #fff; }
+.comp.running { border-color: #bfdbfe; background: #f8fbff; }
+.comp.done    { background: #fafafa; }
+.comp.nova    { border-color: #fbbf24; box-shadow: 0 0 0 2px rgba(251,191,36,.2); }
+.comp-top { display: flex; align-items: center; justify-content: space-between; gap: 10px;
+            flex-wrap: wrap; margin-bottom: 6px; }
+.comp-name { font-size: 16px; font-weight: bold; }
+.badge { font-size: 12px; font-weight: bold; padding: 4px 10px; border-radius: 20px; }
+.badge.run  { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
+.badge.soon { background: #fffbeb; color: #92400e; border: 1px solid #fde68a; }
+.badge.done { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; }
+.badge.new  { background: #fef3c7; color: #92400e; border: 1px solid #fbbf24; }
+.comp-desc { font-size: 13px; color: #475569; font-style: italic; margin-bottom: 8px; }
+.comp-meta { display: flex; gap: 14px; flex-wrap: wrap; font-size: 13px; color: #334155; }
+.comp-foot { display: flex; justify-content: space-between; align-items: center; gap: 10px;
+             flex-wrap: wrap; margin-top: 10px; }
+.days { font-size: 13px; color: #475569; }
+.days strong { color: #1d4ed8; }
+
+.section-title { font-size: 13px; text-transform: uppercase; color: #94a3b8; font-weight: bold;
+                 margin: 18px 0 8px; letter-spacing: .5px; }
+.empty { text-align: center; color: #64748b; font-style: italic; padding: 30px; }
+</style>
+</head>
+
+<body oncontextmenu="return false;">
+<div class="app">
+  <h1>🏆 Moje súťaže</h1>
+  <p class="subtitle">Tréningové súťaže, do ktorých si zapojený.</p>
+
+  <div class="topbar">
+    <div id="summary" style="font-size:14px;color:#334155;"></div>
+    <button class="secondary" onclick="goHome()">Späť do menu</button>
+  </div>
+
+  <div id="novinka" class="novinka"></div>
+  <div id="status" class="status">Načítavam...</div>
+  <div id="list"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/auth.js"></script>
+<script src="js/player.js"></script>
+<script>
+// Kedy si hráč naposledy pozrel súťaže. Uložené v prehliadači — na inom
+// zariadení sa upozornenie ukáže znova, ale pri súťaži trvajúcej týždne to
+// nevadí a ušetrí to tabuľku v databáze aj jej oprávnenia.
+const VIDENE_KEY = 'sutazeVidene';
+
+function goHome() { location.href = 'index.html'; }
+
+function setStatus(t, type = '') {
+  const el = document.getElementById('status');
+  el.textContent = t; el.className = 'status' + (type ? ' ' + type : '');
+  el.style.display = t ? '' : 'none';
+}
+
+function nazovKategorie(k) {
+  const m = {
+    taktika: 'Taktika', strategia: 'Stratégia', koncovka: 'Koncovka',
+    checks: 'Šachy', captures: 'Brania', pawn_breakthrough: 'Pešiakové prielomy',
+    direct_attack: 'Brania so ziskom', underdefended: 'Slabo pokryté',
+    pin: 'Absolútne väzby', relative_pin: 'Relatívne väzby',
+    fork: 'Vidličky', direct_threat: 'Priame hrozby'
+  };
+  return m[k] || k;
+}
+
+function stavSutaze(s) {
+  const d = todayLocal();
+  if (d < s.datum_od) return { key: 'soon', text: 'Začne čoskoro' };
+  if (d > s.datum_do) return { key: 'done', text: 'Ukončená' };
+  return { key: 'run', text: 'Prebieha' };
+}
+
+function dniText(n) {
+  return n + ' ' + (n === 1 ? 'deň' : n < 5 ? 'dni' : 'dní');
+}
+
+// ─── Načítanie ──────────────────────────────────────────────────────────────
+async function load() {
+  if (!requireLogin()) return;
+
+  let hrac;
+  try {
+    hrac = await getCurrentPlayer();
+  } catch (e) {
+    setStatus('Chyba pri načítaní hráča: ' + e.message, 'error'); return;
+  }
+  if (!hrac) {
+    setStatus('Nemáš hráčsky záznam, takže zatiaľ nesúťažíš.', 'error'); return;
+  }
+
+  let vsetky;
+  try {
+    vsetky = await sbFetch('sutaze?select=*&order=datum_od.desc') || [];
+  } catch (e) {
+    setStatus('Chyba pri načítaní súťaží: ' + e.message, 'error'); return;
+  }
+
+  // Hráča sa týkajú súťaže bez obmedzenia skupín a tie, kde je jeho tréner
+  const moje = vsetky.filter(s =>
+    !s.skupiny || !s.skupiny.length || (hrac.trener_id && s.skupiny.includes(hrac.trener_id)));
+
+  if (!moje.length) {
+    setStatus('');
+    document.getElementById('summary').textContent = '';
+    document.getElementById('list').innerHTML =
+      '<div class="empty">Zatiaľ nie si zapojený do žiadnej súťaže. '
+      + 'Keď nejakú tréner vyhlási, objaví sa tu.</div>';
+    return;
+  }
+
+  // Ktoré sú pre hráča nové — porovnáva sa s časom poslednej návštevy
+  let videneOd = 0;
+  try { videneOd = Number(localStorage.getItem(VIDENE_KEY)) || 0; } catch (e) {}
+  const nove = moje.filter(s => new Date(s.created_at).getTime() > videneOd
+                             && stavSutaze(s).key !== 'done');
+
+  if (nove.length && videneOd > 0) {
+    const el = document.getElementById('novinka');
+    el.innerHTML = nove.length === 1
+      ? `🎉 Bol si zapojený do novej súťaže: <strong>${escapeHtml(nove[0].nazov)}</strong>`
+      : `🎉 Pribudli ti <strong>${nove.length}</strong> nové súťaže.`;
+    el.style.display = '';
+  }
+
+  const bezia = moje.filter(s => stavSutaze(s).key === 'run');
+  document.getElementById('summary').innerHTML =
+    `Prebiehajúce: <strong>${bezia.length}</strong> · celkovo <strong>${moje.length}</strong>`;
+
+  const poradie = { run: 0, soon: 1, done: 2 };
+  const zoradene = [...moje].sort((a, b) =>
+    poradie[stavSutaze(a).key] - poradie[stavSutaze(b).key]
+    || (b.datum_od < a.datum_od ? -1 : 1));
+
+  let h = '', poslednyStav = null;
+  zoradene.forEach(s => {
+    const st = stavSutaze(s);
+    if (st.key !== poslednyStav) {
+      h += `<div class="section-title">${st.key === 'run' ? 'Prebiehajúce'
+            : st.key === 'soon' ? 'Pripravené' : 'Ukončené'}</div>`;
+      poslednyStav = st.key;
+    }
+    const jeNova = nove.some(n => n.id === s.id) && videneOd > 0;
+
+    let dni = '';
+    if (st.key === 'run') {
+      const d = Math.max(0, Math.round((new Date(s.datum_do + 'T23:59:59') - new Date()) / 86400000));
+      dni = d === 0 ? '<strong>Končí dnes!</strong>' : `Zostáva <strong>${dniText(d)}</strong>`;
+    } else if (st.key === 'soon') {
+      const d = Math.max(0, Math.round((new Date(s.datum_od + 'T00:00:00') - new Date()) / 86400000));
+      dni = `Začína o <strong>${dniText(d)}</strong>`;
+    }
+
+    h += `<div class="comp ${st.key === 'run' ? 'running' : st.key === 'done' ? 'done' : ''} ${jeNova ? 'nova' : ''}">
+      <div class="comp-top">
+        <span class="comp-name">${escapeHtml(s.nazov)}</span>
+        <span>${jeNova ? '<span class="badge new">Nová</span> ' : ''}<span class="badge ${st.key}">${st.text}</span></span>
+      </div>
+      ${s.popis ? `<div class="comp-desc">${escapeHtml(s.popis)}</div>` : ''}
+      <div class="comp-meta">
+        <span>🎯 ${s.typ === 'pocet' ? 'Počet vyriešených úloh' : 'Nárast ELO'}
+              — ${escapeHtml(nazovKategorie(s.kategoria))}</span>
+        <span>📅 ${s.datum_od} — ${s.datum_do}</span>
+      </div>
+      <div class="comp-foot">
+        <span class="days">${dni}</span>
+        <button class="go-btn" onclick="location.href='sutaz-vysledky.html?id=${s.id}'">Výsledky →</button>
+      </div>
+    </div>`;
+  });
+
+  document.getElementById('list').innerHTML = h;
+  setStatus('');
+
+  // Návštevu si zapamätáme až teraz, keď hráč zoznam naozaj videl
+  try { localStorage.setItem(VIDENE_KEY, String(Date.now())); } catch (e) {}
+}
+
+load();
+</script>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(e =>
+      console.warn('Service worker sa nezaregistroval:', e));
+  });
+}
+</script>
+</body>
+</html>
