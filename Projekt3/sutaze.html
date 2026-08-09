@@ -123,7 +123,7 @@ button { padding: 10px 16px; border: none; border-radius: 10px; cursor: pointer;
       <div class="field wide">
         <label>Zapojené skupiny</label>
         <div class="groups-box" id="fSkupiny"></div>
-        <span class="hint">Ak nevyberieš nič, súťaž platí pre všetky skupiny.</span>
+        <span class="hint">Ak nevyberieš nič, súťaž platí pre všetky skupiny, ku ktorým máš prístup.</span>
       </div>
     </div>
 
@@ -242,21 +242,31 @@ function naplnKategorie() {
   });
 }
 
-function naplnSkupiny() {
+// Tréner môže zapojiť len skupiny, ku ktorým má prístup — vlastnú a tie
+// pridelené v trener_pristup (skupinový tréner). Admin a hlavný tréner všetky.
+let mojeSkupinyList = null;   // null = bez obmedzenia
+
+async function naplnSkupiny() {
   const box = document.getElementById('fSkupiny');
   box.innerHTML = '';
+  mojeSkupinyList = await viditelneSkupiny();
 
-  // Tréner súťaží len vo vlastnej skupine — výber sa mu nezobrazuje,
-  // aby nemohol nedopatrením vyhlásiť súťaž cudzím hráčom.
-  if (IS_TRENER) {
-    box.innerHTML = `<div class="hint">Súťaž bude platiť pre tvoju skupinu (${escapeHtml(USER_NICK)}).</div>`;
+  const dostupne = (mojeSkupinyList === null)
+    ? treneri
+    : treneri.filter(t => mojeSkupinyList.includes(t.id));
+
+  if (!dostupne.length) {
+    box.innerHTML = '<div class="hint">Nenašli sa žiadne skupiny.</div>';
     return;
   }
-  if (!treneri.length) {
-    box.innerHTML = '<div class="hint">Nenašli sa žiadni tréneri.</div>';
+  // Pri jedinej skupine nie je čo vyberať — súťaž bude pre ňu
+  if (mojeSkupinyList !== null && dostupne.length === 1) {
+    const meno = dostupne[0].nick_name
+               || `${dostupne[0].surname || ''} ${dostupne[0].name || ''}`.trim();
+    box.innerHTML = `<div class="hint">Súťaž bude platiť pre tvoju skupinu (${escapeHtml(meno)}).</div>`;
     return;
   }
-  treneri.forEach(t => {
+  dostupne.forEach(t => {
     const meno = t.nick_name || `${t.surname || ''} ${t.name || ''}`.trim();
     const l = document.createElement('label');
     l.innerHTML = `<input type="checkbox" value="${t.id}"> ${escapeHtml(meno)}`;
@@ -265,9 +275,12 @@ function naplnSkupiny() {
 }
 
 function vybrateSkupiny() {
-  if (IS_TRENER) return [USER_ID];
-  return [...document.querySelectorAll('#fSkupiny input[type="checkbox"]:checked')]
+  const zaskrtnute = [...document.querySelectorAll('#fSkupiny input[type="checkbox"]:checked')]
     .map(ch => ch.value);
+  if (zaskrtnute.length) return zaskrtnute;
+  // Nič nezaškrtnuté: tréner dostane svoje skupiny, admin prázdne pole =
+  // súťaž pre všetkých. Tréner nesmie omylom zapojiť celú akadémiu.
+  return (mojeSkupinyList === null) ? [] : mojeSkupinyList;
 }
 
 function aktualizujHint() {
@@ -443,7 +456,7 @@ async function init() {
   if (IS_HRAC) { alert('Vytváranie súťaží je dostupné len pre trénerov a administrátorov.'); goHome(); return; }
 
   const bn = document.getElementById('roleBanner');
-  if (IS_TRENER)             { bn.textContent = `🧑‍🏫 Tréner ${USER_NICK} — súťaže pre moju skupinu`; bn.className = 'role-banner trener'; }
+  if (IS_TRENER)             { bn.textContent = `🧑‍🏫 Tréner ${USER_NICK} — súťaže pre moje skupiny`; bn.className = 'role-banner trener'; }
   else if (IS_HLAVNY_TRENER) { bn.textContent = `👑 Hlavný tréner ${USER_NICK}`; bn.className = 'role-banner hlavny_trener'; }
   else if (IS_ADMIN)         { bn.textContent = '🔧 Admin'; bn.className = 'role-banner admin'; }
   bn.style.display = '';
@@ -453,7 +466,7 @@ async function init() {
   } catch (e) { treneri = []; }
 
   naplnKategorie();
-  naplnSkupiny();
+  await naplnSkupiny();
   aktualizujHint();
   document.getElementById('fTyp').addEventListener('change', aktualizujHint);
 
