@@ -492,6 +492,83 @@ async function getTrainers() {
   }
 }
 
+// ─── Prístup k skupinám ─────────────────────────────────────────────────────
+// Skupina = tréner. Bežný tréner vidí svojich hráčov; skupinový tréner má
+// v tabuľke trener_pristup pridelené aj skupiny iných trénerov. Admin a hlavný
+// tréner vidia všetko.
+//
+// POZOR: je to obmedzenie ZOBRAZENIA, nie bezpečnostná hranica. RLS na players
+// dovoľuje čítať všetkých hráčov každému z personálu (politika staff_read_players),
+// takže tréner sa k cudzím dátam vie dostať aj tak. Na filtrovanie zoznamov to
+// stačí; keby to malo byť skutočné obmedzenie, musí sa sprísniť RLS.
+
+let _skupinyCache = null;
+
+// Vráti pole UUID trénerov, ktorých hráčov smie prihlásený vidieť.
+// null znamená BEZ OBMEDZENIA (admin, hlavný tréner).
+async function viditelneSkupiny() {
+  if (_skupinyCache !== null) return _skupinyCache;
+
+  const rola = sessionStorage.getItem('user_role') || '';
+  const ja   = sessionStorage.getItem('user_id') || '';
+
+  if (rola === 'admin' || rola === 'hlavny_trener') {
+    _skupinyCache = null;
+    return null;
+  }
+  if (rola !== 'trener') {          // hráč sem nemá čo prísť
+    _skupinyCache = [];
+    return [];
+  }
+
+  const skupiny = [ja];             // vlastná skupina vždy
+  try {
+    const rows = await sbFetch(`trener_pristup?trener_id=eq.${ja}&select=skupina_id`) || [];
+    rows.forEach(r => { if (r.skupina_id && !skupiny.includes(r.skupina_id)) skupiny.push(r.skupina_id); });
+  } catch (e) {
+    console.warn('Pridelené skupiny sa nenačítali:', e);
+  }
+  _skupinyCache = skupiny;
+  return skupiny;
+}
+
+// Doplní do PostgREST dotazu obmedzenie na dané skupiny.
+// skupiny = null → bez obmedzenia; jedna → eq; viac → in
+function filterSkupiny(query, skupiny) {
+  if (!skupiny) return query;
+  if (skupiny.length === 1) return query + `&trener_id=eq.${skupiny[0]}`;
+  return query + `&trener_id=in.(${skupiny.join(',')})`;
+}
+
+// Naplní rozbaľovací zoznam skupín podľa toho, čo smie prihlásený vidieť.
+// Vráti true, ak sa má výber vôbec zobraziť (má zmysel pri dvoch a viac).
+async function naplnVyberSkupin(selectEl, popisVsetky = 'Všetci moji hráči') {
+  if (!selectEl) return false;
+  const skupiny = await viditelneSkupiny();
+  let treneri = [];
+  try {
+    treneri = await sbFetch('profiles?role=eq.trener&select=id,name,surname,nick_name&order=surname.asc') || [];
+  } catch (e) {}
+
+  const zoznam = (skupiny === null) ? treneri : treneri.filter(t => skupiny.includes(t.id));
+
+  selectEl.innerHTML = '';
+  const vsetko = document.createElement('option');
+  vsetko.value = 'all';
+  vsetko.textContent = (skupiny === null) ? 'Všetci hráči' : popisVsetky;
+  selectEl.appendChild(vsetko);
+
+  zoznam.forEach(t => {
+    const o = document.createElement('option');
+    o.value = t.id;
+    o.textContent = t.nick_name || `${t.surname || ''} ${t.name || ''}`.trim();
+    selectEl.appendChild(o);
+  });
+
+  // Pri jedinej skupine je výber zbytočný
+  return (skupiny === null) || zoznam.length > 1;
+}
+
 // ─── Hráči ──────────────────────────────────────────────────────────────────
 
 // trenerFilter: UUID trénera — ak zadané, načíta len jeho hráčov
