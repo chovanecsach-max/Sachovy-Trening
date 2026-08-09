@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Výsledky súťaže</title>
+<style>
+body { font-family: Arial, sans-serif; background: #f4f4f6; margin: 0; padding: 12px; color: #111827; }
+.app { max-width: 900px; margin: 0 auto; background: white; border-radius: 14px;
+       box-shadow: 0 10px 30px rgba(0,0,0,0.08); padding: 20px; }
+h1 { margin: 0 0 4px 0; text-align: center; font-size: 25px; }
+.subtitle { text-align: center; color: #475569; margin: 0 0 16px 0; font-size: 14px; font-style: italic; }
+
+button { padding: 10px 16px; border: none; border-radius: 10px; cursor: pointer; font-size: 14px; }
+.secondary { background: #e5e7eb; color: #111827; }
+.toolbar { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+
+.status { margin: 12px 0; padding: 10px; border-radius: 10px; border: 1px solid #d1d5db;
+          background: #f8fafc; color: #334155; font-size: 14px; }
+.status.error { background: #fef2f2; border-color: #fca5a5; color: #b91c1c; }
+
+/* ── Hlavička súťaže ── */
+.info-card { border: 1px solid #bfdbfe; background: #eff6ff; border-radius: 12px;
+             padding: 14px 16px; margin-bottom: 16px; }
+.info-row { display: flex; gap: 16px; flex-wrap: wrap; font-size: 14px; color: #1e3a5f; margin-top: 6px; }
+.badge { font-size: 12px; font-weight: bold; padding: 4px 10px; border-radius: 20px; }
+.badge.run  { background: #dbeafe; color: #1d4ed8; border: 1px solid #bfdbfe; }
+.badge.soon { background: #fffbeb; color: #92400e; border: 1px solid #fde68a; }
+.badge.done { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; }
+.info-top { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+.info-name { font-size: 17px; font-weight: bold; color: #111827; }
+.days-left { font-size: 13px; color: #475569; }
+
+/* ── Rebríček ── */
+.rank { list-style: none; margin: 0; padding: 0; }
+.rank li { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 9px;
+           margin-bottom: 5px; background: #fff; border: 1px solid #e2e8f0; }
+.rank li.me { background: #fffbeb; border-color: #fbbf24; box-shadow: 0 0 0 2px rgba(251,191,36,.25); }
+.rank .poradie { width: 30px; text-align: center; font-weight: bold; color: #64748b; flex-shrink: 0; }
+.rank .meno { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rank .skupina { font-size: 11px; color: #64748b; }
+.rank .bar-wrap { flex: 2; min-width: 80px; background: #f1f5f9; border-radius: 6px; height: 20px; overflow: hidden; }
+.rank .bar { height: 100%; border-radius: 6px; transition: width .3s; }
+.rank .hodnota { width: 74px; text-align: right; font-weight: bold; flex-shrink: 0; font-variant-numeric: tabular-nums; }
+.rank li.zero .hodnota { color: #94a3b8; font-weight: normal; }
+
+.legend { display: flex; gap: 12px; flex-wrap: wrap; font-size: 12px; color: #64748b; margin: 10px 0; }
+.legend .dot { width: 11px; height: 11px; border-radius: 3px; display: inline-block; vertical-align: -1px; margin-right: 5px; }
+.empty { text-align: center; color: #64748b; font-style: italic; padding: 24px; }
+.note { font-size: 12px; color: #64748b; margin-top: 12px; padding-top: 10px; border-top: 1px solid #e2e8f0; }
+
+@media (max-width: 600px) {
+  .rank .bar-wrap { display: none; }
+  .rank .meno { font-size: 14px; }
+}
+</style>
+</head>
+
+<body oncontextmenu="return false;">
+<div class="app">
+  <h1>🏆 Výsledky súťaže</h1>
+  <p class="subtitle" id="podnadpis"></p>
+
+  <div class="toolbar">
+    <button class="secondary" onclick="history.back()">← Späť</button>
+    <button class="secondary" onclick="location.href='index.html'">Menu</button>
+  </div>
+
+  <div id="infoCard" class="info-card" style="display:none;"></div>
+  <div id="status" class="status">Načítavam...</div>
+  <div id="legend" class="legend" style="display:none;"></div>
+  <ol id="rank" class="rank"></ol>
+  <div id="note"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/auth.js"></script>
+<script src="js/player.js"></script>
+<script>
+const STAFF_ROLES = ['trener', 'hlavny_trener', 'admin'];
+
+// Farby skupín — hráči z jednej skupiny majú rovnakú farbu stĺpca.
+const FARBY = ['#2563eb','#16a34a','#d97706','#9333ea','#dc2626',
+               '#0891b2','#c026d3','#65a30d','#e11d48','#4f46e5'];
+
+function setStatus(t, type = '') {
+  const el = document.getElementById('status');
+  el.textContent = t; el.className = 'status' + (type ? ' ' + type : '');
+  el.style.display = t ? '' : 'none';
+}
+
+async function sbFetchAll(query) {
+  const PAGE = 1000; let all = [], off = 0;
+  while (true) {
+    const sep = query.includes('?') ? '&' : '?';
+    const b = await sbFetch(`${query}${sep}limit=${PAGE}&offset=${off}`);
+    if (!b || !b.length) break;
+    all = all.concat(b);
+    if (b.length < PAGE) break;
+    off += PAGE;
+  }
+  return all;
+}
+
+function nazovKategorie(k) {
+  const m = {
+    taktika: 'Taktika', strategia: 'Stratégia', koncovka: 'Koncovka',
+    checks: 'Šachy', captures: 'Brania', pawn_breakthrough: 'Pešiakové prielomy',
+    direct_attack: 'Brania so ziskom', underdefended: 'Slabo pokryté',
+    pin: 'Absolútne väzby', relative_pin: 'Relatívne väzby',
+    fork: 'Vidličky', direct_threat: 'Priame hrozby'
+  };
+  return m[k] || k;
+}
+
+function stavSutaze(s) {
+  const d = todayLocal();
+  if (d < s.datum_od) return { key: 'soon', text: 'Začne čoskoro' };
+  if (d > s.datum_do) return { key: 'done', text: 'Ukončená' };
+  return { key: 'run', text: 'Prebieha' };
+}
+
+// ─── Hlavička ───────────────────────────────────────────────────────────────
+function renderInfo(s, treneri) {
+  const st = stavSutaze(s);
+  const skup = (!s.skupiny || !s.skupiny.length)
+    ? 'všetky skupiny'
+    : s.skupiny.map(id => {
+        const t = treneri.find(x => x.id === id);
+        return t ? (t.nick_name || `${t.surname || ''} ${t.name || ''}`.trim()) : 'neznáma';
+      }).join(', ');
+
+  // Koľko dní zostáva — pri prebiehajúcej súťaži to hráča motivuje najviac
+  let zostava = '';
+  if (st.key === 'run') {
+    const d = Math.max(0, Math.round(
+      (new Date(s.datum_do + 'T23:59:59') - new Date()) / 86400000));
+    zostava = d === 0 ? 'Končí dnes!' : `Zostáva ${d} ${d === 1 ? 'deň' : d < 5 ? 'dni' : 'dní'}`;
+  } else if (st.key === 'soon') {
+    const d = Math.max(0, Math.round(
+      (new Date(s.datum_od + 'T00:00:00') - new Date()) / 86400000));
+    zostava = `Začína o ${d} ${d === 1 ? 'deň' : d < 5 ? 'dni' : 'dní'}`;
+  }
+
+  document.getElementById('infoCard').innerHTML = `
+    <div class="info-top">
+      <span class="info-name">${escapeHtml(s.nazov)}</span>
+      <span class="badge ${st.key}">${st.text}</span>
+    </div>
+    ${s.popis ? `<div style="font-size:13px;color:#475569;margin-top:6px;">${escapeHtml(s.popis)}</div>` : ''}
+    <div class="info-row">
+      <span>🎯 ${s.typ === 'pocet' ? 'Počet vyriešených úloh' : 'Nárast ELO'}
+            — ${escapeHtml(nazovKategorie(s.kategoria))}</span>
+      <span>📅 ${s.datum_od} — ${s.datum_do}</span>
+      <span>👥 ${escapeHtml(skup)}</span>
+    </div>
+    ${zostava ? `<div class="days-left" style="margin-top:6px;"><strong>${zostava}</strong></div>` : ''}`;
+  document.getElementById('infoCard').style.display = '';
+  document.getElementById('podnadpis').textContent = s.nazov;
+  document.title = 'Súťaž — ' + s.nazov;
+}
+
+// ─── Rebríček ───────────────────────────────────────────────────────────────
+function renderRank(vysledky, s, farbaSkupiny, mojePlayerId) {
+  const el = document.getElementById('rank');
+  if (!vysledky.length) {
+    el.innerHTML = '<div class="empty">V zapojených skupinách nie sú žiadni hráči.</div>';
+    return;
+  }
+
+  const jednotka = s.typ === 'pocet' ? '' : ' b';
+  const max = Math.max(1, ...vysledky.map(v => v.hodnota));
+  const medaily = ['🥇','🥈','🥉'];
+
+  el.innerHTML = vysledky.map((v, i) => {
+    const sirka = Math.max(0, Math.round(v.hodnota / max * 100));
+    const farba = farbaSkupiny[v.trener_id || 'ziadna'] || '#94a3b8';
+    const jaSom = mojePlayerId && v.id === mojePlayerId;
+    const poradie = i < 3 && v.hodnota > 0 ? medaily[i] : (i + 1) + '.';
+    return `<li class="${jaSom ? 'me' : ''} ${v.hodnota <= 0 ? 'zero' : ''}">
+      <span class="poradie">${poradie}</span>
+      <span class="meno">${escapeHtml(v.meno)}${jaSom ? ' <strong>(ty)</strong>' : ''}
+        <div class="skupina">${escapeHtml(v.skupinaNazov)}</div></span>
+      <span class="bar-wrap"><span class="bar" style="width:${sirka}%;background:${farba};"></span></span>
+      <span class="hodnota">${v.hodnota > 0 && s.typ === 'elo_narast' ? '+' : ''}${v.hodnota}${jednotka}</span>
+    </li>`;
+  }).join('');
+}
+
+// ─── Načítanie a výpočet ────────────────────────────────────────────────────
+async function nacitaj() {
+  const id = new URLSearchParams(location.search).get('id');
+  if (!id) { setStatus('Chýba označenie súťaže.', 'error'); return; }
+
+  let s, treneri = [];
+  try {
+    const rows = await sbFetch(`sutaze?id=eq.${id}&limit=1`);
+    s = rows && rows[0];
+    if (!s) { setStatus('Súťaž sa nenašla.', 'error'); return; }
+    treneri = await sbFetch('trainers_public?select=id,name,surname,nick_name') || [];
+  } catch (e) {
+    setStatus('Chyba pri načítaní súťaže: ' + e.message, 'error');
+    return;
+  }
+  renderInfo(s, treneri);
+
+  // Hráči zapojených skupín. Personál sa do súťaže nepočíta.
+  let q = 'players?select=id,name,surname,trener_id,user_id,'
+        + sutazEloStlpec(s.kategoria) + ',profile:profiles!user_id(role)';
+  if (s.skupiny && s.skupiny.length === 1)    q += `&trener_id=eq.${s.skupiny[0]}`;
+  else if (s.skupiny && s.skupiny.length > 1) q += `&trener_id=in.(${s.skupiny.join(',')})`;
+
+  let hraci;
+  try {
+    hraci = (await sbFetchAll(q) || []).filter(p => !STAFF_ROLES.includes(p.profile?.role));
+  } catch (e) {
+    setStatus('Chyba pri načítaní hráčov: ' + e.message, 'error');
+    return;
+  }
+  if (!hraci.length) { setStatus(''); renderRank([], s, {}, null); return; }
+
+  // Farba na skupinu — hráči jedného trénera majú rovnakú
+  const farbaSkupiny = {};
+  [...new Set(hraci.map(p => p.trener_id || 'ziadna'))].forEach((t, i) => {
+    farbaSkupiny[t] = FARBY[i % FARBY.length];
+  });
+  const nazovSkupiny = t => {
+    const x = treneri.find(y => y.id === t);
+    return x ? (x.nick_name || `${x.surname || ''} ${x.name || ''}`.trim()) : 'bez trénera';
+  };
+
+  const ids = hraci.map(p => p.id).join(',');
+  let hodnoty = new Map();
+
+  try {
+    if (s.typ === 'pocet') {
+      // Počítajú sa len úlohy vyriešené na prvý pokus v období súťaže.
+      const odISO  = new Date(s.datum_od + 'T00:00:00').toISOString();
+      const doISO  = new Date(s.datum_do + 'T23:59:59.999').toISOString();
+      const log = await sbFetchAll(
+        `training_log?player_id=in.(${ids})&created_at=gte.${odISO}&created_at=lte.${doISO}`
+        + `&select=player_id,puzzle_id,source,result,created_at`);
+      const meta = await loadAssignmentPuzzleMeta(log);
+      hodnoty = countFirstWinsByPlayer(log, s.kategoria, odISO, doISO, meta);
+    } else {
+      // Nárast oproti odfotenému stavu na začiatku súťaže
+      const stlpec = sutazEloStlpec(s.kategoria);
+      const start = await sbFetchAll(`sutaz_start_elo?sutaz_id=eq.${s.id}&select=player_id,elo`);
+      const startMap = new Map((start || []).map(r => [r.player_id, r.elo]));
+      hraci.forEach(p => {
+        const zaciatok = startMap.get(p.id);
+        // Hráč, ktorý pribudol do skupiny až po vyhlásení, nemá odfotený stav —
+        // do súťaže sa nezapočíta, inak by mu celé ELO vyšlo ako nárast.
+        hodnoty.set(p.id, zaciatok == null ? null : eloHodnota(p[stlpec]) - zaciatok);
+      });
+    }
+  } catch (e) {
+    setStatus('Chyba pri výpočte výsledkov: ' + e.message, 'error');
+    return;
+  }
+
+  const vysledky = hraci
+    .map(p => ({
+      id: p.id,
+      meno: `${p.surname || ''} ${p.name || ''}`.trim() || '(bez mena)',
+      trener_id: p.trener_id,
+      skupinaNazov: nazovSkupiny(p.trener_id),
+      hodnota: hodnoty.get(p.id) ?? (s.typ === 'pocet' ? 0 : null),
+      bezStartu: s.typ === 'elo_narast' && hodnoty.get(p.id) == null
+    }))
+    .filter(v => !v.bezStartu)
+    .sort((a, b) => b.hodnota - a.hodnota || a.meno.localeCompare(b.meno, 'sk'));
+
+  // Kto som ja — na zvýraznenie vlastného riadku
+  const mojUserId = sessionStorage.getItem('user_id');
+  const ja = hraci.find(p => p.user_id === mojUserId);
+
+  renderRank(vysledky, s, farbaSkupiny, ja ? ja.id : null);
+
+  // Legenda skupín — len keď je zapojená viac než jedna
+  const skupinyVHre = [...new Set(hraci.map(p => p.trener_id || 'ziadna'))];
+  const leg = document.getElementById('legend');
+  if (skupinyVHre.length > 1) {
+    leg.innerHTML = skupinyVHre.map(t =>
+      `<span><span class="dot" style="background:${farbaSkupiny[t]}"></span>${
+        escapeHtml(t === 'ziadna' ? 'bez trénera' : nazovSkupiny(t))}</span>`).join('');
+    leg.style.display = '';
+  }
+
+  const vynechani = hraci.length - vysledky.length;
+  document.getElementById('note').innerHTML = '<div class="note">'
+    + (s.typ === 'pocet'
+        ? 'Počítajú sa len úlohy vyriešené na prvý pokus — opakované riešenie tej istej pozície sa nezapočíta.'
+        : 'Nárast sa počíta oproti ELO, ktoré mal hráč pri vyhlásení súťaže.')
+    + (vynechani > 0
+        ? ` ${vynechani} ${vynechani === 1 ? 'hráč nie je' : 'hráči nie sú'} v poradí —`
+          + ' do skupiny pribudli až po vyhlásení súťaže a nemajú odfotený východiskový stav.'
+        : '')
+    + '</div>';
+
+  setStatus('');
+}
+
+(function () {
+  if (!requireLogin()) return;
+  nacitaj();
+})();
+</script>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(e =>
+      console.warn('Service worker sa nezaregistroval:', e));
+  });
+}
+</script>
+</body>
+</html>
