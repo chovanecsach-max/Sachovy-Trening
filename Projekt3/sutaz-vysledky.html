@@ -47,6 +47,19 @@ button { padding: 10px 16px; border: none; border-radius: 10px; cursor: pointer;
 .legend { display: flex; gap: 12px; flex-wrap: wrap; font-size: 12px; color: #64748b; margin: 10px 0; }
 .legend .dot { width: 11px; height: 11px; border-radius: 3px; display: inline-block; vertical-align: -1px; margin-right: 5px; }
 .empty { text-align: center; color: #64748b; font-style: italic; padding: 24px; }
+
+/* Rozpis pokusov po kliknutí na vlastný riadok */
+.rank li.me { cursor: pointer; }
+.detail { margin: -2px 0 8px; padding: 10px 12px; border: 1px solid #fbbf24;
+          border-top: none; border-radius: 0 0 9px 9px; background: #fffdf5; font-size: 13px; }
+.detail table { width: 100%; border-collapse: collapse; }
+.detail td { padding: 4px 6px; border-bottom: 1px solid #fef3c7; }
+.detail td.stav { width: 22px; text-align: center; }
+.detail td.duvod { color: #92400e; font-size: 12px; }
+.detail .ok  { color: #166534; }
+.detail .nie { color: #b91c1c; }
+.detail .sumar { margin-bottom: 8px; color: #475569; }
+.detail .prazdne { color: #64748b; font-style: italic; }
 .note { font-size: 12px; color: #64748b; margin-top: 12px; padding-top: 10px; border-top: 1px solid #e2e8f0; }
 
 @media (max-width: 600px) {
@@ -82,6 +95,9 @@ const STAFF_ROLES = ['trener', 'hlavny_trener', 'admin'];
 // Farby skupín — hráči z jednej skupiny majú rovnakú farbu stĺpca.
 const FARBY = ['#2563eb','#16a34a','#d97706','#9333ea','#dc2626',
                '#0891b2','#c026d3','#65a30d','#e11d48','#4f46e5'];
+
+let rozpisData = null;      // dáta na rozpis pokusov (len pri type 'pocet')
+let rozpisOtvoreny = false;
 
 function setStatus(t, type = '') {
   const el = document.getElementById('status');
@@ -177,14 +193,46 @@ function renderRank(vysledky, s, farbaSkupiny, mojePlayerId) {
     const farba = farbaSkupiny[v.trener_id || 'ziadna'] || '#94a3b8';
     const jaSom = mojePlayerId && v.id === mojePlayerId;
     const poradie = i < 3 && v.hodnota > 0 ? medaily[i] : (i + 1) + '.';
-    return `<li class="${jaSom ? 'me' : ''} ${v.hodnota <= 0 ? 'zero' : ''}">
+    const klik = jaSom && rozpisData ? ` onclick="prepniRozpis(${v.id})" title="Klikni pre rozpis úloh"` : '';
+    return `<li class="${jaSom ? 'me' : ''} ${v.hodnota <= 0 ? 'zero' : ''}"${klik}>
       <span class="poradie">${poradie}</span>
       <span class="meno">${escapeHtml(v.meno)}${jaSom ? ' <strong>(ty)</strong>' : ''}
         <div class="skupina">${escapeHtml(v.skupinaNazov)}</div></span>
       <span class="bar-wrap"><span class="bar" style="width:${sirka}%;background:${farba};"></span></span>
       <span class="hodnota">${v.hodnota > 0 && s.typ === 'elo_narast' ? '+' : ''}${v.hodnota}${jednotka}</span>
-    </li>`;
+    </li>${jaSom ? '<div id="rozpis" class="detail" style="display:none;"></div>' : ''}`;
   }).join('');
+}
+
+// ─── Rozpis pokusov vlastného riadku ────────────────────────────────────────
+// Hráč sa najčastejšie pýta „prečo mi to nepribudlo". Rozpis ukáže každý pokus
+// v období súťaže a pri nezapočítaných aj dôvod.
+function prepniRozpis(playerId) {
+  const el = document.getElementById('rozpis');
+  if (!el || !rozpisData) return;
+  rozpisOtvoreny = !rozpisOtvoreny;
+  if (!rozpisOtvoreny) { el.style.display = 'none'; return; }
+
+  const r = rozpisData;
+  const polozky = sutazRozpis(r.log, r.kategoria, r.odISO, r.doISO, r.meta, playerId);
+  const zap = polozky.filter(x => x.zapocitane).length;
+
+  if (!polozky.length) {
+    el.innerHTML = '<div class="prazdne">V období súťaže si v tejto kategórii ešte netrénoval.</div>';
+    el.style.display = '';
+    return;
+  }
+
+  el.innerHTML = `<div class="sumar">Započítaných <strong>${zap}</strong>
+      z <strong>${polozky.length}</strong> pokusov v tejto kategórii:</div>
+    <table>${polozky.map(x => `
+      <tr>
+        <td class="stav ${x.zapocitane ? 'ok' : 'nie'}">${x.zapocitane ? '✓' : '✗'}</td>
+        <td>Úloha #${x.puzzle_id}</td>
+        <td style="color:#64748b;white-space:nowrap;">${localDay(x.cas)}</td>
+        <td class="duvod">${x.zapocitane ? '' : escapeHtml(x.dovod)}</td>
+      </tr>`).join('')}</table>`;
+  el.style.display = '';
 }
 
 // ─── Načítanie a výpočet ────────────────────────────────────────────────────
@@ -242,6 +290,8 @@ async function nacitaj() {
         + `&select=player_id,puzzle_id,source,result,created_at`);
       const meta = await loadAssignmentPuzzleMeta(log);
       hodnoty = countFirstWinsByPlayer(log, s.kategoria, odISO, doISO, meta);
+      // Odložíme na rozpis pokusov, ktorý sa rozbalí po kliknutí na vlastný riadok
+      rozpisData = { log, meta, odISO, doISO, kategoria: s.kategoria };
     } else {
       // Nárast oproti odfotenému stavu na začiatku súťaže
       const stlpec = sutazEloStlpec(s.kategoria);
@@ -291,6 +341,7 @@ async function nacitaj() {
   document.getElementById('note').innerHTML = '<div class="note">'
     + (s.typ === 'pocet'
         ? 'Počítajú sa len úlohy vyriešené na prvý pokus — opakované riešenie tej istej pozície sa nezapočíta.'
+          + ' Klikni na svoj riadok a uvidíš rozpis, ktoré úlohy sa započítali a ktoré nie.'
         : 'Nárast sa počíta oproti ELO, ktoré mal hráč pri vyhlásení súťaže.')
     + (vynechani > 0
         ? ` ${vynechani} ${vynechani === 1 ? 'hráč nie je' : 'hráči nie sú'} v poradí —`
