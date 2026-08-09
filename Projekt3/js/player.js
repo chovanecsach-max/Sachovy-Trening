@@ -373,6 +373,54 @@ function countFirstAttemptWins(logRows, assignment, meta) {
   return n;
 }
 
+// ─── Výsledky súťaží ────────────────────────────────────────────────────────
+// Počet úloh vyriešených NA PRVÝ POKUS v danom období, po hráčoch.
+// Rovnaké pravidlo ako pri zadaniach (countFirstAttemptWins) — bez neho by sa
+// súťaž dala vyhrať opakovaním tej istej úlohy. Rozdiel je len v tom, že tu
+// je obdobie ohraničené z oboch strán a počíta sa naraz pre celú skupinu.
+//
+// kategoria: 'taktika' | 'strategia' | 'koncovka' (klasický tréning)
+//            alebo skill_type ('checks', 'fork', …) pre zručnosti
+function countFirstWinsByPlayer(logRows, kategoria, odISO, doISO, meta) {
+  const od = new Date(odISO).getTime();
+  const doo = new Date(doISO).getTime();
+  const wantCategory = BASIC_ASSIGNMENT_CATEGORY[kategoria] || null;
+
+  const prvyPokus = new Map();     // 'player:source:puzzle' → riadok
+
+  for (const r of (logRows || [])) {
+    const t = new Date(r.created_at).getTime();
+    if (isNaN(t) || t < od || t > doo) continue;
+
+    if (wantCategory) {
+      if (r.source !== 'puzzles') continue;
+      const p = meta.puzzles.get(r.puzzle_id);
+      if (!p || p.category !== wantCategory) continue;
+    } else {
+      if (r.source !== 'skill_puzzles') continue;
+      if (meta.skills.get(r.puzzle_id) !== kategoria) continue;
+    }
+
+    const key = r.player_id + ':' + r.source + ':' + r.puzzle_id;
+    if (!prvyPokus.has(key)) prvyPokus.set(key, r);
+  }
+
+  const podlaHraca = new Map();
+  prvyPokus.forEach(r => {
+    if (r.result !== 'win') return;
+    podlaHraca.set(r.player_id, (podlaHraca.get(r.player_id) || 0) + 1);
+  });
+  return podlaHraca;
+}
+
+// ELO stĺpec pre kategóriu súťaže
+function sutazEloStlpec(kategoria) {
+  if (kategoria === 'taktika')   return 'elo_taktika';
+  if (kategoria === 'strategia') return 'elo_strategia';
+  if (kategoria === 'koncovka')  return 'elo_koncovka';
+  return 'elo_' + kategoria;
+}
+
 // ─── Tréneri ────────────────────────────────────────────────────────────────
 
 // Číta z pohľadu trainers_public (len meno a prezývka trénerov), nie z tabuľky
