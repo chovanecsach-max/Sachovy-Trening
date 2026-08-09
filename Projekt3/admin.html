@@ -482,6 +482,24 @@ button {
     <button class="secondary" style="margin-left:auto;" onclick="goHome()">← Menu</button>
   </div>
 
+  <!-- Prístup trénerov k viacerým skupinám -->
+  <div class="card" style="margin-bottom:16px;">
+    <h2>🧑‍🏫 Skupinový tréner — prístup k skupinám</h2>
+    <div class="tip" style="margin-top:-6px;margin-bottom:10px;">
+      Skupina = tréner. Tréner vždy vidí svojich hráčov; tu mu môžeš pridať prístup
+      k skupinám ďalších trénerov. Uplatní sa v mapách, štatistike, reporte,
+      zadaniach aj súťažiach.
+    </div>
+    <div class="edit-grid">
+      <div class="edit-field">
+        <label>Tréner</label>
+        <select id="tpTrener" onchange="tpNacitaj()"><option value="">— vyber trénera —</option></select>
+      </div>
+    </div>
+    <div id="tpZoznam" style="margin-top:10px;"></div>
+    <div id="tpStatus" style="font-size:13px;margin-top:8px;"></div>
+  </div>
+
   <!-- Ručná registrácia hráča (bez potvrdzovacieho mailu) -->
   <div class="card" style="margin-bottom:16px;">
     <h2>➕ Ručne zaregistrovať hráča</h2>
@@ -919,7 +937,11 @@ function switchTab(tab) {
   document.getElementById('puzzleSection').style.display = tab === 'puzzles' ? 'block' : 'none';
   document.getElementById('skillSection').style.display  = tab === 'skills'  ? 'block' : 'none';
   document.getElementById('userSection').style.display   = tab === 'users'   ? 'block' : 'none';
-  if (tab === 'users') loadUsers();
+  if (tab === 'users') {
+    loadUsers();
+    // Zoznam trénerov pre správu skupinových prístupov — naplní sa raz
+    if (!tpTreneri.length) tpNaplnTrenerov();
+  }
 }
 
 async function reloadActive() {
@@ -1080,6 +1102,85 @@ function setUserStatus(text, type = '') {
   const el = document.getElementById('userStatus');
   el.textContent = text;
   el.className = 'status' + (type ? ' ' + type : '');
+}
+
+// ─── Skupinový tréner ───────────────────────────────────────────────────────
+let tpTreneri = [];
+
+async function tpNaplnTrenerov() {
+  try {
+    tpTreneri = await sbFetch(
+      'profiles?role=eq.trener&select=id,name,surname,nick_name&order=surname.asc') || [];
+  } catch (e) { tpTreneri = []; }
+  const sel = document.getElementById('tpTrener');
+  if (!sel) return;
+  tpTreneri.forEach(t => {
+    const o = document.createElement('option');
+    o.value = t.id;
+    o.textContent = t.nick_name || `${t.surname || ''} ${t.name || ''}`.trim();
+    sel.appendChild(o);
+  });
+}
+
+function tpMeno(t) {
+  return t.nick_name || `${t.surname || ''} ${t.name || ''}`.trim();
+}
+
+async function tpNacitaj() {
+  const trenerId = document.getElementById('tpTrener').value;
+  const box = document.getElementById('tpZoznam');
+  document.getElementById('tpStatus').textContent = '';
+  if (!trenerId) { box.innerHTML = ''; return; }
+
+  let pridelene = [];
+  try {
+    const rows = await sbFetch(`trener_pristup?trener_id=eq.${trenerId}&select=skupina_id`) || [];
+    pridelene = rows.map(r => r.skupina_id);
+  } catch (e) {
+    box.innerHTML = '<div class="tip">Prístupy sa nepodarilo načítať: ' + escapeHtml(e.message) + '</div>';
+    return;
+  }
+
+  const ostatni = tpTreneri.filter(t => t.id !== trenerId);
+  if (!ostatni.length) {
+    box.innerHTML = '<div class="tip">Nie sú žiadni ďalší tréneri.</div>';
+    return;
+  }
+
+  box.innerHTML = '<div style="display:flex;flex-wrap:wrap;gap:8px;">'
+    + ostatni.map(t => `<label style="display:flex;align-items:center;gap:6px;
+         border:1px solid #e2e8f0;border-radius:8px;padding:6px 10px;font-size:13px;">
+        <input type="checkbox" value="${t.id}" ${pridelene.includes(t.id) ? 'checked' : ''}>
+        ${escapeHtml(tpMeno(t))}</label>`).join('')
+    + '</div><button class="primary" style="margin-top:10px;" onclick="tpUloz()">Uložiť prístupy</button>';
+}
+
+async function tpUloz() {
+  const trenerId = document.getElementById('tpTrener').value;
+  if (!trenerId) return;
+  const st = document.getElementById('tpStatus');
+  const vybrane = [...document.querySelectorAll('#tpZoznam input[type="checkbox"]:checked')]
+    .map(ch => ch.value);
+
+  st.textContent = 'Ukladám...'; st.style.color = '#64748b';
+  try {
+    // Najprv zmazať doterajšie, potom vložiť nové — jednoduchšie a spoľahlivejšie
+    // než porovnávať rozdiely; riadkov sú jednotky.
+    await sbFetch(`trener_pristup?trener_id=eq.${trenerId}`, { method: 'DELETE' });
+    if (vybrane.length) {
+      await sbFetch('trener_pristup', {
+        method: 'POST', prefer: 'return=minimal',
+        body: JSON.stringify(vybrane.map(id => ({ trener_id: trenerId, skupina_id: id })))
+      });
+    }
+    st.textContent = vybrane.length
+      ? `✅ Uložené — tréner vidí ${vybrane.length + 1} skupín (vrátane vlastnej).`
+      : '✅ Uložené — tréner vidí len vlastnú skupinu.';
+    st.style.color = '#166534';
+  } catch (e) {
+    st.textContent = 'Chyba pri ukladaní: ' + e.message;
+    st.style.color = '#b91c1c';
+  }
 }
 
 async function loadUsers() {
