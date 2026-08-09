@@ -44,6 +44,19 @@ button { padding: 10px 16px; border: none; border-radius: 10px; cursor: pointer;
 .rank .hodnota { width: 74px; text-align: right; font-weight: bold; flex-shrink: 0; font-variant-numeric: tabular-nums; }
 .rank li.zero .hodnota { color: #94a3b8; font-weight: normal; }
 
+/* Prepínač Hráči / Skupiny */
+.seg { display: inline-flex; border: 1px solid #d1d5db; border-radius: 9px; overflow: hidden;
+       background: white; margin-bottom: 12px; }
+.seg button { border: none; background: white; padding: 9px 16px; font-size: 14px;
+              cursor: pointer; color: #334155; }
+.seg button.active { background: #1e3a5f; color: white; font-weight: bold; }
+
+/* Riadok skupiny — priemer je hlavné číslo, súčet doplnkové */
+.rank li.grp .meno { font-weight: bold; }
+.rank li.grp .pocty { font-size: 11px; color: #64748b; font-weight: normal; }
+.rank li.moja { background: #f0fdf4; border-color: #86efac; box-shadow: 0 0 0 2px rgba(134,239,172,.3); }
+.rank .hodnota .sucet { display: block; font-size: 11px; color: #64748b; font-weight: normal; }
+
 .legend { display: flex; gap: 12px; flex-wrap: wrap; font-size: 12px; color: #64748b; margin: 10px 0; }
 .legend .dot { width: 11px; height: 11px; border-radius: 3px; display: inline-block; vertical-align: -1px; margin-right: 5px; }
 .empty { text-align: center; color: #64748b; font-style: italic; padding: 24px; }
@@ -81,6 +94,10 @@ button { padding: 10px 16px; border: none; border-radius: 10px; cursor: pointer;
 
   <div id="infoCard" class="info-card" style="display:none;"></div>
   <div id="status" class="status">Načítavam...</div>
+  <div class="seg" id="viewSeg" style="display:none;">
+    <button type="button" data-view="hraci" class="active">Hráči</button>
+    <button type="button" data-view="skupiny">Skupiny</button>
+  </div>
   <div id="legend" class="legend" style="display:none;"></div>
   <ol id="rank" class="rank"></ol>
   <div id="note"></div>
@@ -98,6 +115,7 @@ const FARBY = ['#2563eb','#16a34a','#d97706','#9333ea','#dc2626',
 
 let rozpisData = null;      // dáta na rozpis pokusov (len pri type 'pocet')
 let rozpisOtvoreny = false;
+let aktualnyPohlad = () => {};
 
 function setStatus(t, type = '') {
   const el = document.getElementById('status');
@@ -174,6 +192,64 @@ function renderInfo(s, treneri) {
   document.getElementById('infoCard').style.display = '';
   document.getElementById('podnadpis').textContent = s.nazov;
   document.title = 'Súťaž — ' + s.nazov;
+}
+
+// ─── Rebríček skupín ────────────────────────────────────────────────────────
+// Poradie sa určuje podľa PRIEMERU na hráča, nie podľa súčtu — inak by veľká
+// skupina porazila malú bez ohľadu na snahu. Súčet je vedľa ako doplnok.
+//
+// Do priemeru sa počítajú VŠETCI hráči skupiny, aj tí, čo netrénovali. Je to
+// tímová súťaž, takže nula sa ráta a tréner má dôvod zapojiť celú skupinu.
+function spocitajSkupiny(vysledky) {
+  const podla = new Map();
+  vysledky.forEach(v => {
+    const k = v.trener_id || 'ziadna';
+    if (!podla.has(k)) {
+      podla.set(k, { trener_id: v.trener_id, nazov: v.skupinaNazov,
+                     sucet: 0, pocet: 0, aktivni: 0 });
+    }
+    const g = podla.get(k);
+    g.sucet += Number(v.hodnota) || 0;
+    g.pocet += 1;
+    if ((Number(v.hodnota) || 0) > 0) g.aktivni += 1;
+  });
+
+  return [...podla.values()]
+    .map(g => ({ ...g, priemer: g.pocet ? g.sucet / g.pocet : 0 }))
+    .sort((a, b) => b.priemer - a.priemer || b.sucet - a.sucet
+                 || a.nazov.localeCompare(b.nazov, 'sk'));
+}
+
+function renderSkupiny(vysledky, s, farbaSkupiny, mojaSkupina) {
+  const el = document.getElementById('rank');
+  const skupiny = spocitajSkupiny(vysledky);
+
+  if (skupiny.length < 2) {
+    el.innerHTML = '<div class="empty">V súťaži je zapojená len jedna skupina — '
+                 + 'porovnanie skupín nemá čo ukázať.</div>';
+    return;
+  }
+
+  const jednotka = s.typ === 'pocet' ? '' : ' b';
+  const max = Math.max(0.01, ...skupiny.map(g => g.priemer));
+  const medaily = ['🥇','🥈','🥉'];
+
+  el.innerHTML = skupiny.map((g, i) => {
+    const sirka = Math.max(0, Math.round(g.priemer / max * 100));
+    const farba = farbaSkupiny[g.trener_id || 'ziadna'] || '#94a3b8';
+    const moja = mojaSkupina && (g.trener_id || 'ziadna') === mojaSkupina;
+    const poradie = i < 3 && g.priemer > 0 ? medaily[i] : (i + 1) + '.';
+    const priemer = Math.round(g.priemer * 10) / 10;
+    return `<li class="grp ${moja ? 'moja' : ''} ${g.priemer <= 0 ? 'zero' : ''}">
+      <span class="poradie">${poradie}</span>
+      <span class="meno">${escapeHtml(g.nazov)}${moja ? ' <strong>(tvoja skupina)</strong>' : ''}
+        <div class="pocty">${g.pocet} ${g.pocet === 1 ? 'hráč' : g.pocet < 5 ? 'hráči' : 'hráčov'}
+          · ${g.aktivni} zapojených</div></span>
+      <span class="bar-wrap"><span class="bar" style="width:${sirka}%;background:${farba};"></span></span>
+      <span class="hodnota">${g.priemer > 0 && s.typ === 'elo_narast' ? '+' : ''}${priemer}${jednotka}
+        <span class="sucet">spolu ${g.sucet}</span></span>
+    </li>`;
+  }).join('');
 }
 
 // ─── Rebríček ───────────────────────────────────────────────────────────────
@@ -325,7 +401,18 @@ async function nacitaj() {
   const mojUserId = sessionStorage.getItem('user_id');
   const ja = hraci.find(p => p.user_id === mojUserId);
 
-  renderRank(vysledky, s, farbaSkupiny, ja ? ja.id : null);
+  // Prepínanie medzi pohľadmi beží nad už spočítanými dátami — bez nového dotazu
+  const mojaSkupina = ja ? (ja.trener_id || 'ziadna') : null;
+  aktualnyPohlad = () => {
+    const v = document.querySelector('#viewSeg button.active')?.dataset.view || 'hraci';
+    if (v === 'skupiny') {
+      renderSkupiny(vysledky, s, farbaSkupiny, mojaSkupina);
+    } else {
+      renderRank(vysledky, s, farbaSkupiny, ja ? ja.id : null);
+      rozpisOtvoreny = false;
+    }
+  };
+  aktualnyPohlad();
 
   // Legenda skupín — len keď je zapojená viac než jedna
   const skupinyVHre = [...new Set(hraci.map(p => p.trener_id || 'ziadna'))];
@@ -335,6 +422,16 @@ async function nacitaj() {
       `<span><span class="dot" style="background:${farbaSkupiny[t]}"></span>${
         escapeHtml(t === 'ziadna' ? 'bez trénera' : nazovSkupiny(t))}</span>`).join('');
     leg.style.display = '';
+    // Prepínač má zmysel len pri viacerých skupinách
+    const seg = document.getElementById('viewSeg');
+    seg.style.display = '';
+    seg.querySelectorAll('button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        seg.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        aktualnyPohlad();
+      });
+    });
   }
 
   const vynechani = hraci.length - vysledky.length;
