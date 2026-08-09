@@ -14,6 +14,8 @@ h1 { margin: 0 0 4px 0; text-align: center; font-size: 25px; }
 button { padding: 10px 16px; border: none; border-radius: 10px; cursor: pointer; font-size: 14px; }
 .secondary { background: #e5e7eb; color: #111827; }
 .toolbar { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+.go-btn { background: #1e3a5f; color: white; font-weight: bold; padding: 9px 16px; font-size: 14px; }
+.go-btn:hover { background: #2b4d7a; }
 
 .status { margin: 12px 0; padding: 10px; border-radius: 10px; border: 1px solid #d1d5db;
           background: #f8fafc; color: #334155; font-size: 14px; }
@@ -108,6 +110,8 @@ button { padding: 10px 16px; border: none; border-radius: 10px; cursor: pointer;
 <script src="js/player.js"></script>
 <script>
 const STAFF_ROLES = ['trener', 'hlavny_trener', 'admin'];
+// Tlačidlo Trénovať má zmysel len pre hráča — personál sa do súťaže nepočíta
+const jeHrac = (sessionStorage.getItem('user_role') || '') === 'hrac';
 
 // Farby skupín — hráči z jednej skupiny majú rovnakú farbu stĺpca.
 const FARBY = ['#2563eb','#16a34a','#d97706','#9333ea','#dc2626',
@@ -134,6 +138,17 @@ async function sbFetchAll(query) {
     off += PAGE;
   }
   return all;
+}
+
+// Pustí hráča rovno do tréningu tej kategórie, o ktorú v súťaži ide.
+// Rovnaký princíp ako pri zadaniach: základné kategórie idú do klasického
+// tréningu, ostatné sú zručnosti.
+const ZAKLADNE_MODY = ['taktika', 'strategia', 'koncovka'];
+
+function goTrenovat(kategoria) {
+  location.href = ZAKLADNE_MODY.includes(kategoria)
+    ? 'training.html?mode=' + kategoria
+    : 'skills.html?type=' + encodeURIComponent(kategoria);
 }
 
 function nazovKategorie(k) {
@@ -188,7 +203,10 @@ function renderInfo(s, treneri) {
       <span>📅 ${s.datum_od} — ${s.datum_do}</span>
       <span>👥 ${escapeHtml(skup)}</span>
     </div>
-    ${zostava ? `<div class="days-left" style="margin-top:6px;"><strong>${zostava}</strong></div>` : ''}`;
+    ${zostava ? `<div class="days-left" style="margin-top:6px;"><strong>${zostava}</strong></div>` : ''}
+    ${st.key !== 'done' && jeHrac
+      ? `<div style="margin-top:10px;"><button class="go-btn"
+           onclick="goTrenovat('${s.kategoria}')">Trénovať →</button></div>` : ''}`;
   document.getElementById('infoCard').style.display = '';
   document.getElementById('podnadpis').textContent = s.nazov;
   document.title = 'Súťaž — ' + s.nazov;
