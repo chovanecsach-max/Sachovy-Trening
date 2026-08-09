@@ -403,7 +403,7 @@ function renderZoznam(rows) {
         <span>👥 ${escapeHtml(nazvySkupin(s))}</span>
       </div>
       <div class="form-actions">
-        <button class="secondary" disabled title="Pribudne v ďalšej etape">Výsledky</button>
+        <button class="secondary" onclick="location.href='sutaz-vysledky.html?id=${s.id}'">Výsledky</button>
         ${mozeMazat(s) ? `<button class="danger" onclick="zmazSutaz(${s.id})">Zmazať</button>` : ''}
       </div>
     </div>`;
