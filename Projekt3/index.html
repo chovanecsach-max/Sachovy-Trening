@@ -405,6 +405,11 @@ body {
       Zadania
       <span id="asgBadge" style="display:none;position:absolute;top:6px;right:10px;background:#dc2626;color:#fff;font-size:11px;font-weight:bold;min-width:18px;height:18px;line-height:18px;border-radius:9px;padding:0 4px;">0</span>
     </button>
+    <button class="nav-btn" id="sutazBtn" onclick="goMojeSutaze()" style="position:relative;display:none;">
+      <div class="nav-icon i-taktika">🏆</div>
+      Súťaže
+      <span id="sutazBadge" style="display:none;position:absolute;top:6px;right:10px;background:#d97706;color:#fff;font-size:11px;font-weight:bold;min-width:18px;height:18px;line-height:18px;border-radius:9px;padding:0 4px;">0</span>
+    </button>
     <button class="nav-btn" onclick="goStats()">
       <div class="nav-icon i-stat">📊</div>
       Štatistika
@@ -547,6 +552,9 @@ async function initPage() {
 
   // Počet nesplnených zadaní na odznak pri tlačidle Zadania
   loadAssignmentBadge();
+
+  // Prebiehajúce súťaže na odznak pri tlačidle Súťaže
+  loadSutazBadge();
 
   try {
     const player = await getCurrentPlayer();
@@ -717,10 +725,44 @@ function goKoncovky()      { location.href = "koncovky-analyza.html"; }
 function goKoncovkyMapa()  { location.href = "koncovky-mapa.html"; }
 function goCasovaMapa()   { location.href = 'casova-mapa.html'; }
 function goSutaze()       { location.href = 'sutaze.html'; }
+function goMojeSutaze()   { location.href = 'moje-sutaze.html'; }
 
 // Odznak s počtom nesplnených zadaní. Splnenie sa vyhodnocuje rovnako ako na
 // stránke zadania.html: pri cieli na ELO podľa aktuálneho elo_<zručnosť>,
 // pri počte úloh podľa úloh vyriešených na prvý pokus po zadaní.
+// Tlačidlo Súťaže sa zobrazí len hráčovi, ktorého sa nejaká súťaž týka —
+// prázdna položka v menu by len zavadzala. Odznak ukazuje počet prebiehajúcich;
+// ak je medzi nimi niečo, čo hráč ešte nevidel, odznak dostane výkričník.
+async function loadSutazBadge() {
+  try {
+    const hrac = await getCurrentPlayer();
+    if (!hrac) return;
+
+    const dnes = todayLocal();
+    const vsetky = await sbFetch('sutaze?select=id,nazov,skupiny,datum_od,datum_do,created_at') || [];
+
+    const moje = vsetky.filter(s =>
+      !s.skupiny || !s.skupiny.length || (hrac.trener_id && s.skupiny.includes(hrac.trener_id)));
+    if (!moje.length) return;
+
+    document.getElementById('sutazBtn').style.display = 'flex';
+
+    const bezia = moje.filter(s => dnes >= s.datum_od && dnes <= s.datum_do);
+    if (!bezia.length) return;
+
+    // Nové = vytvorené po poslednej návšteve stránky so súťažami
+    let videneOd = 0;
+    try { videneOd = Number(localStorage.getItem('sutazeVidene')) || 0; } catch (e) {}
+    const nove = bezia.filter(s => new Date(s.created_at).getTime() > videneOd);
+
+    const b = document.getElementById('sutazBadge');
+    b.textContent = nove.length && videneOd > 0 ? '!' : bezia.length;
+    b.style.display = '';
+  } catch (e) {
+    console.warn('Odznak súťaží sa nenačítal:', e);
+  }
+}
+
 async function loadAssignmentBadge() {
   try {
     const player = await getCurrentPlayer();
