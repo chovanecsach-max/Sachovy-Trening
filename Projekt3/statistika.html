@@ -680,7 +680,9 @@ async function fetchPlayers() {
   if (IS_HRAC) {
     return await sbFetch(`players?user_id=eq.${USER_ID}&limit=1`);
   } else if (IS_TRENER) {
-    const players = await sbFetch(`players?trener_id=eq.${USER_ID}&order=surname.asc,name.asc`);
+    // Skupinový tréner má prístup k viacerým skupinám (trener_pristup)
+    const q = filterSkupiny('players?order=surname.asc,name.asc', await viditelneSkupiny());
+    const players = await sbFetch(q);
     const self = await fetchSelfAsPlayer();
     return self ? [self, ...(players || [])] : (players || []);
   } else {
