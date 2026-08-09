@@ -85,6 +85,17 @@ function setStatus(t, type = '') {
   el.style.display = t ? '' : 'none';
 }
 
+// Pustí hráča rovno do tréningu tej kategórie, o ktorú v súťaži ide.
+// Rovnaký princíp ako pri zadaniach: základné kategórie idú do klasického
+// tréningu, ostatné sú zručnosti.
+const ZAKLADNE_MODY = ['taktika', 'strategia', 'koncovka'];
+
+function goTrenovat(kategoria) {
+  location.href = ZAKLADNE_MODY.includes(kategoria)
+    ? 'training.html?mode=' + kategoria
+    : 'skills.html?type=' + encodeURIComponent(kategoria);
+}
+
 function nazovKategorie(k) {
   const m = {
     taktika: 'Taktika', strategia: 'Stratégia', koncovka: 'Koncovka',
@@ -196,7 +207,13 @@ async function load() {
       </div>
       <div class="comp-foot">
         <span class="days">${dni}</span>
-        <button class="go-btn" onclick="location.href='sutaz-vysledky.html?id=${s.id}'">Výsledky →</button>
+        <span style="display:flex;gap:8px;flex-wrap:wrap;">
+          ${st.key !== 'done'
+            ? `<button class="go-btn" onclick="goTrenovat('${s.kategoria}')">Trénovať →</button>`
+            : ''}
+          <button class="secondary" style="padding:8px 14px;font-size:13px;"
+                  onclick="location.href='sutaz-vysledky.html?id=${s.id}'">Výsledky</button>
+        </span>
       </div>
     </div>`;
   });
