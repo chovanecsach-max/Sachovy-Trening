@@ -396,8 +396,10 @@ function showBelow() {
 async function fetchPlayers(trenerFilter) {
   const cols = 'id,name,surname,profile:profiles!user_id(role)';
   let q = `players?select=${cols}&order=surname.asc,name.asc`;
-  if (IS_TRENER)                                   q += `&trener_id=eq.${USER_ID}`;
-  else if (trenerFilter && trenerFilter !== 'all') q += `&trener_id=eq.${trenerFilter}`;
+  // Konkrétna zvolená skupina, inak všetky, ku ktorým má prihlásený prístup
+  // (skupinový tréner ich má viac než jednu — viď trener_pristup).
+  if (trenerFilter && trenerFilter !== 'all') q += `&trener_id=eq.${trenerFilter}`;
+  else q = filterSkupiny(q, await viditelneSkupiny());
   const rows = await sbFetchAll(q);
   return (rows || []).filter(p => !STAFF_ROLES.includes(p.profile?.role));
 }
@@ -462,17 +464,9 @@ async function init() {
     });
   });
 
-  if (IS_ADMIN || IS_HLAVNY_TRENER) {
-    const sel = document.getElementById('trenerSelect');
-    try {
-      const tr = await sbFetch('profiles?role=eq.trener&select=id,name,surname,nick_name&order=surname.asc') || [];
-      tr.forEach(t => {
-        const o = document.createElement('option');
-        o.value = t.id;
-        o.textContent = t.nick_name || `${t.surname || ''} ${t.name || ''}`.trim();
-        sel.appendChild(o);
-      });
-    } catch (e) {}
+  // Výber skupiny sa zobrazí každému, kto má prístup k viac než jednej
+  const sel = document.getElementById('trenerSelect');
+  if (await naplnVyberSkupin(sel)) {
     sel.addEventListener('change', loadMap);
   } else {
     document.getElementById('groupField').style.display = 'none';
