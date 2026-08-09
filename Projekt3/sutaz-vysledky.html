@@ -331,8 +331,17 @@ function prepniRozpis(playerId) {
 
 // ─── Načítanie a výpočet ────────────────────────────────────────────────────
 async function nacitaj() {
+  // Stránka sa otvára s ?id=… zo zoznamu súťaží. Bez neho nemá čo zobraziť —
+  // namiesto slepej uličky pošleme používateľa tam, kde si súťaž vyberie.
   const id = new URLSearchParams(location.search).get('id');
-  if (!id) { setStatus('Chýba označenie súťaže.', 'error'); return; }
+  if (!id) {
+    const rola = sessionStorage.getItem('user_role') || '';
+    const kam = ['trener', 'hlavny_trener', 'admin'].includes(rola)
+      ? 'sutaze.html' : 'moje-sutaze.html';
+    setStatus('Nie je vybraná žiadna súťaž — otváram zoznam…');
+    setTimeout(() => { location.replace(kam); }, 900);
+    return;
+  }
 
   let s, treneri = [];
   try {
