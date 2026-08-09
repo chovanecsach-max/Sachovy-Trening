@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Súťaže</title>
+<style>
+body { font-family: Arial, sans-serif; background: #f4f4f6; margin: 0; padding: 12px; color: #111827; }
+.app { max-width: 1000px; margin: 0 auto; background: white; border-radius: 14px;
+       box-shadow: 0 10px 30px rgba(0,0,0,0.08); padding: 20px; }
+h1 { margin: 0 0 6px 0; text-align: center; font-size: 26px; }
+.subtitle { text-align: center; color: #475569; margin: 0 0 18px 0; }
+
+.role-banner { padding: 10px 14px; border-radius: 10px; margin-bottom: 16px; font-size: 14px; text-align: center; }
+.role-banner.trener        { background: #f0fdf4; border: 1px solid #86efac; color: #166534; }
+.role-banner.hlavny_trener { background: #faf5ff; border: 1px solid #d8b4fe; color: #6b21a8; }
+.role-banner.admin         { background: #fff7ed; border: 1px solid #fdba74; color: #c2410c; }
+
+button { padding: 10px 16px; border: none; border-radius: 10px; cursor: pointer; font-size: 14px; }
+.primary   { background: #111827; color: white; font-weight: bold; }
+.secondary { background: #e5e7eb; color: #111827; }
+.danger    { background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; }
+
+.toolbar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; }
+
+.status { margin: 12px 0; padding: 10px; border-radius: 10px; border: 1px solid #d1d5db;
+          background: #f8fafc; color: #334155; font-size: 14px; }
+.status.error { background: #fef2f2; border-color: #fca5a5; color: #b91c1c; }
+.status.ok    { background: #f0fdf4; border-color: #86efac; color: #166534; }
+
+/* ── Formulár ── */
+.form-card { border: 1px solid #d1d5db; border-radius: 12px; padding: 16px; margin-bottom: 18px;
+             background: #f8fafc; display: none; }
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.field { display: flex; flex-direction: column; gap: 4px; }
+.field.wide { grid-column: 1 / -1; }
+.field label { font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: bold; }
+.field input, .field select, .field textarea {
+  padding: 9px 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px;
+  background: white; font-family: inherit;
+}
+.field textarea { resize: vertical; min-height: 60px; }
+.hint { font-size: 12px; color: #64748b; }
+
+.groups-box { border: 1px solid #d1d5db; border-radius: 8px; background: white;
+              padding: 8px 10px; max-height: 150px; overflow-y: auto; }
+.groups-box label { display: flex; align-items: center; gap: 8px; padding: 4px 0;
+                    font-size: 13px; text-transform: none; color: #111827; font-weight: normal; }
+.groups-box input[type="checkbox"] { width: 16px; height: 16px; }
+
+.form-actions { display: flex; gap: 10px; margin-top: 14px; align-items: center; flex-wrap: wrap; }
+
+/* ── Zoznam súťaží ── */
+.sec-title { font-size: 13px; text-transform: uppercase; color: #94a3b8; font-weight: bold;
+             margin: 22px 0 10px; letter-spacing: .5px; border-bottom: 1px solid #e2e8f0; padding-bottom: 5px; }
+.comp { border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px 16px; margin-bottom: 10px; background: #fff; }
+.comp.running { border-color: #bfdbfe; background: #f8fbff; }
+.comp.done    { background: #fafafa; }
+.comp-top { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+.comp-name { font-size: 16px; font-weight: bold; }
+.comp-desc { font-size: 13px; color: #475569; margin: 6px 0; font-style: italic; }
+.comp-meta { font-size: 13px; color: #334155; display: flex; gap: 14px; flex-wrap: wrap; margin-top: 6px; }
+.badge { font-size: 12px; font-weight: bold; padding: 4px 10px; border-radius: 20px; }
+.badge.run     { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
+.badge.soon    { background: #fffbeb; color: #92400e; border: 1px solid #fde68a; }
+.badge.done    { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; }
+.empty { text-align: center; color: #64748b; font-style: italic; padding: 24px; }
+
+@media (max-width: 700px) {
+  .form-grid { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+
+<body oncontextmenu="return false;">
+<div class="app">
+  <h1>🏆 Súťaže</h1>
+  <p class="subtitle">Tréningové súťaže — kto vyrieši najviac, alebo kto najviac stúpne.</p>
+
+  <div id="roleBanner" class="role-banner" style="display:none;"></div>
+
+  <div class="toolbar">
+    <button class="primary" id="btnNova" onclick="toggleForm()">➕ Vytvoriť súťaž</button>
+    <button class="secondary" onclick="goHome()">Späť do menu</button>
+  </div>
+
+  <div class="form-card" id="formCard">
+    <div class="form-grid">
+      <div class="field wide">
+        <label>Názov súťaže</label>
+        <input type="text" id="fNazov" maxlength="80" placeholder="napr. Septembrová výzva">
+      </div>
+
+      <div class="field wide">
+        <label>Popis (nepovinný)</label>
+        <textarea id="fPopis" maxlength="400" placeholder="Čo je cieľom, prípadne odmena pre víťaza."></textarea>
+      </div>
+
+      <div class="field">
+        <label>V čom sa súťaží</label>
+        <select id="fTyp">
+          <option value="pocet">Počet vyriešených úloh</option>
+          <option value="elo_narast">Nárast ELO</option>
+        </select>
+        <span class="hint" id="typHint"></span>
+      </div>
+
+      <div class="field">
+        <label>Kategória / zručnosť</label>
+        <select id="fKategoria"></select>
+      </div>
+
+      <div class="field">
+        <label>Začiatok</label>
+        <input type="date" id="fOd">
+      </div>
+
+      <div class="field">
+        <label>Koniec</label>
+        <input type="date" id="fDo">
+      </div>
+
+      <div class="field wide">
+        <label>Zapojené skupiny</label>
+        <div class="groups-box" id="fSkupiny"></div>
+        <span class="hint">Ak nevyberieš nič, súťaž platí pre všetky skupiny.</span>
+      </div>
+    </div>
+
+    <div class="form-actions">
+      <button class="primary" onclick="ulozSutaz()">Vytvoriť súťaž</button>
+      <button class="secondary" onclick="toggleForm()">Zrušiť</button>
+      <span id="formStatus" class="hint"></span>
+    </div>
+  </div>
+
+  <div id="status" class="status">Načítavam...</div>
+  <div id="list"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/auth.js"></script>
+<script src="js/player.js"></script>
+<script>
+const USER_ROLE        = sessionStorage.getItem('user_role') || '';
+const USER_ID          = sessionStorage.getItem('user_id') || '';
+const USER_NICK        = sessionStorage.getItem('user_nick') || sessionStorage.getItem('user_name') || '';
+const IS_ADMIN         = USER_ROLE === 'admin';
+const IS_TRENER        = USER_ROLE === 'trener';
+const IS_HLAVNY_TRENER = USER_ROLE === 'hlavny_trener';
+const IS_HRAC          = USER_ROLE === 'hrac';
+const STAFF_ROLES      = ['trener', 'hlavny_trener', 'admin'];
+
+// Kategórie, v ktorých sa dá súťažiť. Kľúč musí sedieť s tým, čo používa
+// zvyšok aplikácie: pri klasickom tréningu je to hodnota v puzzles.category
+// (cez BASIC_ASSIGNMENT_CATEGORY v player.js), pri zručnostiach skill_type.
+const KATEGORIE = [
+  { skupina: 'Klasický tréning', polozky: [
+    { key: 'taktika',   label: 'Taktika' },
+    { key: 'strategia', label: 'Stratégia' },
+    { key: 'koncovka',  label: 'Koncovka' },
+  ]},
+  { skupina: 'Zručnosti', polozky: [
+    { key: 'checks',            label: 'Šachy' },
+    { key: 'captures',          label: 'Brania' },
+    { key: 'pawn_breakthrough', label: 'Pešiakové prielomy' },
+    { key: 'direct_attack',     label: 'Brania so ziskom' },
+    { key: 'underdefended',     label: 'Slabo pokryté' },
+    { key: 'pin',               label: 'Absolútne väzby' },
+    { key: 'relative_pin',      label: 'Relatívne väzby' },
+    { key: 'fork',              label: 'Vidličky' },
+    { key: 'direct_threat',     label: 'Priame hrozby' },
+  ]},
+];
+
+// ELO stĺpec pre danú kategóriu — potrebný pri odfotení východiskového stavu
+function eloStlpec(kat) {
+  if (kat === 'taktika')   return 'elo_taktika';
+  if (kat === 'strategia') return 'elo_strategia';
+  if (kat === 'koncovka')  return 'elo_koncovka';
+  return 'elo_' + kat;            // zručnosti
+}
+
+function nazovKategorie(kat) {
+  for (const g of KATEGORIE) {
+    const p = g.polozky.find(x => x.key === kat);
+    if (p) return p.label;
+  }
+  return kat;
+}
+
+let treneri = [];
+
+// ─── Pomôcky ────────────────────────────────────────────────────────────────
+function goHome() { location.href = 'index.html'; }
+
+function setStatus(t, type = '') {
+  const el = document.getElementById('status');
+  el.textContent = t; el.className = 'status' + (type ? ' ' + type : '');
+  el.style.display = t ? '' : 'none';
+}
+function setFormStatus(t, type = '') {
+  const el = document.getElementById('formStatus');
+  el.textContent = t;
+  el.style.color = type === 'err' ? '#b91c1c' : type === 'ok' ? '#166534' : '#64748b';
+}
+
+async function sbFetchAll(query) {
+  const PAGE = 1000; let all = [], off = 0;
+  while (true) {
+    const sep = query.includes('?') ? '&' : '?';
+    const b = await sbFetch(`${query}${sep}limit=${PAGE}&offset=${off}`);
+    if (!b || !b.length) break;
+    all = all.concat(b);
+    if (b.length < PAGE) break;
+    off += PAGE;
+  }
+  return all;
+}
+
+function toggleForm() {
+  const c = document.getElementById('formCard');
+  const otvorene = c.style.display !== 'none' && c.style.display !== '';
+  c.style.display = otvorene ? 'none' : 'block';
+  document.getElementById('btnNova').textContent = otvorene ? '➕ Vytvoriť súťaž' : '✕ Zavrieť formulár';
+  if (!otvorene) setFormStatus('');
+}
+
+// ─── Naplnenie formulára ────────────────────────────────────────────────────
+function naplnKategorie() {
+  const sel = document.getElementById('fKategoria');
+  sel.innerHTML = '';
+  KATEGORIE.forEach(g => {
+    const og = document.createElement('optgroup');
+    og.label = g.skupina;
+    g.polozky.forEach(p => {
+      const o = document.createElement('option');
+      o.value = p.key; o.textContent = p.label;
+      og.appendChild(o);
+    });
+    sel.appendChild(og);
+  });
+}
+
+function naplnSkupiny() {
+  const box = document.getElementById('fSkupiny');
+  box.innerHTML = '';
+
+  // Tréner súťaží len vo vlastnej skupine — výber sa mu nezobrazuje,
+  // aby nemohol nedopatrením vyhlásiť súťaž cudzím hráčom.
+  if (IS_TRENER) {
+    box.innerHTML = `<div class="hint">Súťaž bude platiť pre tvoju skupinu (${escapeHtml(USER_NICK)}).</div>`;
+    return;
+  }
+  if (!treneri.length) {
+    box.innerHTML = '<div class="hint">Nenašli sa žiadni tréneri.</div>';
+    return;
+  }
+  treneri.forEach(t => {
+    const meno = t.nick_name || `${t.surname || ''} ${t.name || ''}`.trim();
+    const l = document.createElement('label');
+    l.innerHTML = `<input type="checkbox" value="${t.id}"> ${escapeHtml(meno)}`;
+    box.appendChild(l);
+  });
+}
+
+function vybrateSkupiny() {
+  if (IS_TRENER) return [USER_ID];
+  return [...document.querySelectorAll('#fSkupiny input[type="checkbox"]:checked')]
+    .map(ch => ch.value);
+}
+
+function aktualizujHint() {
+  const typ = document.getElementById('fTyp').value;
+  document.getElementById('typHint').textContent = typ === 'pocet'
+    ? 'Počítajú sa len úlohy vyriešené na prvý pokus.'
+    : 'ELO na začiatku sa odfotí pri vytvorení — súťaž sa nedá vyhlásiť spätne.';
+}
+
+// ─── Uloženie ───────────────────────────────────────────────────────────────
+async function ulozSutaz() {
+  const nazov = (document.getElementById('fNazov').value || '').trim();
+  const popis = (document.getElementById('fPopis').value || '').trim() || null;
+  const typ   = document.getElementById('fTyp').value;
+  const kat   = document.getElementById('fKategoria').value;
+  const od    = document.getElementById('fOd').value;
+  const doD   = document.getElementById('fDo').value;
+  const skup  = vybrateSkupiny();
+
+  if (!nazov)        return setFormStatus('Zadaj názov súťaže.', 'err');
+  if (!od || !doD)   return setFormStatus('Zadaj začiatok aj koniec.', 'err');
+  if (doD < od)      return setFormStatus('Koniec nemôže byť pred začiatkom.', 'err');
+
+  // Nárast ELO potrebuje odfotiť východiskový stav, takže spätné vyhlásenie
+  // by dalo skreslené výsledky — časť nárastu by sa započítala dvakrát.
+  if (typ === 'elo_narast' && od < todayLocal()) {
+    return setFormStatus('Súťaž na nárast ELO sa nedá vyhlásiť so začiatkom v minulosti.', 'err');
+  }
+
+  setFormStatus('Vytváram...', 'ok');
+  try {
+    const vytvorene = await sbFetch('sutaze', {
+      method: 'POST',
+      prefer: 'return=representation',
+      body: JSON.stringify({
+        nazov, popis, typ, kategoria: kat,
+        datum_od: od, datum_do: doD,
+        skupiny: skup,             // prázdne pole = všetky skupiny
+        vytvoril: USER_ID
+      })
+    });
+    const sutaz = Array.isArray(vytvorene) ? vytvorene[0] : vytvorene;
+
+    // Odfotenie východiskového ELO pre všetkých zapojených hráčov
+    if (typ === 'elo_narast' && sutaz && sutaz.id) {
+      const pocet = await odfotElo(sutaz.id, kat, skup);
+      setFormStatus(`✅ Súťaž vytvorená, východiskové ELO uložené pre ${pocet} hráčov.`, 'ok');
+    } else {
+      setFormStatus('✅ Súťaž vytvorená.', 'ok');
+    }
+
+    document.getElementById('fNazov').value = '';
+    document.getElementById('fPopis').value = '';
+    await nacitaj();
+  } catch (e) {
+    setFormStatus('Chyba pri vytváraní: ' + e.message, 'err');
+  }
+}
+
+// Odfotí ELO všetkých hráčov zapojených skupín. Bez toho by sa nárast nedal
+// spočítať u hráča, ktorý pred súťažou dlhšie netrénoval — v elo_history
+// totiž vzniká záznam len pri zmene.
+async function odfotElo(sutazId, kat, skupiny) {
+  const stlpec = eloStlpec(kat);
+  let q = `players?select=id,${stlpec},trener_id,profile:profiles!user_id(role)`;
+  if (skupiny.length === 1)      q += `&trener_id=eq.${skupiny[0]}`;
+  else if (skupiny.length > 1)   q += `&trener_id=in.(${skupiny.join(',')})`;
+
+  const hraci = (await sbFetchAll(q) || [])
+    .filter(p => !STAFF_ROLES.includes(p.profile?.role));
+  if (!hraci.length) return 0;
+
+  const riadky = hraci.map(p => ({
+    sutaz_id: sutazId,
+    player_id: p.id,
+    elo: eloHodnota(p[stlpec])
+  }));
+  await sbFetch('sutaz_start_elo', {
+    method: 'POST', prefer: 'return=minimal',
+    body: JSON.stringify(riadky)
+  });
+  return riadky.length;
+}
+
+// ─── Zoznam ─────────────────────────────────────────────────────────────────
+function stavSutaze(s) {
+  const dnes = todayLocal();
+  if (dnes < s.datum_od) return { key: 'soon', text: 'Začne čoskoro' };
+  if (dnes > s.datum_do) return { key: 'done', text: 'Ukončená' };
+  return { key: 'run', text: 'Prebieha' };
+}
+
+function nazvySkupin(s) {
+  if (!s.skupiny || !s.skupiny.length) return 'všetky skupiny';
+  return s.skupiny.map(id => {
+    const t = treneri.find(x => x.id === id);
+    return t ? (t.nick_name || `${t.surname || ''} ${t.name || ''}`.trim()) : 'neznáma skupina';
+  }).join(', ');
+}
+
+function renderZoznam(rows) {
+  const el = document.getElementById('list');
+  if (!rows.length) {
+    el.innerHTML = '<div class="empty">Zatiaľ nie je vytvorená žiadna súťaž.</div>';
+    return;
+  }
+
+  const poradie = { run: 0, soon: 1, done: 2 };
+  const zoradene = [...rows].sort((a, b) => {
+    const r = poradie[stavSutaze(a).key] - poradie[stavSutaze(b).key];
+    return r !== 0 ? r : (b.datum_od < a.datum_od ? -1 : 1);
+  });
+
+  let h = '';
+  let poslednyStav = null;
+  zoradene.forEach(s => {
+    const st = stavSutaze(s);
+    if (st.key !== poslednyStav) {
+      h += `<div class="sec-title">${st.key === 'run' ? 'Prebiehajúce'
+            : st.key === 'soon' ? 'Pripravené' : 'Ukončené'}</div>`;
+      poslednyStav = st.key;
+    }
+    h += `<div class="comp ${st.key === 'run' ? 'running' : st.key === 'done' ? 'done' : ''}">
+      <div class="comp-top">
+        <span class="comp-name">${escapeHtml(s.nazov)}</span>
+        <span class="badge ${st.key}">${st.text}</span>
+      </div>
+      ${s.popis ? `<div class="comp-desc">${escapeHtml(s.popis)}</div>` : ''}
+      <div class="comp-meta">
+        <span>🎯 ${s.typ === 'pocet' ? 'Počet vyriešených' : 'Nárast ELO'}
+              — ${escapeHtml(nazovKategorie(s.kategoria))}</span>
+        <span>📅 ${s.datum_od} — ${s.datum_do}</span>
+        <span>👥 ${escapeHtml(nazvySkupin(s))}</span>
+      </div>
+      <div class="form-actions">
+        <button class="secondary" disabled title="Pribudne v ďalšej etape">Výsledky</button>
+        ${mozeMazat(s) ? `<button class="danger" onclick="zmazSutaz(${s.id})">Zmazať</button>` : ''}
+      </div>
+    </div>`;
+  });
+  el.innerHTML = h;
+}
+
+function mozeMazat(s) {
+  if (IS_ADMIN || IS_HLAVNY_TRENER) return true;
+  return IS_TRENER && s.vytvoril === USER_ID;
+}
+
+async function zmazSutaz(id) {
+  if (!confirm('Naozaj zmazať túto súťaž? Výsledky sa nedajú obnoviť.')) return;
+  try {
+    await sbFetch(`sutaze?id=eq.${id}`, { method: 'DELETE' });
+    await nacitaj();
+  } catch (e) {
+    setStatus('Chyba pri mazaní: ' + e.message, 'error');
+  }
+}
+
+async function nacitaj() {
+  setStatus('Načítavam...');
+  try {
+    const rows = await sbFetchAll('sutaze?select=*&order=datum_od.desc') || [];
+    renderZoznam(rows);
+    setStatus('');
+  } catch (e) {
+    setStatus('Chyba pri načítaní: ' + e.message, 'error');
+  }
+}
+
+// ─── Inicializácia ──────────────────────────────────────────────────────────
+async function init() {
+  if (!requireLogin()) return;
+  if (IS_HRAC) { alert('Vytváranie súťaží je dostupné len pre trénerov a administrátorov.'); goHome(); return; }
+
+  const bn = document.getElementById('roleBanner');
+  if (IS_TRENER)             { bn.textContent = `🧑‍🏫 Tréner ${USER_NICK} — súťaže pre moju skupinu`; bn.className = 'role-banner trener'; }
+  else if (IS_HLAVNY_TRENER) { bn.textContent = `👑 Hlavný tréner ${USER_NICK}`; bn.className = 'role-banner hlavny_trener'; }
+  else if (IS_ADMIN)         { bn.textContent = '🔧 Admin'; bn.className = 'role-banner admin'; }
+  bn.style.display = '';
+
+  try {
+    treneri = await sbFetch('profiles?role=eq.trener&select=id,name,surname,nick_name&order=surname.asc') || [];
+  } catch (e) { treneri = []; }
+
+  naplnKategorie();
+  naplnSkupiny();
+  aktualizujHint();
+  document.getElementById('fTyp').addEventListener('change', aktualizujHint);
+
+  // Predvolené obdobie: od dneška do konca nasledujúceho mesiaca
+  const dnes = new Date();
+  document.getElementById('fOd').value = todayLocal();
+  const koniec = new Date(dnes.getFullYear(), dnes.getMonth() + 1, 0);
+  document.getElementById('fDo').value = localDay(koniec);
+
+  await nacitaj();
+}
+
+init();
+</script>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(e =>
+      console.warn('Service worker sa nezaregistroval:', e));
+  });
+}
+</script>
+</body>
+</html>
