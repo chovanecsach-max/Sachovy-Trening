@@ -262,7 +262,9 @@ function zobrazMojePostavenie(vysledky, s, mojeId) {
   }
 
   el.innerHTML = text + '<button class="skok" onclick="skocNaMojRiadok()">Nájdi ma</button>';
-  el.style.display = '';
+  // POZOR: 'block', nie ''. Trieda .moje-postavenie má display:none, takže
+  // zrušením inline štýlu by sa prvok znova skryl.
+  el.style.display = 'block';
 }
 
 function skocNaMojRiadok() {
@@ -499,7 +501,7 @@ async function nacitaj() {
       if (mp) mp.style.display = 'none';   // súhrn sa týka poradia hráčov
       renderSkupiny(vysledky, s, farbaSkupiny, mojaSkupina);
     } else {
-      if (mp && ja) mp.style.display = '';
+      if (mp && ja) mp.style.display = 'block';
       if (ja) zobrazMojePostavenie(vysledky, s, ja.id);
   renderRank(vysledky, s, farbaSkupiny, ja ? ja.id : null);
       rozpisOtvoreny = false;
