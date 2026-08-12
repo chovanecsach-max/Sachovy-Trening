@@ -59,6 +59,15 @@ button { padding: 10px 16px; border: none; border-radius: 10px; cursor: pointer;
 .rank li.moja { background: #f0fdf4; border-color: #86efac; box-shadow: 0 0 0 2px rgba(134,239,172,.3); }
 .rank .hodnota .sucet { display: block; font-size: 11px; color: #64748b; font-weight: normal; }
 
+/* Súhrn pre prihláseného hráča — pri dlhšom zozname sa inak hľadá ťažko */
+.moje-postavenie { margin: 0 0 12px; padding: 12px 14px; border-radius: 10px;
+                   background: #fffbeb; border: 1px solid #fbbf24; color: #78350f;
+                   font-size: 14px; display: none; }
+.moje-postavenie strong { color: #92400e; }
+.moje-postavenie .skok { background: #fbbf24; color: #451a03; border: none;
+                         border-radius: 7px; padding: 5px 11px; font-size: 12px;
+                         font-weight: bold; cursor: pointer; margin-left: 8px; }
+
 .legend { display: flex; gap: 12px; flex-wrap: wrap; font-size: 12px; color: #64748b; margin: 10px 0; }
 .legend .dot { width: 11px; height: 11px; border-radius: 3px; display: inline-block; vertical-align: -1px; margin-right: 5px; }
 .empty { text-align: center; color: #64748b; font-style: italic; padding: 24px; }
@@ -96,6 +105,7 @@ button { padding: 10px 16px; border: none; border-radius: 10px; cursor: pointer;
 
   <div id="infoCard" class="info-card" style="display:none;"></div>
   <div id="status" class="status">Načítavam...</div>
+  <div id="mojePostavenie" class="moje-postavenie"></div>
   <div class="seg" id="viewSeg" style="display:none;">
     <button type="button" data-view="hraci" class="active">Hráči</button>
     <button type="button" data-view="skupiny">Skupiny</button>
@@ -109,7 +119,6 @@ button { padding: 10px 16px; border: none; border-radius: 10px; cursor: pointer;
 <script src="js/auth.js"></script>
 <script src="js/player.js"></script>
 <script>
-const STAFF_ROLES = ['trener', 'hlavny_trener', 'admin'];
 // Tlačidlo Trénovať má zmysel len pre hráča — personál sa do súťaže nepočíta
 const jeHrac = (sessionStorage.getItem('user_role') || '') === 'hrac';
 
@@ -210,6 +219,55 @@ function renderInfo(s, treneri) {
   document.getElementById('infoCard').style.display = '';
   document.getElementById('podnadpis').textContent = s.nazov;
   document.title = 'Súťaž — ' + s.nazov;
+}
+
+// ─── Kde stojím ─────────────────────────────────────────────────────────────
+// Rebríček vidí hráč celý, ale pri dlhšom zozname musí svoj riadok hľadať.
+// Tento súhrn mu povie poradie a hlavne to, čo ho posunie: koľko mu chýba
+// na priečku pred ním.
+function zobrazMojePostavenie(vysledky, s, mojeId) {
+  const el = document.getElementById('mojePostavenie');
+  const i = vysledky.findIndex(v => v.id === mojeId);
+  if (i < 0) return;                       // do poradia som sa nedostal
+
+  const ja = vysledky[i];
+  const skoncila = stavSutaze(s).key === 'done';
+
+  // Slovenské skloňovanie. Pád závisí od vety: „máš 1 úlohU" (akuzatív),
+  // ale „s výsledkom 1 úlohA" (nominatív po predložke s výsledkom).
+  const n = Math.abs(ja.hodnota);
+  const jednotka = s.typ !== 'pocet' ? ' b'
+    : (n === 1 ? (skoncila ? ' úloha' : ' úlohu')
+    : (n >= 2 && n <= 4) ? ' úlohy' : ' úloh');
+  const hodnota = (s.typ === 'elo_narast' && ja.hodnota > 0 ? '+' : '') + ja.hodnota;
+
+  let text = (skoncila ? 'Skončil si na' : 'Si na')
+           + ` <strong>${i + 1}. mieste</strong> z ${vysledky.length}`
+           + (skoncila ? ' · s výsledkom <strong>' : ' · máš <strong>')
+           + `${hodnota}${jednotka}</strong>`;
+
+  if (i > 0) {
+    const predomnou = vysledky[i - 1];
+    const rozdiel = predomnou.hodnota - ja.hodnota;
+    text += rozdiel > 0
+      ? (skoncila ? ` · na ${i}. miesto chýbalo <strong>${rozdiel}</strong>`
+                  : ` · na ${i}. miesto ti chýba <strong>${rozdiel}</strong>`)
+      : ` · o ${i}. miesto sa delíš rovnakým výsledkom`;
+  } else if (vysledky.length > 1) {
+    const druhy = vysledky[1];
+    const odstup = ja.hodnota - druhy.hodnota;
+    text += skoncila
+      ? (odstup > 0 ? ` · vyhral si o <strong>${odstup}</strong>` : ' · vyhral si')
+      : (odstup > 0 ? ` · vedieš o <strong>${odstup}</strong>` : ' · vedieš');
+  }
+
+  el.innerHTML = text + '<button class="skok" onclick="skocNaMojRiadok()">Nájdi ma</button>';
+  el.style.display = '';
+}
+
+function skocNaMojRiadok() {
+  const r = document.querySelector('#rank li.me');
+  if (r) r.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
 // ─── Rebríček skupín ────────────────────────────────────────────────────────
@@ -356,14 +414,18 @@ async function nacitaj() {
   renderInfo(s, treneri);
 
   // Hráči zapojených skupín. Personál sa do súťaže nepočíta.
-  let q = 'players?select=id,name,surname,trener_id,user_id,'
-        + sutazEloStlpec(s.kategoria) + ',profile:profiles!user_id(role)';
+  // Číta sa z pohľadu sutaz_hraci, nie z players. Politika read_own na players
+  // totiž dovoľuje hráčovi vidieť len vlastný riadok — rebríček by mal jednu
+  // položku. Pohľad vydáva len meno, skupinu a ELO (bez emailu) a adminov
+  // vynecháva, takže je bezpečné sprístupniť ho všetkým prihláseným.
+  let q = 'sutaz_hraci?select=id,name,surname,trener_id,user_id,'
+        + sutazEloStlpec(s.kategoria);
   if (s.skupiny && s.skupiny.length === 1)    q += `&trener_id=eq.${s.skupiny[0]}`;
   else if (s.skupiny && s.skupiny.length > 1) q += `&trener_id=in.(${s.skupiny.join(',')})`;
 
   let hraci;
   try {
-    hraci = (await sbFetchAll(q) || []).filter(p => !STAFF_ROLES.includes(p.profile?.role));
+    hraci = await sbFetchAll(q) || [];   // pohľad už adminov vynecháva
   } catch (e) {
     setStatus('Chyba pri načítaní hráčov: ' + e.message, 'error');
     return;
@@ -432,10 +494,14 @@ async function nacitaj() {
   const mojaSkupina = ja ? (ja.trener_id || 'ziadna') : null;
   aktualnyPohlad = () => {
     const v = document.querySelector('#viewSeg button.active')?.dataset.view || 'hraci';
+    const mp = document.getElementById('mojePostavenie');
     if (v === 'skupiny') {
+      if (mp) mp.style.display = 'none';   // súhrn sa týka poradia hráčov
       renderSkupiny(vysledky, s, farbaSkupiny, mojaSkupina);
     } else {
-      renderRank(vysledky, s, farbaSkupiny, ja ? ja.id : null);
+      if (mp && ja) mp.style.display = '';
+      if (ja) zobrazMojePostavenie(vysledky, s, ja.id);
+  renderRank(vysledky, s, farbaSkupiny, ja ? ja.id : null);
       rozpisOtvoreny = false;
     }
   };
