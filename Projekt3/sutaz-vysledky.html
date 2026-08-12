@@ -261,7 +261,13 @@ function zobrazMojePostavenie(vysledky, s, mojeId) {
       : (odstup > 0 ? ` · vedieš o <strong>${odstup}</strong>` : ' · vedieš');
   }
 
-  el.innerHTML = text + '<button class="skok" onclick="skocNaMojRiadok()">Nájdi ma</button>';
+  // Tlačidlo má zmysel len pri dlhom zozname, kde sa treba posúvať. Pri malej
+  // skupine vidno celý rebríček naraz a tlačidlo by len mýlilo — nič viditeľné
+  // by neurobilo.
+  const dlhyZoznam = vysledky.length >= 15;
+  el.innerHTML = text + (dlhyZoznam
+    ? '<button class="skok" onclick="skocNaMojRiadok()">Nájdi ma v rebríčku</button>'
+    : '');
   // POZOR: 'block', nie ''. Trieda .moje-postavenie má display:none, takže
   // zrušením inline štýlu by sa prvok znova skryl.
   el.style.display = 'block';
