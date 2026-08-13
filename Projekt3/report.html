@@ -199,7 +199,7 @@ async function build() {
     // klasického tréningu od zručností. POZOR: puzzles.id a skill_puzzles.id sa
     // prekrývajú, takže úloha je jednoznačná až párom source + puzzle_id.
     const log = await sbFetchAll(
-      `training_log?player_id=in.(${ids})&created_at=gte.${startISO}&created_at=lt.${endISO}&select=player_id,puzzle_id,source,result,time_spent,created_at`
+      `training_log?player_id=in.(${ids})&created_at=gte.${startISO}&created_at=lt.${endISO}&select=player_id,puzzle_id,source,result,time_spent,loss_reason,created_at`
     );
 
     // 3) História ELO do konca mesiaca (na výpočet stavu pred obdobím aj po ňom)
@@ -269,13 +269,23 @@ function render(ym, players, log, hist, asg, startISO) {
     const mine    = asg.filter(a => a.player_id === p.id);
     const overdue = mine.filter(a => !a.completed_at && a.deadline && a.deadline < today).length;
 
+    // Prečo hráč neuspel. Rozdiel medzi chybou a vypršaným časom je pre trénera
+    // zásadný: prvé znamená, že vzor nepozná, druhé že ho rozpoznáva pomaly.
+    const prehry = counted.filter(l => l.result === 'loss');
+    const dovody = { chyba: 0, cas: 0, riesenie: 0, odchod: 0, neznamy: 0 };
+    prehry.forEach(l => {
+      const d = l.loss_reason;
+      if (d && dovody[d] !== undefined) dovody[d]++;
+      else dovody.neznamy++;    // staré záznamy spred zavedenia stĺpca
+    });
+
     // Najslabšia zručnosť (aktuálny stav)
     const weakest = SKILL_COLS
       .map(c => ({ n: c.n, v: Number(p[c.f] ?? DEF_SKILL) }))
       .sort((a, b) => a.v - b.v)[0];
 
     return { p, rows, solved, time, days, classic, skills, unknown,
-             moves, mine, overdue, weakest,
+             moves, mine, overdue, weakest, prehry: prehry.length, dovody,
              name: `${p.surname || ''} ${p.name || ''}`.trim() || '(bez mena)' };
   });
 
@@ -355,6 +365,16 @@ function render(ym, players, log, hist, asg, startISO) {
         d.skills.attempts > d.skills.solved ? ` (${d.skills.attempts} pokusov)` : ''} · ${fmtTime(d.skills.time)}</div>
       <div class="pb-line"><span class="lbl">Posun ELO:</span></div>
       ${moves}
+      ${d.prehry ? `<div class="pb-line"><span class="lbl">Neúspešné pokusy:</span> ${d.prehry}${
+        (() => {
+          const c = [];
+          if (d.dovody.chyba)    c.push(`${d.dovody.chyba}× chybný ťah`);
+          if (d.dovody.cas)      c.push(`<strong>${d.dovody.cas}× nestihol čas</strong>`);
+          if (d.dovody.riesenie) c.push(`${d.dovody.riesenie}× pozrel riešenie`);
+          if (d.dovody.odchod)   c.push(`${d.dovody.odchod}× opustil úlohu`);
+          return c.length ? ' — ' + c.join(', ') : '';
+        })()
+      }</div>` : ''}
       <div class="pb-line"><span class="lbl">Najslabšia zručnosť:</span> ${d.weakest.n} (${d.weakest.v})</div>
       <div class="pb-line"><span class="lbl">Zadania:</span> ${d.mine.length
         ? `${openA} otvorených, ${done} uzavretých${d.overdue ? ` · <span class="down">${d.overdue} po termíne</span>` : ''}`
