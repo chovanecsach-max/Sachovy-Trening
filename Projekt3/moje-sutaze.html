@@ -121,6 +121,7 @@ function dniText(n) {
 // ─── Načítanie ──────────────────────────────────────────────────────────────
 async function load() {
   if (!requireLogin()) return;
+  if (!await vyzadujPlatnost()) return;   // platnosť sa overuje na každej stránke
 
   let hrac;
   try {
