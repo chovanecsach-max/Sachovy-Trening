@@ -522,6 +522,30 @@ function _linia(Chess, fen, uzly, prvyVLinii) {
 
 // Klasická úloha má strom riešenia, zručnosť zoznam ťahov — tie sa zapíšu ako
 // rovnocenné alternatívy z východiskovej pozície.
+// Čo hráč v pozícii zahral, prevedené do šachovej notácie. Toto je pri
+// rozbore s dieťaťom najcennejšie: nestačí vedieť, že úlohu pokazilo — treba
+// vidieť, ČO zahralo. „Tu si zahral Jf3, prečo?" je iná otázka než „tu si sa
+// pomýlil".
+function chybnyTahDoPgn(Chess, fen, uci, ply) {
+  const t = String(uci || '').trim();
+  if (!t || t.length < 4) return '';
+  const popisPly = (Number(ply) > 1) ? ` v ${ply}. ťahu riešenia` : '';
+
+  if (!Chess) return `{ Hráč zahral (súradnice): ${t}${popisPly} }`;
+  try {
+    const hra = new Chess(fen);
+    const o = _uciNaObjekt(t);
+    if (!o) return '';
+    const m = hra.move(o);
+    if (!m) return `{ Hráč zahral: ${t}${popisPly} }`;
+    return `{ Hráč zahral: ${m.san}${popisPly} }`;
+  } catch (e) {
+    // Chyba v druhom či treťom ťahu variantu — z východiskovej pozície ju
+    // prehrať nemožno, tak sa uvedú aspoň súradnice.
+    return `{ Hráč zahral (súradnice): ${t}${popisPly} }`;
+  }
+}
+
 function riesenieDoPgn(Chess, p) {
   let uzly = null;
   const strom = p.solution_tree;
@@ -974,7 +998,7 @@ async function exportPgn() {
 
     // Načítaj všetky chybné záznamy za obdobie (vrátane puzzle_id)
     const logs = await sbFetchAll(
-      `training_log?player_id=eq.${playerId}&result=eq.loss&created_at=gte.${dateFromFull}&created_at=lte.${dateToFull}&select=puzzle_id,source,created_at&order=created_at.asc,id.asc`
+      `training_log?player_id=eq.${playerId}&result=eq.loss&created_at=gte.${dateFromFull}&created_at=lte.${dateToFull}&select=puzzle_id,source,created_at,loss_reason,wrong_move,ply&order=created_at.asc,id.asc`
     );
 
     if (!logs || !logs.length) {
@@ -1059,6 +1083,7 @@ async function exportPgn() {
         `[Annotator "${title}"]`,
         `[PuzzleId "${pid}"]`,
         prompt ? `{ ${prompt} }` : '',
+        log.wrong_move ? chybnyTahDoPgn(Chess, fen, log.wrong_move, log.ply) : '',
         (riesenieDoPgn(Chess, p) + ' *').trim(),
         ``  // prázdny riadok medzi partiami
       );
