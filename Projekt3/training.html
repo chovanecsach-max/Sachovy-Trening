@@ -501,6 +501,18 @@ button:disabled {
    zostávajúcim časom — to je pod ohybom obrazovky a hráč ho počas riešenia
    nevidí. Preto sa čas zopakuje tesne nad šachovnicou, kam sa hráč aj tak
    pozerá. Nad ňou je voľné miesto, takže nič neprekryje. */
+/* Oznam o kalibrácii — vysvetľuje hráčovi veľké skoky ELO na začiatku */
+.kalib-info {
+  margin: 0 0 8px;
+  padding: 8px 12px;
+  border-radius: 9px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1e3a5f;
+  font-size: 13px;
+  text-align: center;
+}
+
 .mobile-timer {
   display: none;
   align-items: center;
@@ -584,6 +596,7 @@ button:disabled {
       <div class="board-card">
         <div class="board-area">
           <h2 id="promptText" class="board-prompt">Nájdi najlepší ťah</h2>
+          <div id="kalibInfo" class="kalib-info" style="display:none;"></div>
           <div id="mobileTimer" class="mobile-timer"><span class="mt-label">Zostáva</span><span id="mobileTimerValue">-</span></div>
           <div id="board" class="board"></div>
           <div id="turnIndicator" class="turn-indicator white" aria-label="Na ťahu"></div>
@@ -900,6 +913,24 @@ async function finishTrainingAndGoHome() {
 }
 
 // Ukáže „+8" alebo „−12" vedľa ELO hráča. Skryje sa pri načítaní ďalšej úlohy.
+// Hráč musí vedieť, prečo mu ELO skáče po sto bodoch a potom zrazu po
+// desiatich. Bez vysvetlenia to pôsobí ako chyba.
+function oznamKalibraciu(mode) {
+  const pole = kalibPole(mode);
+  if (!pole || !currentPlayer) return;
+  const zostava = kalibZostava(currentPlayer[pole]);
+  const el = document.getElementById('kalibInfo');
+  if (!el) return;
+  if (zostava > 0) {
+    el.textContent = `⚡ Zisťujeme tvoju úroveň — ešte ${zostava} `
+      + (zostava === 1 ? 'úloha' : zostava < 5 ? 'úlohy' : 'úloh')
+      + '. ELO sa zatiaľ mení rýchlejšie.';
+    el.style.display = 'block';
+  } else {
+    el.style.display = 'none';
+  }
+}
+
 function ukazZmenuElo(zmena) {
   const el = document.getElementById('eloDelta');
   if (!el) return;
@@ -925,6 +956,7 @@ async function updatePlayerUI(skipFetch = false) {
   const eloLabel = { taktika: 'Taktika', strategia: 'Stratégia', koncovka: 'Koncovka', mix: 'Mix' }[mode] || 'Mix';
   document.getElementById('playerName').textContent = currentPlayer.name + (currentPlayer.surname ? ' ' + currentPlayer.surname : '');
   document.getElementById('playerElo').textContent = getPlayerEloByMode(currentPlayer, mode) + ' (' + eloLabel + ')';
+  oznamKalibraciu(mode);   // hráč musí vedieť o kalibrácii hneď, nielen po prvom výsledku
 }
 
 // Zopakuje čas do pruhu nad šachovnicou (viditeľný len na mobile).
@@ -1083,10 +1115,17 @@ async function recordResultOnce(result) {
       const _mode   = getTrainingMode();
       const _field  = getEloField(_mode);
       const _curElo = Number(currentPlayer[_field] || 1500);
-      const _change = eloZmena(_curElo, current.elo, result);   // rovnaký vzorec ako v player.js
-      currentPlayer[_field] = Math.max(100, _curElo + _change);
+      // Rovnaký výpočet ako v player.js vrátane kalibrácie — inak by číslo
+      // v hlavičke nesedelo s tým, čo sa uložilo do databázy.
+      const _kPole = kalibPole(_mode);
+      const _kOdohrane = _kPole ? (Number(currentPlayer[_kPole]) || 0) : 0;
+      const _K = _kPole ? kalibK(_kOdohrane) : null;
+      const _change = eloZmena(_curElo, current.elo, result, _K);
+      currentPlayer[_field] = Math.max(_K != null ? KALIB_MIN_ELO : 100, _curElo + _change);
+      if (_K != null) currentPlayer[_kPole] = _kOdohrane + 1;
       // Skutočná zmena môže byť menšia, ak ELO narazilo na spodnú hranicu 100
       ukazZmenuElo(currentPlayer[_field] - _curElo);
+      oznamKalibraciu(_mode);
     }
     // Súhrn session zachytáva skutočnú aktivitu, teda aj opakované pokusy
     updateSessionStats(result, usedTime);
