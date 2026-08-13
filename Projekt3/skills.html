@@ -854,7 +854,7 @@ function onTimeExpired() {
   puzzleDone = true;
   puzzleFailed = true;
   markPlayed();
-  recordResult('loss');
+  recordResult('loss', 'cas');
   updateRemainingUI();
   setStatus('Čas vypršal!', 'error');
   showAllSolutionsOnBoard();
@@ -1170,7 +1170,7 @@ function handleMoveAttempt(tah) {
       puzzleFailed = true;
       everFailed = true;
       stopTimer();
-      recordResult('loss');
+      recordResult('loss', 'chyba');
     }
     setStatus('Toto nie je ' + skillNazovNom() + '. Skús znova alebo ukáž riešenie.', 'error');
   }
@@ -1263,7 +1263,7 @@ function showSolution() {
   stopTimer();
   markPlayed();
   everFailed = true; // videl riešenie — ELO sa nezapočíta ani po "Skús znova"
-  recordResult('loss');
+  recordResult('loss', 'riesenie');
   puzzleDone = true;
   puzzleFailed = true;
 
@@ -1308,7 +1308,8 @@ window.addEventListener('pagehide', function (e) {
 
   sbZapisPriOdchode('training_log', {
     player_id: currentPlayer.id, puzzle_id: current.id,
-    result: 'loss', time_spent: Math.round(cas), source: 'skill_puzzles'
+    result: 'loss', time_spent: Math.round(cas), source: 'skill_puzzles',
+    loss_reason: 'odchod'
   });
 
   if (isSkillEloEligible(current.id)) {
@@ -1345,11 +1346,12 @@ async function opustitUlohu() {
   if (uplynulyCasUlohy() < MILOST_SEKUND) return false;
   stopTimer();
   puzzleDone = true;
-  await recordResult('loss');
+  await recordResult('loss', 'odchod');
   return true;
 }
 
-async function recordResult(result) {
+// dovod: prečo hráč neuspel — 'chyba' | 'cas' | 'riesenie' | 'odchod'.
+async function recordResult(result, dovod = null) {
   if (resultLogged || !currentPlayer || !current) return;
   resultLogged = true;
 
@@ -1383,7 +1385,8 @@ async function recordResult(result) {
         puzzle_id: current.id,
         result: result,
         time_spent: usedTime,
-        source: "skill_puzzles"   // úloha z tabuľky skill_puzzles (tréning zručností)
+        source: "skill_puzzles",  // úloha z tabuľky skill_puzzles (tréning zručností)
+        loss_reason: result === 'loss' ? (dovod || 'chyba') : null
       })
     });
   } catch(e) {
