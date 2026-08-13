@@ -578,7 +578,11 @@ function nazovKategorie(p) {
 }
 
 // ─── Inicializácia ───────────────────────────────────────────────────────────
-function init() {
+async function init() {
+  // Platnosť prístupu sa overuje na každej stránke — na mobile sa cez
+  // skratku v aplikácii dá vojsť rovno sem, mimo úvodnej stránky.
+  if (!await vyzadujPlatnost()) return;
+
   // Role banner
   const banner = document.getElementById('roleBanner');
   if (IS_HRAC) {
