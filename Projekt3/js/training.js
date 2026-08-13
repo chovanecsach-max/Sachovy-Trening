@@ -3,7 +3,10 @@ const TRAINING_KEY = "trainingLog";
 // lossReason: prečo hráč neuspel — 'chyba' | 'cas' | 'riesenie' | 'odchod'.
 // Pri výhre sa neuvádza. Rozdiel medzi chybou a vypršaným časom je pre trénera
 // zásadný: prvé znamená, že hráč vzor nepozná, druhé že ho rozpoznáva pomaly.
-async function addTrainingResult(playerId, puzzleId, result, timeSpent = 0, lossReason = null) {
+// chybnyTah: čo hráč zahral ('e2e4'), ply: v ktorom ťahu riešenia sa pomýlil.
+// Obidva len pri skutočnej chybe — pri vypršanom čase nie je čo zapisovať.
+async function addTrainingResult(playerId, puzzleId, result, timeSpent = 0,
+                                 lossReason = null, chybnyTah = null, ply = null) {
   try {
     await sbFetch("training_log", {
       method: "POST",
@@ -14,7 +17,9 @@ async function addTrainingResult(playerId, puzzleId, result, timeSpent = 0, loss
         result: result,
         time_spent: Math.max(0, Math.round(timeSpent)),
         source: "puzzles",       // úloha z tabuľky puzzles (klasický tréning)
-        loss_reason: result === 'loss' ? (lossReason || 'chyba') : null
+        loss_reason: result === 'loss' ? (lossReason || 'chyba') : null,
+        wrong_move: chybnyTah || null,
+        ply: Number.isFinite(Number(ply)) ? Number(ply) : null
       })
     });
   } catch (e) {
