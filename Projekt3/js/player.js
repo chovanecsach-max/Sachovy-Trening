@@ -544,6 +544,58 @@ async function getTrainers() {
   }
 }
 
+// ─── Platnosť prístupu ──────────────────────────────────────────────────────
+// POZOR: doteraz sa platnosť len ZOBRAZOVALA v pruhu na úvodnej stránke a nikde
+// sa nevynucovala. Hráč s vypršaným prístupom mohol pokojne trénovať ďalej —
+// a na mobile, kde sa cez skratku v aplikácii ide rovno do tréningu, neuvidel
+// ani ten oznam.
+//
+// Vracia { platny, valid_to, dni } — dni sú záporné, ak už vypršala.
+// Admin a hlavný tréner majú prístup neobmedzený.
+async function overPlatnost() {
+  const rola = sessionStorage.getItem('user_role') || '';
+  if (rola === 'admin' || rola === 'hlavny_trener') {
+    return { platny: true, valid_to: null, dni: null };
+  }
+  const userId = sessionStorage.getItem('user_id');
+  if (!userId) return { platny: false, valid_to: null, dni: null };
+
+  try {
+    const rows = await sbFetch(`profiles?id=eq.${userId}&select=valid_to&limit=1`);
+    const validTo = rows && rows[0] && rows[0].valid_to;
+    if (!validTo) return { platny: true, valid_to: null, dni: null };  // bez obmedzenia
+
+    const dni = Math.ceil((new Date(validTo) - new Date()) / 86400000);
+    return { platny: dni > 0, valid_to: validTo, dni };
+  } catch (e) {
+    // Pri výpadku siete hráča nevyhadzujeme — chyba spojenia nie je dôvod
+    // odopierať prístup. Kontrola prebehne pri ďalšom načítaní stránky.
+    console.warn('Platnosť sa nepodarilo overiť:', e);
+    return { platny: true, valid_to: null, dni: null };
+  }
+}
+
+// Zastaví stránku, ak prístup vypršal. Vráti true, ak sa má pokračovať.
+async function vyzadujPlatnost() {
+  const p = await overPlatnost();
+  if (p.platny) return true;
+
+  const datum = p.valid_to ? new Date(p.valid_to).toLocaleDateString('sk-SK') : '';
+  document.body.innerHTML =
+    '<div style="max-width:520px;margin:60px auto;padding:26px;background:#fff;'
+    + 'border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,.08);'
+    + 'font-family:Arial,sans-serif;text-align:center;color:#111827;">'
+    + '<div style="font-size:40px;margin-bottom:10px;">⏳</div>'
+    + '<h2 style="margin:0 0 10px;color:#b91c1c;">Platnosť prístupu vypršala</h2>'
+    + '<p style="color:#475569;font-size:15px;line-height:1.5;">'
+    + (datum ? `Tvoj prístup skončil <strong>${datum}</strong>. ` : '')
+    + 'Pre pokračovanie v tréningu kontaktuj svojho trénera.</p>'
+    + '<button onclick="location.href=\'index.html\'" style="margin-top:14px;padding:11px 20px;'
+    + 'border:none;border-radius:10px;background:#1e3a5f;color:#fff;font-size:14px;'
+    + 'font-weight:bold;cursor:pointer;">Späť na úvod</button></div>';
+  return false;
+}
+
 // ─── Prístup k skupinám ─────────────────────────────────────────────────────
 // Skupina = tréner. Bežný tréner vidí svojich hráčov; skupinový tréner má
 // v tabuľke trener_pristup pridelené aj skupiny iných trénerov. Admin a hlavný
