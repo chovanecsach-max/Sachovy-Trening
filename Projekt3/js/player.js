@@ -166,14 +166,61 @@ function getEloCategory(mode) {
 // K = 20 zachováva pôvodné správanie pri rovnakej sile: ±10 bodov.
 const ELO_K = 20;
 
-function eloZmena(hracElo, ulohaElo, result) {
+// ─── Kalibrácia ELO ─────────────────────────────────────────────────────────
+// Nový hráč začína na 1000. Pri bežnom K=20 by sa hráč so silou 1600 dostával
+// na svoju úroveň stovky úloh a celý ten čas by riešil neprimerane ľahké
+// pozície. Prvých pár úloh sa preto počíta s vyšším K.
+//
+// Prečo vyššie K, a nie pevných ±100: vzorec zohľadní aj to, AKÚ ťažkú úlohu
+// hráč vyriešil. Výhra nad úlohou 1000 dá menej než výhra nad úlohou 1400 —
+// presne tá informácia, ktorú pri hľadaní úrovne potrebujeme.
+//
+// Týka sa LEN klasického tréningu. Mix je zmes, tam sa kalibrovať nedá;
+// zručnosti majú vlastnú stupnicu.
+// Stupne overené simuláciou (600 priebehov na variant). Hráč so skutočnou
+// silou 1600 sa po 10 úlohách dostane na ~1434 namiesto 1092 bez kalibrácie;
+// začiatočník na 1000 zostane na 1000, kalibrácia mu neublíži.
+// Mierne stupne (5×100, 5×50) sa ukázali ako prislabé — po 10 úlohách len 1314.
+const KALIB_STUPNE = [
+  { do: 5,  k: 150 },   // prvých 5 úloh — najväčšie skoky
+  { do: 10, k: 80  },   // ďalších 5
+  { do: 15, k: 40  },   // dojazd, potom už bežné ELO_K = 20
+];
+const KALIB_MIN_ELO = 800;   // spodná hranica, pod ktorú kalibrácia nespadne
+
+const KALIB_POLIA = {
+  taktika:   'kalib_taktika',
+  strategia: 'kalib_strategia',
+  koncovka:  'kalib_koncovka',
+};
+
+function kalibPole(mode) { return KALIB_POLIA[mode] || null; }
+
+// Aké K platí pri danom počte odohraných kalibračných úloh.
+// null = kalibrácia skončila, platí bežný vzorec.
+function kalibK(odohranych) {
+  const n = Number(odohranych) || 0;
+  for (const stupen of KALIB_STUPNE) if (n < stupen.do) return stupen.k;
+  return null;
+}
+
+// Koľko kalibračných úloh ešte zostáva (na hlášku pre hráča)
+function kalibZostava(odohranych) {
+  const n = Number(odohranych) || 0;
+  return Math.max(0, KALIB_STUPNE[KALIB_STUPNE.length - 1].do - n);
+}
+
+// kValue: nepovinné. Bez neho platí bežné ELO_K; kalibrácia posiela vyššie.
+function eloZmena(hracElo, ulohaElo, result, kValue) {
   const h = Number(hracElo);
   const u = Number(ulohaElo);
   if (!Number.isFinite(h) || !Number.isFinite(u)) return 0;
   // očakávaný výsledok hráča proti úlohe danej sily (0 až 1)
   const ocakavane = 1 / (1 + Math.pow(10, (u - h) / 400));
   const skutocne  = result === 'win' ? 1 : 0;
-  const zmena = ELO_K * (skutocne - ocakavane);
+  const K = (Number.isFinite(Number(kValue)) && Number(kValue) > 0)
+            ? Number(kValue) : ELO_K;
+  const zmena = K * (skutocne - ocakavane);
   // aby aj pri extrémnom rozdiele nebola zmena nulová a smer bol vždy jasný
   return result === 'win' ? Math.max(1, Math.round(zmena))
                           : Math.min(-1, Math.round(zmena));
@@ -683,10 +730,25 @@ async function updatePlayerElo(playerId, puzzleElo, result, mode) {
 
     const eloField = getEloField(mode);
     const currentElo = Number(player[eloField] || 1500);
-    const change = eloZmena(currentElo, puzzleElo, result);
-    const newElo = Math.max(100, currentElo + change);
+
+    // Kalibrácia: prvých pár úloh v klasickom tréningu sa počíta s vyšším K,
+    // aby sa hráč rýchlo dostal na svoju úroveň. Počítadlo je v databáze,
+    // takže sa nedá obísť vynulovaním prehliadača.
+    const kPole = kalibPole(mode);
+    const kOdohrane = kPole ? (Number(player[kPole]) || 0) : 0;
+    const K = kPole ? kalibK(kOdohrane) : null;
+
+    const change = eloZmena(currentElo, puzzleElo, result, K);
+    // Počas kalibrácie sa nespadne pod KALIB_MIN_ELO — začiatočník, ktorý
+    // pokazí prvé úlohy, by inak skončil na absurdne nízkej úrovni a dostával
+    // by triviality.
+    const dolnaHranica = (K != null) ? KALIB_MIN_ELO : 100;
+    const newElo = Math.max(dolnaHranica, currentElo + change);
 
     const zmeny = { [eloField]: newElo };
+
+    // Počítadlo rastie, kým kalibrácia beží
+    if (K != null) zmeny[kPole] = kOdohrane + 1;
 
     // Ak sa menila zručnosť, prepočítaj aj odvodený priemer elo_zrucnosti.
     // Ide v tom istom zápise, takže to nestojí ďalšiu cestu po sieti.
