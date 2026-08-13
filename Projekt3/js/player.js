@@ -175,8 +175,8 @@ const ELO_K = 20;
 // hráč vyriešil. Výhra nad úlohou 1000 dá menej než výhra nad úlohou 1400 —
 // presne tá informácia, ktorú pri hľadaní úrovne potrebujeme.
 //
-// Týka sa LEN klasického tréningu. Mix je zmes, tam sa kalibrovať nedá;
-// zručnosti majú vlastnú stupnicu.
+// Týka sa LEN klasického tréningu vrátane mixu. Zručnosti majú vlastnú
+// stupnicu a základ 1200, tie kalibráciou neprechádzajú.
 // Stupne overené simuláciou (600 priebehov na variant). Hráč so skutočnou
 // silou 1600 sa po 10 úlohách dostane na ~1434 namiesto 1092 bez kalibrácie;
 // začiatočník na 1000 zostane na 1000, kalibrácia mu neublíži.
@@ -188,10 +188,15 @@ const KALIB_STUPNE = [
 ];
 const KALIB_MIN_ELO = 800;   // spodná hranica, pod ktorú kalibrácia nespadne
 
+// Mix má vlastný stĺpec elo a vyberá úlohy podľa neho rovnako ako ostatné
+// režimy — jediný rozdiel je, že sa hráčovi skryje kategória. Na kalibráciu to
+// nemá vplyv, preto ju má tiež. Zručnosti majú vlastnú stupnicu a základ 1200,
+// tie sem nepatria.
 const KALIB_POLIA = {
   taktika:   'kalib_taktika',
   strategia: 'kalib_strategia',
   koncovka:  'kalib_koncovka',
+  mix:       'kalib_mix',
 };
 
 function kalibPole(mode) { return KALIB_POLIA[mode] || null; }
