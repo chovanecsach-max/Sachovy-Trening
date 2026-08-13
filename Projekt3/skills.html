@@ -2020,6 +2020,9 @@ async function init() {
 async function checkAuthAndInit() {
   const ok = await refreshSession();
   if (!ok) { location.href = 'login.html'; return; }
+  // Platnosť prístupu sa musí overiť na KAŽDEJ stránke, nielen na úvodnej —
+  // na mobile sa cez skratku v aplikácii ide rovno sem.
+  if (!await vyzadujPlatnost()) return;
   init();
 }
 checkAuthAndInit();
