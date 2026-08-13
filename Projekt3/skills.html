@@ -1170,7 +1170,7 @@ function handleMoveAttempt(tah) {
       puzzleFailed = true;
       everFailed = true;
       stopTimer();
-      recordResult('loss', 'chyba');
+      recordResult('loss', 'chyba', attempted);
     }
     setStatus('Toto nie je ' + skillNazovNom() + '. Skús znova alebo ukáž riešenie.', 'error');
   }
@@ -1351,7 +1351,7 @@ async function opustitUlohu() {
 }
 
 // dovod: prečo hráč neuspel — 'chyba' | 'cas' | 'riesenie' | 'odchod'.
-async function recordResult(result, dovod = null) {
+async function recordResult(result, dovod = null, chybnyTah = null) {
   if (resultLogged || !currentPlayer || !current) return;
   resultLogged = true;
 
@@ -1386,7 +1386,12 @@ async function recordResult(result, dovod = null) {
         result: result,
         time_spent: usedTime,
         source: "skill_puzzles",  // úloha z tabuľky skill_puzzles (tréning zručností)
-        loss_reason: result === 'loss' ? (dovod || 'chyba') : null
+        loss_reason: result === 'loss' ? (dovod || 'chyba') : null,
+        // Chybný ťah/políčko a počet už nájdených odpovedí — len pri chybe.
+        // Pri zručnostiach hovorí ply, po koľkých správnych sa hráč pomýlil:
+        // chyba pri nule znamená, že vzor nevidí vôbec.
+        wrong_move: (result === 'loss' && (dovod || 'chyba') === 'chyba') ? (chybnyTah || null) : null,
+        ply: (result === 'loss' && (dovod || 'chyba') === 'chyba') ? foundMoves.length : null
       })
     });
   } catch(e) {
