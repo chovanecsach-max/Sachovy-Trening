@@ -185,6 +185,7 @@ function renderCard(a, prog) {
 // ─── Načítanie ───────────────────────────────────────────────────────────────
 async function load() {
   if (!requireLogin()) return;
+  if (!await vyzadujPlatnost()) return;   // platnosť sa overuje na každej stránke
 
   let player;
   try {
