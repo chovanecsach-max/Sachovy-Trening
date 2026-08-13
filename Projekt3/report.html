@@ -124,6 +124,11 @@ const SKILL_COLS = [
   { f: 'elo_fork',              k: 'fork',              n: 'Vidličky' },
   { f: 'elo_direct_threat',     k: 'direct_threat',     n: 'Hrozby' }
 ];
+// Názvy zručností podľa skill_type — odvodené zo SKILL_COLS, aby existovali
+// v súbore len raz a pri pridaní zručnosti sa nemuseli dopĺňať dvakrát.
+const SKILL_NAZOV = {};
+SKILL_COLS.forEach(c => { SKILL_NAZOV[c.k] = c.n; });
+
 const BASIC_COLS = [
   { f: 'elo_taktika',   k: 'taktika',   n: 'Taktika' },
   { f: 'elo_strategia', k: 'strategia', n: 'Stratégia' },
@@ -210,7 +215,12 @@ async function build() {
     // 4) Zadania
     const asg = await sbFetchAll(`assignments?player_id=in.(${ids})&select=*`);
 
-    render(ym, players, log, hist, asg, startISO);
+    // 5) Kategórie úloh — aby sa neúspechy dali rozdeliť podľa toho, KDE vznikli.
+    // Samotný počet („6 neúspešných pokusov") sa nedá použiť: šesť chýb
+    // v taktike znamená niečo iné než šesť v koncovkách.
+    const meta = await loadAssignmentPuzzleMeta(log);
+
+    render(ym, players, log, hist, asg, startISO, meta);
     setStatus('');
   } catch (e) {
     setStatus('Chyba pri zostavovaní: ' + e.message, 'error');
@@ -236,7 +246,7 @@ function eloMoves(pid, hist, startISO) {
   return out.sort((a, b) => b.d - a.d);
 }
 
-function render(ym, players, log, hist, asg, startISO) {
+function render(ym, players, log, hist, asg, startISO, meta) {
   const today = todayLocal();
 
   // Aktivita jedného zdroja: pokusy, unikátne vyriešené úlohy a čas.
@@ -279,13 +289,30 @@ function render(ym, players, log, hist, asg, startISO) {
       else dovody.neznamy++;    // staré záznamy spred zavedenia stĺpca
     });
 
+    // Rozdelenie neúspechov podľa kategórie. Klasické úlohy majú kategóriu
+    // v puzzles.category, zručnosti v skill_puzzles.skill_type.
+    const podlaKat = {};
+    prehry.forEach(l => {
+      let nazov;
+      if (l.source === 'puzzles') {
+        nazov = meta?.puzzles?.get(l.puzzle_id)?.category || 'Klasický tréning';
+        if (nazov === 'Strategia') nazov = 'Stratégia';
+      } else {
+        const st = meta?.skills?.get(l.puzzle_id);
+        nazov = st ? (SKILL_NAZOV[st] || st) : 'Zručnosti';
+      }
+      if (!podlaKat[nazov]) podlaKat[nazov] = { spolu: 0, cas: 0 };
+      podlaKat[nazov].spolu++;
+      if (l.loss_reason === 'cas') podlaKat[nazov].cas++;
+    });
+
     // Najslabšia zručnosť (aktuálny stav)
     const weakest = SKILL_COLS
       .map(c => ({ n: c.n, v: Number(p[c.f] ?? DEF_SKILL) }))
       .sort((a, b) => a.v - b.v)[0];
 
     return { p, rows, solved, time, days, classic, skills, unknown,
-             moves, mine, overdue, weakest, prehry: prehry.length, dovody,
+             moves, mine, overdue, weakest, prehry: prehry.length, dovody, podlaKat,
              name: `${p.surname || ''} ${p.name || ''}`.trim() || '(bez mena)' };
   });
 
@@ -374,7 +401,13 @@ function render(ym, players, log, hist, asg, startISO) {
           if (d.dovody.odchod)   c.push(`${d.dovody.odchod}× opustil úlohu`);
           return c.length ? ' — ' + c.join(', ') : '';
         })()
-      }</div>` : ''}
+      }</div>
+      ${Object.keys(d.podlaKat).length ? `<div class="chips">${
+        Object.entries(d.podlaKat)
+          .sort((a, b) => b[1].spolu - a[1].spolu)
+          .map(([nazov, v]) => `<span class="chip">${escapeHtml(nazov)}: ${v.spolu}${
+            v.cas ? ` (${v.cas}× čas)` : ''}</span>`).join('')
+      }</div>` : ''}` : ''}
       <div class="pb-line"><span class="lbl">Najslabšia zručnosť:</span> ${d.weakest.n} (${d.weakest.v})</div>
       <div class="pb-line"><span class="lbl">Zadania:</span> ${d.mine.length
         ? `${openA} otvorených, ${done} uzavretých${d.overdue ? ` · <span class="down">${d.overdue} po termíne</span>` : ''}`
