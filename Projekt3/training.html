@@ -789,6 +789,10 @@ let dragState = {
 
 let solutionRoot = [];
 let activeBranches = [];
+// Koľko ťahov riešenia už hráč správne našiel. Slúži na určenie hĺbky, v ktorej
+// sa pomýlil: 1 = pomýlil sa hneď, 2 = prvý ťah trafil a zlyhal až v druhom.
+// Práve to odlišuje „nevidí nápad" od „vidí nápad, ale nedopočíta variant".
+let spravnychTahov = 0;
 let currentPuzzleIsAdmin = false;
 
 let sessionStats = {
@@ -1090,7 +1094,7 @@ async function opustitUlohu() {
 // odoslať aj vtedy, keď hráč hneď potom odíde do menu alebo na ďalšiu úlohu.
 // dovod: prečo hráč neuspel — 'chyba' | 'cas' | 'riesenie' | 'odchod'.
 // Pri výhre sa neuvádza.
-async function recordResultOnce(result, dovod = null) {
+async function recordResultOnce(result, dovod = null, chybnyTah = null) {
   if (resultLogged || !currentPlayer || !current) return;
 
   const usedTime = Math.max(0, normalizeTimeValue(current.time) - timerRemaining);
@@ -1105,7 +1109,12 @@ async function recordResultOnce(result, dovod = null) {
 
   if (!currentPuzzleIsAdmin) {
     // História — vždy úplná, vrátane opakovaného riešenia už známej pozície
-    await addTrainingResult(currentPlayer.id, current.id, result, usedTime, dovod);
+    // Chybný ťah a hĺbka majú zmysel len pri skutočnej chybe — pri vypršanom
+    // čase ani pri ukázanom riešení žiadny chybný ťah neexistuje.
+    const jeChyba = (result === 'loss' && dovod === 'chyba');
+    await addTrainingResult(currentPlayer.id, current.id, result, usedTime, dovod,
+                            jeChyba ? chybnyTah : null,
+                            jeChyba ? spravnychTahov + 1 : null);
 
     if (countsForProgress) {
       eloAwardedPuzzleIds.add(String(current.id));
@@ -1695,7 +1704,7 @@ function handleMoveAttempt(fromIndex, targetIndex) {
     failed = true;
     solved = true;
     stopPuzzleTimer();
-    recordResultOnce("loss", "chyba");
+    recordResultOnce("loss", "chyba", attempted);
     selected = null;
     legalTargets = [];
     render();
@@ -2116,6 +2125,7 @@ function finishTurn(playerBranch, playedMove) {
   legalTargets = [];
   render();
 
+  spravnychTahov++;
   activeBranches = Array.isArray(playerBranch.next) ? playerBranch.next : [];
 
   if (!activeBranches.length) {
@@ -2177,7 +2187,7 @@ function finishPromotionChoice(chosenPiece, fromIndex, toIndexTarget) {
     failed = true;
     solved = true;
     stopPuzzleTimer();
-    recordResultOnce("loss", "chyba");
+    recordResultOnce("loss", "chyba", attempted);
     selected = null;
     legalTargets = [];
     render();
@@ -2243,6 +2253,7 @@ function loadPuzzleObject(puzzle, isAdmin = false) {
   meta = parsed.meta;
 
   solutionRoot = getPuzzleSolutionRoot(current);
+  spravnychTahov = 0;
   activeBranches = solutionRoot;
 
   resetPuzzleState();
