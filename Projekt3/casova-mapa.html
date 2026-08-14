@@ -51,6 +51,8 @@ table.map td.cell { text-align: center; padding: 6px 5px; border-radius: 5px; li
 table.map td.cell .n { font-weight: bold; font-size: 13px; }
 table.map td.cell .u { font-size: 10px; opacity: .8; }
 table.map td.cell .d { font-size: 10px; font-weight: 700; margin-top: 2px; opacity: .95; }
+/* Využitie limitu — nízke číslo znamená rezervu na ťažšie úlohy */
+table.map td.cell .v { font-size: 10px; margin-top: 2px; opacity: .75; font-style: italic; }
 table.map td.last { text-align: center; padding: 6px 8px; border-radius: 5px; white-space: nowrap; font-size: 12px; }
 
 .below-result { margin-top: 12px; border-top: 1px solid #e2e8f0; padding-top: 12px; }
@@ -103,7 +105,7 @@ table.map td.last { text-align: center; padding: 6px 8px; border-radius: 5px; wh
     <span><span class="box" style="background:#fed7aa;border:1px solid #fdba74;"></span>pod dvomi tretinami</span>
     <span><span class="box" style="background:#fef08a;border:1px solid #fde047;"></span>tesne pod cieľom</span>
     <span><span class="box" style="background:#bbf7d0;border:1px solid #86efac;"></span>cieľ splnený</span>
-    <span style="color:#94a3b8;">v bunke: čas · počet úloh · dni s cieľom</span>
+    <span style="color:#94a3b8;">v bunke: čas · počet úloh · dni s cieľom · využitie limitu</span>
   </div>
 
   <div class="action-card" id="actionCard" style="display:none;">
@@ -209,7 +211,8 @@ function spocitaj(players, log) {
 
   players.forEach(p => {
     stats[p.id] = { posledny: null };
-    OBDOBIA.forEach(o => { stats[p.id][o.key] = { cas: 0, uloh: 0, poDnoch: {} }; });
+    OBDOBIA.forEach(o => { stats[p.id][o.key] = { cas: 0, uloh: 0, poDnoch: {},
+      vyuzitieSucet: 0, vyuzitiePocet: 0, prvySucet: 0, prvyPocet: 0 }; });
   });
 
   (log || []).forEach(r => {
@@ -228,6 +231,20 @@ function spocitaj(players, log) {
       c.cas  += cas;
       c.uloh += 1;
       c.poDnoch[den] = (c.poDnoch[den] || 0) + cas;
+
+      // Využitie limitu — počíta sa LEN z vyriešených úloh. Pri neúspechu
+      // hráč často vyčerpá celý limit, čo by priemer skreslilo nahor.
+      const limit = Number(r.time_limit) || 0;
+      if (r.result === 'win' && limit > 0) {
+        c.vyuzitieSucet += Math.min(1, cas / limit);
+        c.vyuzitiePocet += 1;
+      }
+      // Čas do prvého ťahu — rozvaha pred rozhodnutím
+      const prvy = Number(r.first_move_ms);
+      if (Number.isFinite(prvy) && prvy >= 0) {
+        c.prvySucet += prvy;
+        c.prvyPocet += 1;
+      }
     });
   });
 
@@ -266,14 +283,23 @@ function bunka(c, o, maxVSkupine) {
   }
 
   const priemerNaUlohu = Math.round(c.cas / c.uloh);
+  // Využitie limitu hovorí o pripravenosti na ťažšie úlohy: kto rieši správne
+  // na 30 % času, má rezervu; kto na 90 %, je na hranici a pri prvom zaváhaní
+  // spadne. Čas do prvej odpovede hovorí o rozvahe.
+  const vyuzitie = c.vyuzitiePocet ? Math.round(c.vyuzitieSucet / c.vyuzitiePocet * 100) : null;
+  const prvy = c.prvyPocet ? (c.prvySucet / c.prvyPocet / 1000) : null;
+
   const tip = `${fmtCas(c.cas)} · ${c.uloh} úloh · priemer ${fmtCas(priemerNaUlohu)} na úlohu`
             + ` · aktívnych dní ${c.dniAktivne}`
-            + ` · dní so splneným cieľom ${c.dniCiel} z ${o.dni} (cieľ ${ciel} min)`;
+            + ` · dní so splneným cieľom ${c.dniCiel} z ${o.dni} (cieľ ${ciel} min)`
+            + (vyuzitie != null ? ` · využitie limitu ${vyuzitie} % (z vyriešených)` : '')
+            + (prvy != null ? ` · rozvaha pred prvým ťahom ${prvy.toFixed(1)} s` : '');
 
   return `<td class="cell" style="background:${f.bg};color:${f.fg};border:${f.border};" title="${tip}">
             <div class="n">${fmtCas(c.cas)}</div>
             <div class="u">${c.uloh} úloh</div>
-            <div class="d">${c.dniCiel}/${o.dni} dní</div></td>`;
+            <div class="d">${c.dniCiel}/${o.dni} dní</div>
+            ${vyuzitie != null ? `<div class="v">${vyuzitie} % limitu</div>` : ''}</td>`;
 }
 
 // ─── Vykreslenie ────────────────────────────────────────────────────────────
@@ -421,7 +447,7 @@ async function loadMap() {
     // len za prvý pokus o úlohu (aby opakovanie neskresľovalo pokrok), kým tu
     // ide o skutočne odrobený čas vrátane opakovaní.
     const log = await sbFetchAll(
-      `training_log?player_id=in.(${ids})&created_at=gte.${od}&select=player_id,time_spent,created_at`
+      `training_log?player_id=in.(${ids})&created_at=gte.${od}&select=player_id,time_spent,created_at,time_limit,first_move_ms,result`
     );
 
     mapPlayers = players;
