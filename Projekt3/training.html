@@ -793,6 +793,16 @@ let activeBranches = [];
 // sa pomýlil: 1 = pomýlil sa hneď, 2 = prvý ťah trafil a zlyhal až v druhom.
 // Práve to odlišuje „nevidí nápad" od „vidí nápad, ale nedopočíta variant".
 let spravnychTahov = 0;
+// Meranie času do prvého ťahu. Kto ťahá po dvoch sekundách a mýli sa, hrá
+// impulzívne; kto premyslí a zahrá dobre, počíta. Je to údaj o návyku.
+let ulohaZobrazenaOd = 0;   // časová značka načítania úlohy
+let prvyTahMs = null;       // vyplní sa pri prvom pokuse hráča
+
+function zaznamenajPrvyTah() {
+  if (prvyTahMs === null && ulohaZobrazenaOd) {
+    prvyTahMs = Math.max(0, Date.now() - ulohaZobrazenaOd);
+  }
+}
 let currentPuzzleIsAdmin = false;
 
 let sessionStats = {
@@ -1114,7 +1124,8 @@ async function recordResultOnce(result, dovod = null, chybnyTah = null) {
     const jeChyba = (result === 'loss' && dovod === 'chyba');
     await addTrainingResult(currentPlayer.id, current.id, result, usedTime, dovod,
                             jeChyba ? chybnyTah : null,
-                            jeChyba ? spravnychTahov + 1 : null);
+                            jeChyba ? spravnychTahov + 1 : null,
+                            normalizeTimeValue(current.time), prvyTahMs);
 
     if (countsForProgress) {
       eloAwardedPuzzleIds.add(String(current.id));
@@ -1690,6 +1701,7 @@ function handleMoveAttempt(fromIndex, targetIndex) {
     return;
   }
 
+  zaznamenajPrvyTah();
   const attempted = name(fromIndex) + name(targetIndex);
 
   if (!isLegalMove(fromIndex, targetIndex)) {
@@ -2254,6 +2266,8 @@ function loadPuzzleObject(puzzle, isAdmin = false) {
 
   solutionRoot = getPuzzleSolutionRoot(current);
   spravnychTahov = 0;
+  ulohaZobrazenaOd = Date.now();
+  prvyTahMs = null;
   activeBranches = solutionRoot;
 
   resetPuzzleState();
