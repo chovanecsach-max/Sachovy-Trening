@@ -482,6 +482,34 @@ button {
     <button class="secondary" style="margin-left:auto;" onclick="goHome()">← Menu</button>
   </div>
 
+  <!-- Režim údržby a prehľad pripojených -->
+  <div class="card" style="margin-bottom:16px;">
+    <h2>🔧 Údržba a pripojení hráči</h2>
+    <div class="tip" style="margin-top:-6px;margin-bottom:10px;">
+      Pred nasadzovaním zmien zapni údržbu. Hráč, ktorý má stránku otvorenú
+      spred nasadenia, beží na starej verzii kódu a jeho zápis môže po zmene
+      databázy zlyhať. Teba ani hlavného trénera údržba neodstaví.
+    </div>
+
+    <div id="udrzbaStav" style="padding:10px 12px;border-radius:10px;margin-bottom:10px;
+         font-size:14px;font-weight:bold;">Načítavam…</div>
+
+    <div class="edit-grid">
+      <div class="edit-field" style="grid-column:1/-1;">
+        <label>Správa pre hráčov (nepovinné)</label>
+        <input type="text" id="udrzbaText" maxlength="200"
+               placeholder="napr. Nasadzujeme novú verziu, skús o 10 minút.">
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">
+      <button class="primary" onclick="prepniUdrzbu(true)">Zapnúť údržbu</button>
+      <button class="secondary" onclick="prepniUdrzbu(false)">Vypnúť údržbu</button>
+      <button class="secondary" onclick="nacitajPritomnych()">🔄 Obnoviť zoznam</button>
+    </div>
+
+    <div id="pritomniBox" style="margin-top:12px;"></div>
+  </div>
+
   <!-- Prístup trénerov k viacerým skupinám -->
   <div class="card" style="margin-bottom:16px;">
     <h2>🧑‍🏫 Skupinový tréner — prístup k skupinám</h2>
@@ -941,6 +969,12 @@ function switchTab(tab) {
     loadUsers();
     // Zoznam trénerov pre správu skupinových prístupov — naplní sa raz
     if (!tpTreneri.length) tpNaplnTrenerov();
+    nacitajUdrzbu();
+    nacitajPritomnych();
+    // Zoznam sa sám obnovuje — pri nasadzovaní chce admin vidieť, keď
+    // posledný hráč odíde, bez toho aby klikal.
+    if (_pritomniTimer) clearInterval(_pritomniTimer);
+    _pritomniTimer = setInterval(nacitajPritomnych, 30000);
   }
 }
 
@@ -1102,6 +1136,74 @@ function setUserStatus(text, type = '') {
   const el = document.getElementById('userStatus');
   el.textContent = text;
   el.className = 'status' + (type ? ' ' + type : '');
+}
+
+// ─── Údržba a prehľad pripojených ───────────────────────────────────────────
+let _pritomniTimer = null;
+
+async function nacitajUdrzbu() {
+  const el = document.getElementById('udrzbaStav');
+  if (!el) return;
+  try {
+    const rows = await sbFetch('nastavenia?kluc=in.(udrzba,udrzba_text)&select=kluc,hodnota');
+    const m = {};
+    (rows || []).forEach(r => { m[r.kluc] = r.hodnota; });
+    const zapnuta = m.udrzba === 'on';
+    document.getElementById('udrzbaText').value = m.udrzba_text || '';
+    el.textContent = zapnuta
+      ? '🔧 ÚDRŽBA JE ZAPNUTÁ — hráči sa nedostanú do aplikácie.'
+      : '✅ Údržba je vypnutá — aplikácia beží normálne.';
+    el.style.background = zapnuta ? '#fffbeb' : '#f0fdf4';
+    el.style.border = '1px solid ' + (zapnuta ? '#fbbf24' : '#86efac');
+    el.style.color = zapnuta ? '#92400e' : '#166534';
+  } catch (e) {
+    el.textContent = 'Stav údržby sa nepodarilo načítať: ' + e.message;
+  }
+}
+
+async function prepniUdrzbu(zapnut) {
+  if (zapnut && !confirm('Zapnúť údržbu? Hráči sa počas nej nedostanú do aplikácie.')) return;
+  const text = (document.getElementById('udrzbaText').value || '').trim();
+  try {
+    await sbFetch('nastavenia?kluc=eq.udrzba', {
+      method: 'PATCH', prefer: 'return=minimal',
+      body: JSON.stringify({ hodnota: zapnut ? 'on' : 'off', zmenene: new Date().toISOString() })
+    });
+    await sbFetch('nastavenia?kluc=eq.udrzba_text', {
+      method: 'PATCH', prefer: 'return=minimal',
+      body: JSON.stringify({ hodnota: text, zmenene: new Date().toISOString() })
+    });
+    await nacitajUdrzbu();
+  } catch (e) {
+    alert('Chyba pri prepínaní údržby: ' + e.message);
+  }
+}
+
+async function nacitajPritomnych() {
+  const box = document.getElementById('pritomniBox');
+  if (!box) return;
+  try {
+    const rows = await sbFetch('pritomni?select=*') || [];
+    if (!rows.length) {
+      box.innerHTML = '<div style="padding:10px 12px;border-radius:9px;background:#f0fdf4;'
+        + 'border:1px solid #86efac;color:#166534;font-size:13px;">'
+        + '✅ Nikto nie je v aplikácii — môžeš nasadzovať.</div>';
+      return;
+    }
+    box.innerHTML = '<div style="font-size:13px;color:#334155;margin-bottom:6px;">'
+      + `V aplikácii je <strong>${rows.length}</strong> `
+      + (rows.length === 1 ? 'používateľ' : rows.length < 5 ? 'používatelia' : 'používateľov')
+      + ' (aktivita za posledné 2 minúty):</div>'
+      + '<div style="display:flex;flex-wrap:wrap;gap:6px;">'
+      + rows.map(r => `<span style="border:1px solid #e2e8f0;border-radius:8px;
+          padding:5px 9px;font-size:12px;background:#fff;">
+          ${escapeHtml(r.meno || '(bez mena)')}
+          <span style="color:#94a3b8;">· ${escapeHtml(r.stranka || '')}
+          · pred ${r.pred_sekundami}s</span></span>`).join('')
+      + '</div>';
+  } catch (e) {
+    box.innerHTML = '<div class="tip">Zoznam sa nepodarilo načítať: ' + escapeHtml(e.message) + '</div>';
+  }
 }
 
 // ─── Skupinový tréner ───────────────────────────────────────────────────────
