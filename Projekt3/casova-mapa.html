@@ -333,7 +333,13 @@ function render(players, log) {
     if (!pos) {
       b += `<td class="last" style="background:#fff;color:#94a3b8;border:1px dashed #cbd5e1;">nikdy</td>`;
     } else {
-      const dni = Math.floor((Date.now() - pos) / 86400000);
+      // Rozdiel KALENDÁRNYCH dní, nie hodín. Delenie 24 hodinami by o 4:33 ráno
+      // označilo včerajší večerný tréning ako „dnes" — ubehlo len 8 hodín.
+      // localDay() zároveň ošetrí letný a zimný čas.
+      const dnesStr = todayLocal();
+      const denTreningu = localDay(pos);
+      const dni = Math.round(
+        (new Date(dnesStr + 'T12:00:00') - new Date(denTreningu + 'T12:00:00')) / 86400000);
       const f = dni <= 2 ? { bg:'#bbf7d0', fg:'#14532d', bd:'#86efac' }
               : dni <= 7 ? { bg:'#fef08a', fg:'#713f12', bd:'#fde047' }
               : dni <= 21 ? { bg:'#fed7aa', fg:'#7c2d12', bd:'#fdba74' }
