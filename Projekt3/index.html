@@ -548,6 +548,9 @@ async function initPage() {
   }
 
   // Platnosť prístupu — zobraz len hráčom a trénerom (admin/hlavný tréner majú neobmedzený prístup)
+  if (!await vyzadujBezUdrzby()) return;   // pri nasadení zmien odstav hráčov
+  hlasPritomnost();
+
   checkValidity(role);
 
   // Počet nesplnených zadaní na odznak pri tlačidle Zadania
