@@ -2150,7 +2150,9 @@ async function checkAuthAndInit() {
   if (!ok) { location.href = 'login.html'; return; }
   // Platnosť prístupu sa musí overiť na KAŽDEJ stránke, nielen na úvodnej —
   // na mobile sa cez skratku v aplikácii ide rovno sem.
+  if (!await vyzadujBezUdrzby()) return;   // nasadenie zmien — hráč beží na starom kóde
   if (!await vyzadujPlatnost()) return;
+  hlasPritomnost();
   init();
 }
 checkAuthAndInit();
