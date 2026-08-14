@@ -264,6 +264,23 @@ body {
   gap: 4px;
 }
 
+/* Vysvetlenie k riešeniu — ukáže sa po kliknutí na štítok, keď je úloha
+   uzavretá. Jedna veta naraz, nech ju netreba scrollovať ani pri desiatich
+   nenájdených ťahoch. */
+.vysvetlenie {
+  margin-top: 8px; padding: 9px 11px; border-radius: 9px;
+  background: #eff6ff; border: 1px solid #bfdbfe; color: #1e3a5f;
+  font-size: 13px; line-height: 1.4; display: none;
+}
+.vysvetlenie .tah { font-family: monospace; font-weight: bold; }
+.found-move-badge.klikatelny { cursor: pointer; }
+.found-move-badge.aktivny { outline: 2px solid #1d4ed8; outline-offset: 1px; }
+
+/* Vrstva so šípkou nad šachovnicou — nezachytáva kliknutia */
+#boardOverlay {
+  position: absolute; inset: 0; pointer-events: none; z-index: 5;
+}
+
 .found-move-badge {
   padding: 3px 8px;
   border-radius: 6px;
@@ -505,7 +522,7 @@ button:disabled { opacity: 0.6; cursor: not-allowed; }
           <h2 id="promptText" class="board-prompt">Nájdi všetky šachy</h2>
           <div id="mobileTimer" class="mobile-timer"><span class="mt-label">Zostáva</span><span id="mobileTimerValue">-</span><span class="mt-sep"></span><span class="mt-label">Nájsť</span><span id="mobileFindValue">-</span></div>
           <div id="completeProgress" style="display:none; font-size:0.85em; color:#2E75B6; font-weight:600; margin-top:4px;"></div>
-          <div id="board" class="board"></div>
+          <div id="boardWrap" style="position:relative;width:min(100%,74vh);max-width:720px;margin:auto;"><div id="board" class="board" style="width:100%;max-width:none;margin:0;"></div><svg id="boardOverlay" viewBox="0 0 100 100" preserveAspectRatio="none"></svg></div>
           <div id="turnIndicator" class="turn-indicator white"></div>
         </div>
       </div>
@@ -551,6 +568,7 @@ button:disabled { opacity: 0.6; cursor: not-allowed; }
         <div class="found-list">
           <div class="found-list-title">Nájdené ťahy</div>
           <div id="foundMoves" class="found-moves"></div>
+          <div id="vysvetlenie" class="vysvetlenie"></div>
         </div>
 
         <div class="buttons">
@@ -623,6 +641,7 @@ let foundMoves = [];      // ťahy zobrazené v zozname
 // doplní o zvyšok, takže bez tejto množiny by sa stratila informácia, čo
 // prehliadol — a práve tú chceme ukázať červenou.
 let skutocneNajdene = new Set();
+let vysvetlenia = {};   // ťah → veta, prečo je to riešenie
 
 // Meranie času do prvej odpovede. Nízky čas pri chybe znamená impulzívnosť —
 // hráč klikol skôr, než sa pozrel. Je to údaj o návyku, nie o vedomostiach.
@@ -1252,6 +1271,78 @@ function updateRemainingUI() {
   updateMobileFind();
 }
 
+// ─── Vysvetlenie k riešeniu ─────────────────────────────────────────────────
+// Ukáže sa až po uzavretí úlohy a vždy len k jednému ťahu naraz — pri desiatich
+// nenájdených by zoznam viet nikto nečítal a roztiahol by panel.
+// Pri ťahu sa nad šachovnicou nakreslí šípka, pri políčku sa pole zvýrazní.
+
+// Stred políčka v percentách plochy šachovnice (0–100), s ohľadom na otočenie
+function stredPolicka(sq) {
+  const i = map(sqToIndex(sq));      // map() zohľadní otočenie šachovnice
+  const r = Math.floor(i / 8), c = i % 8;
+  return { x: c * 12.5 + 6.25, y: r * 12.5 + 6.25 };
+}
+
+function vykresliSipku(tah) {
+  const ov = document.getElementById('boardOverlay');
+  if (!ov) return;
+  ov.innerHTML = '';
+  if (!tah) return;
+
+  if (tah.length === 2) {                     // políčko — len zvýrazniť
+    const p = stredPolicka(tah);
+    ov.innerHTML = `<circle cx="${p.x}" cy="${p.y}" r="5.2" fill="none"
+        stroke="#1d4ed8" stroke-width="1.6" opacity=".9"/>`;
+    return;
+  }
+
+  const a = stredPolicka(tah.slice(0, 2));
+  const b = stredPolicka(tah.slice(2, 4));
+  // Šípka sa skráti pred cieľom, aby hrot nezakryl figúrku
+  const dx = b.x - a.x, dy = b.y - a.y;
+  const d = Math.hypot(dx, dy) || 1;
+  const kon = { x: b.x - dx / d * 4.2, y: b.y - dy / d * 4.2 };
+
+  ov.innerHTML = `
+    <defs><marker id="hrot" markerWidth="4" markerHeight="4" refX="2.6" refY="2"
+        orient="auto"><path d="M0,0 L4,2 L0,4 z" fill="#1d4ed8"/></marker></defs>
+    <line x1="${a.x}" y1="${a.y}" x2="${kon.x}" y2="${kon.y}"
+      stroke="#1d4ed8" stroke-width="1.8" opacity=".85"
+      marker-end="url(#hrot)" stroke-linecap="round"/>
+    <circle cx="${a.x}" cy="${a.y}" r="2" fill="#1d4ed8" opacity=".85"/>`;
+}
+
+function ukazVysvetlenie(tah, badge) {
+  const el = document.getElementById('vysvetlenie');
+  if (!el) return;
+
+  // Druhý klik na ten istý štítok vysvetlenie zavrie
+  if (el.dataset.tah === tah && el.style.display === 'block') {
+    el.style.display = 'none';
+    el.dataset.tah = '';
+    vykresliSipku(null);
+    document.querySelectorAll('.found-move-badge.aktivny')
+      .forEach(b => b.classList.remove('aktivny'));
+    return;
+  }
+
+  document.querySelectorAll('.found-move-badge.aktivny')
+    .forEach(b => b.classList.remove('aktivny'));
+  if (badge) badge.classList.add('aktivny');
+
+  el.innerHTML = `<span class="tah">${escapeHtml(tah)}</span> — `
+               + escapeHtml(vysvetlenia[tah] || '');
+  el.dataset.tah = tah;
+  el.style.display = 'block';
+  vykresliSipku(tah);
+}
+
+function skryVysvetlenie() {
+  const el = document.getElementById('vysvetlenie');
+  if (el) { el.style.display = 'none'; el.dataset.tah = ''; }
+  vykresliSipku(null);
+}
+
 function updateFoundMovesUI() {
   const el = document.getElementById('foundMoves');
   el.innerHTML = '';
@@ -1261,9 +1352,13 @@ function updateFoundMovesUI() {
   const zmeskane  = foundMoves.filter(m => !skutocneNajdene.has(m));
   [...najdene, ...zmeskane].forEach(move => {
     const badge = document.createElement('span');
-    badge.className = 'found-move-badge' + (skutocneNajdene.has(move) ? '' : ' missed');
+    const maVysvetlenie = puzzleDone && !!vysvetlenia[move];
+    badge.className = 'found-move-badge' + (skutocneNajdene.has(move) ? '' : ' missed')
+                    + (maVysvetlenie ? ' klikatelny' : '');
     badge.textContent = move;
-    badge.title = skutocneNajdene.has(move) ? 'Našiel si' : 'Toto si nenašiel';
+    badge.title = maVysvetlenie ? 'Klikni a uvidíš, prečo je to riešenie'
+                : (skutocneNajdene.has(move) ? 'Našiel si' : 'Toto si nenašiel');
+    if (maVysvetlenie) badge.onclick = () => ukazVysvetlenie(move, badge);
     el.appendChild(badge);
   });
 }
@@ -1739,6 +1834,16 @@ function loadPuzzle(puzzle) {
   // Z ťahu sa piaty znak odreže: na akú figúru sa pešiak premení, je iná
   // otázka a v generátore vzniknú štyri rovnaké zápisy „d7c8". Duplikáty sa
   // odstránia, inak by úloha čakala odpovede, ktoré sa nedajú zadať.
+  // Vysvetlenia sú v rovnakom poradí ako pôvodné riešenia. Musia sa priradiť
+  // PRED odstránením duplikátov, inak by sa poradie rozišlo.
+  vysvetlenia = {};
+  const _povodne = Array.isArray(puzzle.solutions) ? puzzle.solutions : [];
+  const _notes = Array.isArray(puzzle.notes) ? puzzle.notes : [];
+  _povodne.forEach((m, i) => {
+    const kluc = String(m || '').trim().slice(0, 4);
+    if (_notes[i] && !vysvetlenia[kluc]) vysvetlenia[kluc] = _notes[i];
+  });
+
   solutions = [...new Set(
     (Array.isArray(puzzle.solutions) ? puzzle.solutions : [])
       .map(m => {
@@ -1752,6 +1857,7 @@ function loadPuzzle(puzzle) {
   ulohaZobrazenaOd = Date.now();
   prvyTahMs = null;
   skryZmenuElo();
+  skryVysvetlenie();
   xMarked = new Map();
   puzzleDone = false;
   puzzleFailed = false;
