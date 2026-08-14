@@ -276,9 +276,15 @@ body {
 .found-move-badge.klikatelny { cursor: pointer; }
 .found-move-badge.aktivny { outline: 2px solid #1d4ed8; outline-offset: 1px; }
 
-/* Vrstva so šípkou nad šachovnicou — nezachytáva kliknutia */
+/* Vrstva so šípkou nad šachovnicou — nezachytáva kliknutia.
+   Šachovnica má rám 8px a NEpoužíva box-sizing:border-box, takže jej hracia
+   plocha začína 8px od okraja obalu a je presne taká široká ako obal. Vrstva
+   sa preto musí posunúť o rám dovnútra a o rovnako veľa presahovať vpravo
+   a dole — inak by krúžky aj šípky sedeli mimo stredov polí. */
 #boardOverlay {
-  position: absolute; inset: 0; pointer-events: none; z-index: 5;
+  position: absolute;
+  top: 8px; left: 8px; right: -8px; bottom: -8px;
+  pointer-events: none; z-index: 5;
 }
 
 .found-move-badge {
