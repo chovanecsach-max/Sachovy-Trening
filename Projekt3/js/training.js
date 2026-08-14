@@ -5,8 +5,11 @@ const TRAINING_KEY = "trainingLog";
 // zásadný: prvé znamená, že hráč vzor nepozná, druhé že ho rozpoznáva pomaly.
 // chybnyTah: čo hráč zahral ('e2e4'), ply: v ktorom ťahu riešenia sa pomýlil.
 // Obidva len pri skutočnej chybe — pri vypršanom čase nie je čo zapisovať.
+// timeLimit: koľko sekúnd mal hráč na úlohu (podiel využitia hovorí o pripravenosti)
+// firstMoveMs: čas do prvého ťahu v ms (nízky pri chybe = impulzívnosť)
 async function addTrainingResult(playerId, puzzleId, result, timeSpent = 0,
-                                 lossReason = null, chybnyTah = null, ply = null) {
+                                 lossReason = null, chybnyTah = null, ply = null,
+                                 timeLimit = null, firstMoveMs = null) {
   try {
     await sbFetch("training_log", {
       method: "POST",
@@ -19,7 +22,11 @@ async function addTrainingResult(playerId, puzzleId, result, timeSpent = 0,
         source: "puzzles",       // úloha z tabuľky puzzles (klasický tréning)
         loss_reason: result === 'loss' ? (lossReason || 'chyba') : null,
         wrong_move: chybnyTah || null,
-        ply: Number.isFinite(Number(ply)) ? Number(ply) : null
+        ply: Number.isFinite(Number(ply)) ? Number(ply) : null,
+        time_limit: Number.isFinite(Number(timeLimit)) && Number(timeLimit) > 0
+                    ? Math.round(Number(timeLimit)) : null,
+        first_move_ms: Number.isFinite(Number(firstMoveMs)) && Number(firstMoveMs) >= 0
+                    ? Math.round(Number(firstMoveMs)) : null
       })
     });
   } catch (e) {
