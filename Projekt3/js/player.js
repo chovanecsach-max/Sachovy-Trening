@@ -544,6 +544,78 @@ async function getTrainers() {
   }
 }
 
+// ─── Režim údržby a prítomnosť ──────────────────────────────────────────────
+// Pri nasadzovaní zmien treba hráčov na chvíľu odstaviť. Dôvod nie je len
+// pohodlie: hráč, ktorý má stránku otvorenú spred nasadenia, beží na STAREJ
+// verzii kódu a jeho zápis môže po zmene schémy zlyhať alebo uložiť nezmysel.
+//
+// Admin a hlavný tréner cez údržbu prejdú — musia si overiť, že všetko beží,
+// skôr než ju vypnú.
+
+let _udrzbaCache = null;
+
+async function jeUdrzba() {
+  try {
+    const rows = await sbFetch("nastavenia?kluc=in.(udrzba,udrzba_text)&select=kluc,hodnota");
+    const m = {};
+    (rows || []).forEach(r => { m[r.kluc] = r.hodnota; });
+    _udrzbaCache = { zapnuta: m.udrzba === 'on', text: m.udrzba_text || '' };
+  } catch (e) {
+    // Výpadok siete nie je dôvod odstaviť hráča
+    _udrzbaCache = { zapnuta: false, text: '' };
+  }
+  return _udrzbaCache;
+}
+
+// Zastaví stránku, ak prebieha údržba. Vráti true, ak sa má pokračovať.
+async function vyzadujBezUdrzby() {
+  const rola = sessionStorage.getItem('user_role') || '';
+  if (rola === 'admin' || rola === 'hlavny_trener') return true;
+
+  const u = await jeUdrzba();
+  if (!u.zapnuta) return true;
+
+  document.body.innerHTML =
+    '<div style="max-width:540px;margin:60px auto;padding:28px;background:#fff;'
+    + 'border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,.08);'
+    + 'font-family:Arial,sans-serif;text-align:center;color:#111827;">'
+    + '<div style="font-size:44px;margin-bottom:10px;">🔧</div>'
+    + '<h2 style="margin:0 0 12px;color:#92400e;">Prebieha údržba</h2>'
+    + '<p style="color:#475569;font-size:15px;line-height:1.55;">'
+    + (u.text ? escapeHtml(u.text)
+              : 'Pracujeme na vylepšeniach tréningového programu. '
+              + 'Skús sa prihlásiť o chvíľu — zvyčajne to netrvá dlho.')
+    + '</p>'
+    + '<button onclick="location.reload()" style="margin-top:16px;padding:11px 22px;'
+    + 'border:none;border-radius:10px;background:#1e3a5f;color:#fff;font-size:14px;'
+    + 'font-weight:bold;cursor:pointer;">Skúsiť znova</button></div>';
+  return false;
+}
+
+// Značka „som tu" — raz za minútu. Slúži adminovi na prehľad pred nasadením.
+// Presné to byť nemôže: keď hráč zavrie kartu, server sa to nedozvie, preto sa
+// za prítomného počíta ten, kto sa ozval za posledné 2 minúty.
+let _pritomnostTimer = null;
+
+function hlasPritomnost(stranka) {
+  const userId = sessionStorage.getItem('user_id');
+  if (!userId) return;
+  const posli = () => {
+    sbFetch('pritomnost', {
+      method: 'POST',
+      prefer: 'resolution=merge-duplicates,return=minimal',
+      body: JSON.stringify({
+        user_id: userId,
+        posledny: new Date().toISOString(),
+        stranka: stranka || (location.pathname.split('/').pop() || 'index.html')
+      })
+    }).catch(() => {});   // prehľad nie je dôvod rušiť tréning
+  };
+  posli();
+  if (_pritomnostTimer) clearInterval(_pritomnostTimer);
+  _pritomnostTimer = setInterval(posli, 60000);
+}
+
 // ─── Platnosť prístupu ──────────────────────────────────────────────────────
 // POZOR: doteraz sa platnosť len ZOBRAZOVALA v pruhu na úvodnej stránke a nikde
 // sa nevynucovala. Hráč s vypršaným prístupom mohol pokojne trénovať ďalej —
