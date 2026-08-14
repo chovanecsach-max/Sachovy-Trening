@@ -314,7 +314,31 @@ async function zabudnuteHeslo() {
     + 'nového hesla. Platí 60 minút. (Skontroluj aj Spam.)', 'success');
 }
 
+// Prebieha údržba? Číta sa priamo cez klienta — login.html nenačítava
+// player.js a používateľ tu ešte nie je prihlásený. Tabuľka nastavenia má
+// preto politiku na čítanie aj pre neprihlásených.
+async function zistiUdrzbu() {
+  try {
+    const { data, error } = await sb.from('nastavenia')
+      .select('kluc,hodnota').in('kluc', ['udrzba', 'udrzba_text']);
+    if (error) return { zapnuta: false, text: '' };
+    const m = {};
+    (data || []).forEach(r => { m[r.kluc] = r.hodnota; });
+    return { zapnuta: m.udrzba === 'on', text: m.udrzba_text || '' };
+  } catch (e) {
+    // Výpadok siete nie je dôvod nepustiť hráča ďalej
+    return { zapnuta: false, text: '' };
+  }
+}
+
 async function login() {
+  // Údržba sa kontroluje UŽ TU, aby hráč nedostal chybu až v tréningu.
+  const _u = await zistiUdrzbu();
+  if (_u.zapnuta) {
+    setStatus('loginStatus', '🔧 ' + (_u.text ||
+      'Prebieha údržba tréningového programu. Skús sa prihlásiť o chvíľu.'), 'error');
+    return;
+  }
   const email = document.getElementById('loginEmail').value.trim();
   const password = document.getElementById('loginPassword').value;
 
