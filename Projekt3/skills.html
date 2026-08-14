@@ -623,6 +623,17 @@ let foundMoves = [];      // ťahy zobrazené v zozname
 // doplní o zvyšok, takže bez tejto množiny by sa stratila informácia, čo
 // prehliadol — a práve tú chceme ukázať červenou.
 let skutocneNajdene = new Set();
+
+// Meranie času do prvej odpovede. Nízky čas pri chybe znamená impulzívnosť —
+// hráč klikol skôr, než sa pozrel. Je to údaj o návyku, nie o vedomostiach.
+let ulohaZobrazenaOd = 0;
+let prvyTahMs = null;
+
+function zaznamenajPrvyTah() {
+  if (prvyTahMs === null && ulohaZobrazenaOd) {
+    prvyTahMs = Math.max(0, Date.now() - ulohaZobrazenaOd);
+  }
+}
 // Komplexný sekvenčný režim
 let completeByFen = new Map(); // fen → { fen, puzzlesByKey: {key→puzzle} }
 let completeFens = [];         // pole unikátnych FEN-ov (náhodný výber)
@@ -1120,6 +1131,7 @@ function click(i) {
 }
 
 function handleMoveAttempt(tah) {
+  zaznamenajPrvyTah();
   // Poistka: aj keby sem prišiel ťah s piatym znakom (premena), porovnáva sa
   // len „odkiaľ-kam" — rovnako ako sú uložené riešenia.
   const attempted = String(tah || '').slice(0, 4);
@@ -1391,7 +1403,9 @@ async function recordResult(result, dovod = null, chybnyTah = null) {
         // Pri zručnostiach hovorí ply, po koľkých správnych sa hráč pomýlil:
         // chyba pri nule znamená, že vzor nevidí vôbec.
         wrong_move: (result === 'loss' && (dovod || 'chyba') === 'chyba') ? (chybnyTah || null) : null,
-        ply: (result === 'loss' && (dovod || 'chyba') === 'chyba') ? foundMoves.length : null
+        ply: (result === 'loss' && (dovod || 'chyba') === 'chyba') ? foundMoves.length : null,
+        time_limit: Number(aktualnyLimit) > 0 ? Math.round(Number(aktualnyLimit)) : null,
+        first_move_ms: prvyTahMs != null ? Math.round(prvyTahMs) : null
       })
     });
   } catch(e) {
@@ -1735,6 +1749,8 @@ function loadPuzzle(puzzle) {
   )];
   foundMoves = [];
   skutocneNajdene = new Set();
+  ulohaZobrazenaOd = Date.now();
+  prvyTahMs = null;
   skryZmenuElo();
   xMarked = new Map();
   puzzleDone = false;
