@@ -581,7 +581,9 @@ function nazovKategorie(p) {
 async function init() {
   // Platnosť prístupu sa overuje na každej stránke — na mobile sa cez
   // skratku v aplikácii dá vojsť rovno sem, mimo úvodnej stránky.
+  if (!await vyzadujBezUdrzby()) return;   // nasadenie zmien — hráč beží na starom kóde
   if (!await vyzadujPlatnost()) return;
+  hlasPritomnost();
 
   // Role banner
   const banner = document.getElementById('roleBanner');
