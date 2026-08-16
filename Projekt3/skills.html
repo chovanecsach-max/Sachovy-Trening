@@ -673,7 +673,7 @@ const COMPLETE_SKILLS = [
   { key: 'pin',               label: 'Absolútne väzby',    prompt: 'Nájdi všetky absolútne viazané figúrky (biele aj čierne)' },
   { key: 'relative_pin',      label: 'Relatívne väzby',    prompt: 'Nájdi všetky relatívne viazané figúrky (biele aj čierne)' },
   { key: 'fork',              label: 'Vidličky',           prompt: 'Nájdi všetky ťahy, ktoré vytvoria vidličku (biele aj čierne)' },
-  { key: 'direct_threat',     label: 'Priame hrozby',      prompt: 'Nájdi všetky ťahy vytvárajúce priame materiálne hrozby (biele aj čierne)' },
+  { key: 'direct_threat',     label: 'Priame hrozby',      prompt: 'Nájdi všetky ťahy vytvárajúce priame hrozby (biele aj čierne)' },
 ];
 let puzzleDone = false;
 let puzzleFailed = false;
@@ -1240,7 +1240,7 @@ const SKILL_NAZVY = {
   pin:               { nom: 'absolútne viazaná figúrka',     dalsi: 'ďalšiu absolútne viazanú figúrku' },
   relative_pin:      { nom: 'relatívne viazaná figúrka',     dalsi: 'ďalšiu relatívne viazanú figúrku' },
   fork:              { nom: 'vidlička',                      dalsi: 'ďalšiu vidličku' },
-  direct_threat:     { nom: 'materiálna hrozba',             dalsi: 'ďalšiu materiálnu hrozbu' }
+  direct_threat:     { nom: 'priama hrozba',                 dalsi: 'ďalšiu priamu hrozbu' }
 };
 
 // „Toto nie je <nominatív>."
@@ -2095,7 +2095,7 @@ async function init() {
     document.getElementById("promptText").textContent = "Nájdi všetky ťahy, ktoré vytvoria vidličku (biele aj čierne)";
   } else if (type === "direct_threat") {
     document.title = "Priame hrozby";
-    document.getElementById("promptText").textContent = "Nájdi všetky ťahy vytvárajúce priame materiálne hrozby (biele aj čierne)";
+    document.getElementById("promptText").textContent = "Nájdi všetky ťahy vytvárajúce priame hrozby (biele aj čierne)";
   } else {
     document.title = "Šachy a brania";
     document.getElementById("promptText").textContent = "Nájdi všetky šachy a brania";
