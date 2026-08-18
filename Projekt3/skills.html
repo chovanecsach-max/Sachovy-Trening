@@ -1892,7 +1892,15 @@ function loadPuzzle(puzzle) {
 
   // UI
   if (!isCompleteMode()) {
-    document.getElementById('promptText').textContent = puzzle.prompt || 'Nájdi všetky šachy';
+    // Zadanie sa berie z databázy, aby sedelo s tým, na čo bola úloha
+    // generovaná. Staršie úlohy hrozieb však majú uložené znenie so slovom
+    // „materiálne", ktoré už neplatí — od zavedenia hrozby matu sa za hrozbu
+    // počíta aj mat. Kým sa databáza neprepíše, opraví sa text tu.
+    let _zadanie = puzzle.prompt || 'Nájdi všetky šachy';
+    if (puzzle.skill_type === 'direct_threat') {
+      _zadanie = _zadanie.replace('priame materiálne hrozby', 'priame hrozby');
+    }
+    document.getElementById('promptText').textContent = _zadanie;
   }
   document.getElementById('puzzleId').textContent = puzzle.id ?? '-';
   document.getElementById('puzzleElo').textContent = puzzle.elo ?? '-';
