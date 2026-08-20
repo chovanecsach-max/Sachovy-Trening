@@ -238,7 +238,10 @@ async function spocitaj(players, log) {
       // z tabuľky podľa ELA a počtu riešení) a hráč býva v jednom rýchly
       // a v druhom pomalý — spoločný priemer by to zamaskoval.
       vyuzitieK: 0, vyuzitieKn: 0, vyuzitieZ: 0, vyuzitieZn: 0,
-      prvySucet: 0, prvyPocet: 0 }; });
+      prvySucet: 0, prvyPocet: 0,
+      // Rozpis po kategóriách — rozbalí sa kliknutím na meno hráča.
+      // Do bunky sa nezmestí: bolo by to 12 čísel krát päť období.
+      kat: {} }; });
   });
 
   (log || []).forEach(r => {
@@ -271,6 +274,16 @@ async function spocitaj(players, log) {
       if (Number.isFinite(prvy) && prvy >= 0) {
         c.prvySucet += prvy;
         c.prvyPocet += 1;
+      }
+
+      // Rozdelenie času a využitia limitu podľa kategórie úlohy
+      const kk = kategoriaUlohy(r, meta);
+      if (!c.kat[kk]) c.kat[kk] = { cas: 0, uloh: 0, vSucet: 0, vPocet: 0 };
+      c.kat[kk].cas += cas;
+      c.kat[kk].uloh += 1;
+      if (r.result === 'win' && limit > 0) {
+        c.kat[kk].vSucet += Math.min(1, cas / limit);
+        c.kat[kk].vPocet += 1;
       }
     });
   });
