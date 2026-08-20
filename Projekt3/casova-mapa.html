@@ -75,6 +75,8 @@ td.rozpis-cell { background: #f8fafc; padding: 12px 16px !important; text-align:
                  color: #94a3b8; font-weight: bold; padding: 3px 14px 5px 0; }
 .rozpis-tab td { padding: 4px 14px 4px 0; color: #334155; white-space: nowrap; }
 .rozpis-tab td.k { font-weight: bold; color: #1e3a5f; }
+.rozpis-tab .zpoctu { color: #94a3b8; font-size: 11px; margin-left: 5px; }
+
 .pruh { display: inline-block; width: 70px; height: 8px; background: #e2e8f0;
         border-radius: 4px; overflow: hidden; vertical-align: middle; margin-right: 6px; }
 .pruh span { display: block; height: 100%; background: #2563eb; border-radius: 4px; }
@@ -401,6 +403,10 @@ function rozpisHtml(st, id) {
     + '<th>Kategória</th><th>Čas</th><th>Podiel</th><th>Úloh</th><th>Využitie limitu</th></tr>'
     + mena.map(k => {
         const v = kat[k];
+        // Z koľkých úloh percento vychádza. Kým sa nazbierajú dáta, môže stáť
+        // na hŕstke záznamov — stĺpec time_limit pribudol až v auguste, staršie
+        // úlohy ho nemajú a do priemeru sa nezapočítajú. Bez tohto údaja
+        // vyzerá „24 % zo 4 úloh" rovnako dôveryhodne ako „24 % z 550".
         const vyuz = v.vPocet ? Math.round(v.vSucet / v.vPocet * 100) : null;
         const podiel = Math.round(v.cas / celkom * 100);
         return `<tr>
@@ -408,7 +414,9 @@ function rozpisHtml(st, id) {
           <td>${fmtCas(v.cas)}</td>
           <td><span class="pruh"><span style="width:${podiel}%"></span></span> ${podiel} %</td>
           <td>${v.uloh}</td>
-          <td>${vyuz != null ? vyuz + ' %' : '—'}</td></tr>`;
+          <td>${vyuz != null
+                ? `${vyuz} %<span class="zpoctu">z ${v.vPocet}</span>`
+                : '—'}</td></tr>`;
       }).join('')
     + '</table>';
 }
