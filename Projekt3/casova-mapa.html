@@ -60,6 +60,15 @@ table.map td.name.klik:hover { background: #f1f5f9; }
 td.rozpis-cell { background: #f8fafc; padding: 12px 16px !important; text-align: left; }
 .rozpis-nadpis { font-size: 12px; text-transform: uppercase; color: #94a3b8;
                  font-weight: bold; letter-spacing: .4px; margin-bottom: 7px; }
+/* Prepínač obdobia v rozpise */
+.rozpis-seg { display: inline-flex; border: 1px solid #cbd5e1; border-radius: 8px;
+              overflow: hidden; background: #fff; margin-bottom: 10px; }
+.rozpis-seg button { border: none; background: #fff; padding: 5px 11px; font-size: 12px;
+                     cursor: pointer; color: #334155; border-right: 1px solid #e2e8f0; }
+.rozpis-seg button:last-child { border-right: none; }
+.rozpis-seg button:hover { background: #f1f5f9; }
+.rozpis-seg button.akt { background: #1e3a5f; color: #fff; font-weight: bold; }
+
 .rozpis-prazdny { font-size: 13px; color: #64748b; font-style: italic; }
 .rozpis-tab { border-collapse: collapse; font-size: 13px; }
 .rozpis-tab th { text-align: left; font-size: 11px; text-transform: uppercase;
@@ -365,18 +374,29 @@ function bunka(c, o, maxVSkupine) {
 // pod riadkom hráča a ukáže všetky kategórie naraz, za zvolené obdobie.
 // Zmysel: tréner uvidí, že hráč zvláda taktiku s rezervou, ale v stratégii je
 // na hranici — to je iné odporúčanie než „trénuj viac".
-const ROZPIS_OBDOBIE = '30';    // ktoré okno sa v rozpise ukazuje
+// Ktoré okno rozpis ukazuje. Dáta za všetkých päť období sú už spočítané,
+// prepínač teda len prekreslí obsah — bez nového dotazu do databázy.
+// Voľba je spoločná pre všetkých hráčov a pamätá sa počas relácie.
+let rozpisObdobie = '30';
 
-function rozpisHtml(st) {
-  const c = st[ROZPIS_OBDOBIE];
+function rozpisHtml(st, id) {
+  const c = st[rozpisObdobie];
   const kat = c && c.kat ? c.kat : {};
   const mena = KAT_PORADIE.filter(k => kat[k] && kat[k].uloh > 0);
+  const popis = (OBDOBIA.find(o => o.key === rozpisObdobie) || {}).label || rozpisObdobie;
+  const prepinac = '<div class="rozpis-seg">'
+    + OBDOBIA.map(o => `<button type="button" class="${o.key === rozpisObdobie ? 'akt' : ''}"
+        onclick="prepniObdobieRozpisu('${o.key}')">${o.label}</button>`).join('')
+    + '</div>';
+
   if (!mena.length) {
-    return '<div class="rozpis-prazdny">Za posledných 30 dní žiadny tréning.</div>';
+    return '<div class="rozpis-nadpis">Rozpis podľa kategórií</div>' + prepinac
+         + `<div class="rozpis-prazdny">Za obdobie „${popis}" žiadny tréning.</div>`;
   }
   const celkom = mena.reduce((a, k) => a + kat[k].cas, 0) || 1;
 
-  return '<div class="rozpis-nadpis">Rozpis za posledných 30 dní</div>'
+  return '<div class="rozpis-nadpis">Rozpis podľa kategórií</div>'
+    + prepinac
     + '<table class="rozpis-tab"><tr>'
     + '<th>Kategória</th><th>Čas</th><th>Podiel</th><th>Úloh</th><th>Využitie limitu</th></tr>'
     + mena.map(k => {
@@ -393,6 +413,20 @@ function rozpisHtml(st) {
     + '</table>';
 }
 
+// Prepnutie obdobia prekreslí VŠETKY otvorené rozpisy naraz — tréner tak môže
+// porovnávať viacerých hráčov v tom istom okne bez zatvárania a otvárania.
+function prepniObdobieRozpisu(key) {
+  rozpisObdobie = key;
+  document.querySelectorAll('tr.rozpis-row').forEach(r => {
+    if (r.style.display === 'none') return;          // zatvorené netreba
+    const id = r.id.replace('roz', '');
+    const bunka = r.querySelector('.rozpis-cell');
+    if (bunka && window._stats && window._stats[id]) {
+      bunka.innerHTML = rozpisHtml(window._stats[id], id);
+    }
+  });
+}
+
 function prepniRozpis(id) {
   const r = document.getElementById('roz' + id);
   const sip = document.getElementById('sip' + id);
@@ -405,6 +439,7 @@ function prepniRozpis(id) {
 // ─── Vykreslenie ────────────────────────────────────────────────────────────
 async function render(players, log) {
   const stats = await spocitaj(players, log);
+  window._stats = stats;   // prepínač obdobia si ich vyžiada pri prekreslení
   const ciel  = dennyCiel();
 
   // maximum v skupine pre režim „V rámci skupiny"
@@ -454,7 +489,7 @@ async function render(players, log) {
     // Skrytý riadok s rozpisom — rozbalí sa kliknutím na meno
     b += `<tr class="rozpis-row" id="roz${p.id}" style="display:none;">
             <td colspan="${OBDOBIA.length + 2}" class="rozpis-cell">
-              ${rozpisHtml(stats[p.id])}</td></tr>`;
+              ${rozpisHtml(stats[p.id], p.id)}</td></tr>`;
   });
   document.getElementById('mapBody').innerHTML = b;
   document.getElementById('mapTable').style.display = '';
