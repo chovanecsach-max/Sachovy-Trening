@@ -578,6 +578,20 @@ button {
 
   <div id="userStatus" class="status">Klikni na Načítať používateľov.</div>
 
+  <div id="userTools" style="display:none;margin-top:12px;align-items:center;gap:10px;flex-wrap:wrap;">
+    <label style="font-size:13px;color:#475569;">Zoradiť:</label>
+    <select id="userSort" onchange="renderUserList(window._playerMap || {})"
+            style="padding:6px 10px;border:1px solid #d1d5db;border-radius:8px;font-size:13px;">
+      <option value="meno">podľa mena</option>
+      <option value="platnost">podľa platnosti (najskôr končiace)</option>
+    </select>
+    <label style="font-size:13px;color:#475569;display:flex;align-items:center;gap:5px;">
+      <input type="checkbox" id="userLenVyprsane"
+             onchange="renderUserList(window._playerMap || {})"> len vypršané
+    </label>
+    <span id="userPocty" style="font-size:12px;color:#94a3b8;"></span>
+  </div>
+
   <div id="userList" style="margin-top:12px; display:grid; gap:8px;"></div>
 
   <div id="userEditBox" class="result hidden" style="margin-top:16px;">
@@ -1455,20 +1469,69 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 });
 
+// Odznak platnosti v zozname. Okrem zostávajúcich dní ukazuje aj DÁTUM —
+// bez neho sa nedalo zistiť, kedy komu platnosť skončila, a pri vypršaných
+// účtoch je to práve tá informácia, ktorú administrátor potrebuje.
 function validityBadge(u) {
-  if (!u.valid_to) return '<span style="font-size:11px;color:#94a3b8;">bez platnosti</span>';
+  if (!u.valid_to) {
+    return '<span style="font-size:11px;color:#94a3b8;">bez obmedzenia</span>';
+  }
   const now = new Date();
   const to  = new Date(u.valid_to);
-  if (now > to) return '<span style="font-size:11px;color:#dc2626;font-weight:bold;">⛔ vypršané</span>';
-  const days = Math.ceil((to - now) / (1000 * 60 * 60 * 24));
-  const color = days <= 7 ? '#d97706' : '#16a34a';
-  return `<span style="font-size:11px;color:${color};">✓ ${days} dní</span>`;
+  const den = to.toLocaleDateString('sk-SK');
+  // Rozdiel v KALENDÁRNYCH dňoch, nie v hodinách — inak by účet končiaci dnes
+  // večer hlásil „0 dní" aj ráno. admin.html nenačítava player.js, preto sa
+  // dni počítajú tu, bez pomocných funkcií.
+  const naPoludnie = d => new Date(d.getFullYear(), d.getMonth(), d.getDate(), 12);
+  const dni = Math.round((naPoludnie(to) - naPoludnie(now)) / 86400000);
+
+  if (dni < 0) {
+    return `<span style="font-size:11px;color:#dc2626;font-weight:bold;">⛔ vypršalo ${den}</span>`
+         + `<span style="font-size:10px;color:#94a3b8;display:block;">pred ${Math.abs(dni)} dňami</span>`;
+  }
+  if (dni === 0) {
+    return `<span style="font-size:11px;color:#dc2626;font-weight:bold;">⚠️ končí dnes (${den})</span>`;
+  }
+  const farba = dni <= 7 ? '#d97706' : dni <= 30 ? '#ca8a04' : '#16a34a';
+  const slovo = dni === 1 ? 'deň' : dni < 5 ? 'dni' : 'dní';
+  return `<span style="font-size:11px;color:${farba};">✓ do ${den}</span>`
+       + `<span style="font-size:10px;color:#94a3b8;display:block;">ešte ${dni} ${slovo}</span>`;
 }
 
 function renderUserList(playerMap) {
   const el = document.getElementById('userList');
+  window._playerMap = playerMap;   // ovládanie zoradenia si ju vyžiada
   if (!allUsers.length) {
     el.innerHTML = '<div style="color:#64748b;font-style:italic;padding:10px;">Žiadni používatelia</div>';
+    return;
+  }
+
+  // Zoradenie a filter podľa platnosti. Pri stovkách účtov sa vypršané inak
+  // hľadajú ťažko — a práve tie treba nájsť.
+  const nastroje = document.getElementById('userTools');
+  if (nastroje) nastroje.style.display = 'flex';
+
+  const teraz = Date.now();
+  const koniec = u => u.valid_to ? new Date(u.valid_to).getTime() : Infinity;
+  const vyprsane = allUsers.filter(u => u.valid_to && koniec(u) < teraz);
+
+  const lenVyprsane = document.getElementById('userLenVyprsane')?.checked;
+  const zoradit = document.getElementById('userSort')?.value || 'meno';
+
+  let zoznam = lenVyprsane ? vyprsane : allUsers.slice();
+  if (zoradit === 'platnost') {
+    // Bez platnosti (Infinity) skončia na konci — nemajú čo riešiť
+    zoznam.sort((a, b) => koniec(a) - koniec(b));
+  }
+
+  const pocty = document.getElementById('userPocty');
+  if (pocty) {
+    pocty.textContent = `zobrazených ${zoznam.length} z ${allUsers.length}`
+      + (vyprsane.length ? ` · vypršaných ${vyprsane.length}` : '');
+  }
+
+  if (!zoznam.length) {
+    el.innerHTML = '<div style="color:#166534;padding:10px;">✅ Žiadny účet nemá vypršanú platnosť.</div>';
     return;
   }
 
@@ -1491,7 +1554,7 @@ function renderUserList(playerMap) {
     trenerNameMap[t.id] = t.nick_name || `${t.name || ''} ${t.surname || ''}`.trim();
   });
 
-  el.innerHTML = allUsers.map(u => {
+  el.innerHTML = zoznam.map(u => {
     const roleStyle = roleColors[u.role] || '';
     const roleLabel = roleLabels[u.role] || u.role;
     const trenerName = (u.role === 'hrac' && playerMap[u.id])
