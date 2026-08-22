@@ -1303,7 +1303,7 @@ async function loadUsers() {
   setUserStatus('Načítavam používateľov...');
   try {
     // Načítaj všetky profily
-    const profiles = await sbFetch('profiles?order=surname.asc,name.asc&select=id,email,role,nick_name,name,surname');
+    const profiles = await sbFetch('profiles?order=surname.asc,name.asc&select=id,email,role,nick_name,name,surname,valid_from,valid_to');
     allUsers = profiles || [];
 
     // Načítaj trénerov pre dropdown
