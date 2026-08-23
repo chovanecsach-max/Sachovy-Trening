@@ -414,9 +414,9 @@ body {
       <div class="nav-icon i-stat">📊</div>
       Štatistika
     </button>
-    <button class="nav-btn" onclick="goManual()">
+    <button class="nav-btn" onclick="goDokumentacia()">
       <div class="nav-icon i-stat">📖</div>
-      Manuál
+      Dokumentácia
     </button>
     <button class="nav-btn nav-admin" id="trenerBtn" onclick="toggleTrenerMenu()" style="display:none;">
       <div class="nav-icon i-admin">🧑‍🏫</div>
@@ -805,7 +805,7 @@ async function loadAssignmentBadge() {
   }
 }
 function goSkills(type)    { location.href = "skills.html?type=" + type; }
-function goManual()        { location.href = "manual.html"; }
+function goDokumentacia()  { location.href = "dokumentacia.html"; }
 
 function goKoncovka(type) {
   location.href = "training.html?mode=koncovka" + (type ? "&endgame=" + encodeURIComponent(type) : "");
