@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dokumentácia — Šachový tréning</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0f1117">
+<link rel="apple-touch-icon" href="ikona-180.png">
+<link rel="icon" type="image/svg+xml" href="logo2_favicon.svg">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Segoe UI', Arial, sans-serif;
+  background: #e8eaf0;
+  min-height: 100vh;
+  color: #111827;
+}
+
+/* ── Hlavička ── */
+.header {
+  background: #0f1117;
+  padding: 16px 40px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.logo { display: flex; align-items: center; gap: 12px; }
+.logo-text { font-size: 22px; font-weight: 600; color: #d4a843; letter-spacing: .4px; }
+.back-btn {
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.14);
+  color: #e5e7eb; padding: 8px 16px; border-radius: 8px;
+  font-size: 14px; cursor: pointer; font-family: inherit;
+}
+.back-btn:hover { background: rgba(255,255,255,0.14); }
+
+.main { max-width: 1000px; margin: 0 auto; padding: 24px 20px 60px; }
+
+h1 { font-size: 28px; margin-bottom: 6px; color: #0f1117; }
+.podnadpis { color: #64748b; margin-bottom: 20px; font-size: 15px; }
+
+/* ── Prepínač sekcií ── */
+.taby { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 22px; }
+.taby button {
+  border: 1px solid #cbd5e1; background: #fff; color: #334155;
+  padding: 11px 20px; border-radius: 10px; font-size: 15px;
+  cursor: pointer; font-family: inherit;
+}
+.taby button:hover { background: #f1f5f9; }
+.taby button.akt { background: #0f1117; color: #fff; border-color: #0f1117; font-weight: 600; }
+
+.sekcia { display: none; }
+.sekcia.akt { display: block; }
+
+/* ── Obsah ── */
+.karta {
+  background: #fff; border-radius: 14px; padding: 22px 26px;
+  margin-bottom: 16px; box-shadow: 0 2px 10px rgba(0,0,0,.05);
+}
+.karta h2 {
+  font-size: 19px; color: #1e3a5f; margin-bottom: 12px;
+  padding-bottom: 8px; border-bottom: 2px solid #e2e8f0;
+}
+.karta h3 { font-size: 15px; color: #334155; margin: 16px 0 7px; }
+.karta p { line-height: 1.6; margin-bottom: 10px; color: #334155; font-size: 14.5px; }
+.karta ul, .karta ol { margin: 0 0 12px 22px; }
+.karta li { line-height: 1.6; margin-bottom: 6px; color: #334155; font-size: 14.5px; }
+
+code {
+  background: #f1f5f9; padding: 1px 6px; border-radius: 5px;
+  font-family: Consolas, monospace; font-size: 13px; color: #1e3a5f;
+}
+
+.tip, .pozor, .info {
+  border-radius: 10px; padding: 12px 15px; margin: 12px 0; font-size: 14px; line-height: 1.55;
+}
+.tip   { background: #f0fdf4; border: 1px solid #86efac; color: #166534; }
+.pozor { background: #fffbeb; border: 1px solid #fbbf24; color: #78350f; }
+.info  { background: #eff6ff; border: 1px solid #bfdbfe; color: #1e3a5f; }
+
+table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 14px; }
+th {
+  background: #1e3a5f; color: #fff; text-align: left;
+  padding: 8px 11px; font-size: 12.5px; text-transform: uppercase; letter-spacing: .3px;
+}
+td { padding: 8px 11px; border-bottom: 1px solid #e2e8f0; color: #334155; }
+tr:nth-child(even) td { background: #f8fafc; }
+
+/* ── Kartičky zručností ── */
+.zruc-mriezka { display: grid; grid-template-columns: repeat(auto-fit, minmax(310px, 1fr)); gap: 14px; }
+.zruc {
+  background: #fff; border-radius: 12px; padding: 16px 18px;
+  border-left: 5px solid #94a3b8; box-shadow: 0 2px 8px rgba(0,0,0,.05);
+}
+.zruc.modra   { border-left-color: #2563eb; }
+.zruc.fialova { border-left-color: #9333ea; }
+.zruc.oranz   { border-left-color: #d97706; }
+.zruc.zelena  { border-left-color: #16a34a; }
+.zruc h3 { font-size: 16px; color: #1e3a5f; margin-bottom: 3px; }
+.zruc .zadanie { font-size: 13px; color: #64748b; font-style: italic; margin-bottom: 11px; }
+.krok { display: flex; align-items: flex-start; gap: 9px; padding: 5px 0; border-bottom: 1px solid #f1f5f9; }
+.krok:last-of-type { border-bottom: none; }
+.krok .cis { color: #94a3b8; font-size: 12px; font-weight: bold; min-width: 15px; }
+.krok .txt { flex: 1; font-size: 13.5px; color: #334155; line-height: 1.45; }
+.odp { font-size: 11.5px; font-weight: bold; padding: 2px 8px; border-radius: 5px; white-space: nowrap; }
+.odp.ano { background: #dcfce7; color: #166534; }
+.odp.nie { background: #fee2e2; color: #b91c1c; }
+.zruc .pozn { font-size: 12.5px; color: #92400e; margin-top: 10px; line-height: 1.5; }
+
+.hodnoty { text-align: center; color: #64748b; font-size: 13.5px; margin-top: 16px; }
+
+@media (max-width: 640px) {
+  .header { padding: 14px 16px; }
+  .main { padding: 18px 14px 40px; }
+  .karta { padding: 18px 16px; }
+  h1 { font-size: 23px; }
+  .taby button { padding: 9px 14px; font-size: 14px; }
+}
+</style>
+</head>
+
+<body>
+
+<div class="header">
+  <div class="logo"><span class="logo-text">♟ Šachový tréning</span></div>
+  <button class="back-btn" onclick="location.href='index.html'">← Späť do menu</button>
+</div>
+
+<div class="main">
+  <h1>Dokumentácia</h1>
+  <p class="podnadpis">Návody k tréningovému programu — pre hráčov aj trénerov.</p>
+
+  <div class="taby">
+    <button class="akt" data-s="hrac">Pre hráča</button>
+    <button data-s="trener">Pre trénera</button>
+    <button data-s="zrucnosti">Čo hľadám — prehľad zručností</button>
+  </div>
+
+<!-- ══════════════════════════ PRE HRÁČA ══════════════════════════ -->
+<div class="sekcia akt" id="s-hrac">
+
+  <div class="karta">
+    <h2>Ako začať</h2>
+    <p>Po prihlásení uvidíš hlavné menu. Každá dlaždica je jeden druh tréningu:</p>
+    <table>
+      <tr><th>Dlaždica</th><th>Čo tam nájdeš</th></tr>
+      <tr><td><strong>Zručnosti</strong></td><td>Deväť typov úloh na šachové videnie — šachy, brania, vidličky, väzby a ďalšie. Hľadáš <em>všetky</em> riešenia v pozícii.</td></tr>
+      <tr><td><strong>Taktika</strong></td><td>Klasické úlohy: nájdi najlepší ťah a dohraj variant.</td></tr>
+      <tr><td><strong>Stratégia</strong></td><td>Pozičné úlohy, kde nejde o okamžitý zisk.</td></tr>
+      <tr><td><strong>Koncovka</strong></td><td>Záverečné fázy partie.</td></tr>
+      <tr><td><strong>Mix</strong></td><td>Zmes všetkého — a nevieš dopredu, o aký typ ide. Presne ako v partii.</td></tr>
+      <tr><td><strong>Zadania</strong></td><td>Úlohy, ktoré ti dal tréner. Číslo na dlaždici hovorí, koľko ich čaká.</td></tr>
+      <tr><td><strong>Súťaže</strong></td><td>Tréningové súťaže, do ktorých si zapojený.</td></tr>
+      <tr><td><strong>Štatistika</strong></td><td>Tvoj postup, úspešnosť a prehľad chýb.</td></tr>
+    </table>
+  </div>
+
+  <div class="karta">
+    <h2>Ako sa počíta ELO</h2>
+    <p>ELO je číslo, ktoré hovorí o tvojej sile. Každá kategória má vlastné — môžeš byť silný v taktike a slabší v koncovkách.</p>
+    <ul>
+      <li>Za <strong>vyriešenú</strong> úlohu ELO stúpne, za <strong>nevyriešenú</strong> klesne.</li>
+      <li>Koľko presne, závisí od <strong>obtiažnosti úlohy</strong>. Ťažká úloha dá viac než ľahká.</li>
+      <li>Ak si úlohu raz pokazil, <strong>ELO ti už za ňu nepribudne</strong>, aj keby si ju potom vyriešil. Preto sa oplatí premýšľať, nie skúšať.</li>
+    </ul>
+
+    <h3>Prvých pätnásť úloh je iných</h3>
+    <p>Keď začínaš, program nevie, aký si silný. Prvých pätnásť úloh v každej kategórii preto mení ELO <strong>oveľa rýchlejšie</strong> — aby si sa čo najskôr dostal na svoju úroveň a nedostával príliš ľahké pozície.</p>
+    <table>
+      <tr><th>Úloha</th><th>Zmena pri úlohe na tvojej úrovni</th></tr>
+      <tr><td>1. – 5.</td><td>približne ±75 bodov</td></tr>
+      <tr><td>6. – 10.</td><td>približne ±40 bodov</td></tr>
+      <tr><td>11. – 15.</td><td>približne ±20 bodov</td></tr>
+      <tr><td>16. a ďalšie</td><td>približne ±10 bodov — bežný výpočet</td></tr>
+    </table>
+    <div class="info">Kým toto obdobie trvá, nad šachovnicou uvidíš oznam <em>„Zisťujeme tvoju úroveň"</em>. Neľakaj sa veľkých skokov, je to zámer.</div>
+  </div>
+
+  <div class="karta">
+    <h2>Časový limit</h2>
+    <p>Každá úloha má odporúčaný čas. Odpočet vidíš v paneli vpravo, na telefóne aj v pruhu nad šachovnicou.</p>
+    <ul>
+      <li>Posledných tridsať sekúnd je odpočet <strong>oranžový</strong>.</li>
+      <li>Keď čas vyprší, úloha sa počíta ako <strong>nevyriešená</strong>.</li>
+    </ul>
+    <div class="tip">Limit je odporúčanie, nie preteky. Lepšie je jednu úlohu poriadne premyslieť než tri odhádzať.</div>
+  </div>
+
+  <div class="karta">
+    <h2>Pravidlá, ktoré ťa môžu prekvapiť</h2>
+
+    <h3>Nedá sa utiecť z rozriešenej úlohy</h3>
+    <p>Keď úlohu otvoríš a po <strong>desiatich sekundách</strong> z nej odídeš — cez menu, cez „Ďalšia úloha" alebo zavretím okna — počíta sa ako nevyriešená a ELO klesne. Prvých desať sekúnd je ochranná lehota, keby si sa preklikol.</p>
+
+    <h3>„Skús znova" ELO nevráti</h3>
+    <p>Tlačidlo je na to, aby si si pozíciu prešiel ešte raz. Body za ňu už ale nedostaneš.</p>
+
+    <h3>Úloha sa nevráti hneď</h3>
+    <p>Vyriešené úlohy sa ti už nezobrazia. Tie, ktoré si pokazil, sa vrátia <strong>po dvoch týždňoch</strong> — dovtedy ich stihneš zabudnúť a je to skutočná skúška.</p>
+    <div class="pozor">Preto sa nesnaž zapamätať si riešenie. Snaž sa pochopiť, <em>prečo</em> je správne.</div>
+  </div>
+
+  <div class="karta">
+    <h2>Zručnosti — čo je iné</h2>
+    <p>Pri zručnostiach nehľadáš jeden ťah, ale <strong>všetky</strong>, ktoré vyhovujú zadaniu. Vpravo vidíš, koľko ich ešte zostáva nájsť.</p>
+    <ul>
+      <li>Nájdené sa ukazujú <strong>zelené</strong>, prehliadnuté po odhalení <strong>červené</strong>.</li>
+      <li>Pri niektorých zručnostiach klikáš na <strong>figúrku</strong>, nie na ťah — napríklad pri slabo pokrytých figúrkach a väzbách.</li>
+      <li>Šachovnica sa pri zručnostiach <strong>nehýbe</strong>. Označuješ, nie hráš.</li>
+    </ul>
+
+    <h3>Vysvetlenie po skončení</h3>
+    <p>Keď je úloha uzavretá, <strong>klikni na ktorýkoľvek štítok s ťahom</strong> a dozvieš sa, prečo je to riešenie. Na šachovnici sa zároveň objaví šípka alebo krúžok.</p>
+    <div class="tip">Toto je najužitočnejšia časť tréningu. Nestačí vedieť, <em>čo</em> si prehliadol — dôležité je vedieť <em>prečo</em> to riešením je. Podrobný rozpis máš v záložke „Čo hľadám".</div>
+  </div>
+
+  <div class="karta">
+    <h2>Zadania a súťaže</h2>
+    <h3>Zadania</h3>
+    <p>Tréner ti môže zadať úlohu typu „vyriešiť 20 úloh z vidličiek do konca mesiaca" alebo „dosiahnuť ELO 1400". Postup vidíš priebežne a tlačidlo ťa pustí rovno do správneho tréningu.</p>
+
+    <h3>Súťaže</h3>
+    <p>Súťaží sa buď v <strong>počte vyriešených úloh</strong>, alebo v <strong>náraste ELO</strong>. V rebríčku vidíš všetkých zapojených a svoj riadok máš zvýraznený. Nad ním je zhrnutie — koľký si a koľko ti chýba na priečku pred tebou.</p>
+    <div class="pozor"><strong>Do súťaže sa počítajú len úlohy vyriešené na prvý pokus.</strong> Opakované riešenie tej istej pozície sa nezapočíta. Klikni na svoj riadok a uvidíš rozpis, ktoré úlohy sa započítali a ktoré nie.</div>
+  </div>
+
+  <div class="karta">
+    <h2>Praktické veci</h2>
+    <h3>Zabudnuté heslo</h3>
+    <p>Na prihlasovacej stránke je pod tlačidlom odkaz <strong>Zabudnuté heslo?</strong>. Vyplň email, príde ti odkaz na nastavenie nového. Platí hodinu.</p>
+
+    <h3>Aplikácia v telefóne</h3>
+    <p>Stránku si môžeš pridať na plochu telefónu a otvárať ako aplikáciu. V Chrome je to ponuka ⋮ → <em>Inštalovať aplikáciu</em> alebo <em>Pridať na plochu</em>.</p>
+
+    <h3>Platnosť prístupu</h3>
+    <p>Prístup má obmedzenú platnosť. Keď sa blíži koniec, na úvodnej stránke sa objaví upozornenie. Po vypršaní sa do tréningu nedostaneš — vtedy sa ozvi trénerovi.</p>
+
+    <h3>Údržba</h3>
+    <p>Občas sa program vylepšuje. Vtedy sa môže objaviť oznam <em>„Prebieha údržba"</em>. Zvyčajne to netrvá dlho, skús to o chvíľu znova.</p>
+  </div>
+</div>
+
+<!-- ══════════════════════════ PRE TRÉNERA ══════════════════════════ -->
+<div class="sekcia" id="s-trener">
+
+  <div class="karta">
+    <h2>Kde čo nájdeš</h2>
+    <p>Trénerské nástroje sú v menu pod tlačidlom <strong>Tréner</strong>.</p>
+    <table>
+      <tr><th>Nástroj</th><th>Na čo slúži</th></tr>
+      <tr><td><strong>Slabinová mapa</strong></td><td>Farebná tabuľka ELO po zručnostiach a kategóriách. Ukáže, kde má kto medzeru.</td></tr>
+      <tr><td><strong>Mapa koncoviek</strong></td><td>To isté pre dvanásť typov koncoviek.</td></tr>
+      <tr><td><strong>Časová mapa</strong></td><td>Koľko kto trénuje a ako pravidelne.</td></tr>
+      <tr><td><strong>Report</strong></td><td>Mesačné zhrnutie po hráčoch — postup ELO, chyby, zadania.</td></tr>
+      <tr><td><strong>Zadania</strong></td><td>Prehľad zadaných úloh a ich plnenia.</td></tr>
+      <tr><td><strong>Súťaže</strong></td><td>Vytváranie súťaží a výsledky.</td></tr>
+    </table>
+  </div>
+
+  <div class="karta">
+    <h2>Slabinová mapa</h2>
+    <p>Riadok je hráč, stĺpec zručnosť. Farba hovorí, ako na tom hráč je v porovnaní so skupinou — od červenej po zelenú.</p>
+    <ul>
+      <li>Prepínač hore mení pohľad: <strong>zručnosti</strong> alebo <strong>kategórie</strong> klasického tréningu.</li>
+      <li>Pod tabuľkou je zoznam hráčov, ktorí zaostávajú.</li>
+    </ul>
+
+    <h3>Návrhy zadaní</h3>
+    <p>Nad mapou sa môžu objaviť žlté návrhy typu <em>„Absolútne väzby sú o 230 bodov pod priemerom skupiny, pod prahom sú traja hráči"</em>. Jedno kliknutie vytvorí zadanie všetkým vypísaným.</p>
+    <div class="info">Sú to <strong>návrhy, nie automatika</strong>. Program vidí čísla, ty vidíš dieťa — rozhodnutie zostáva na tebe. Návrh sa ukáže len vtedy, keď zaostávajú aspoň dvaja hráči; slabina jedného sa hromadným zadaním nerieši.</div>
+  </div>
+
+  <div class="karta">
+    <h2>Časová mapa</h2>
+    <p>Ukazuje päť období: týždeň, mesiac, tri mesiace, polrok a rok. V bunke je čas, počet úloh, dni so splneným cieľom a využitie časového limitu.</p>
+
+    <h3>Dni so splneným cieľom</h3>
+    <p>Údaj <code>4/30 dní</code> znamená, že hráč za mesiac splnil denný cieľ štyrikrát. <strong>Pravidelnosť je cennejšia než objem</strong> — kto odtrénuje dve hodiny raz za týždeň, má rovnaký čas ako ten, kto trénuje dvadsať minút denne, ale návyk si nevybuduje. Denný cieľ si nastavíš hore.</p>
+
+    <h3>Využitie limitu</h3>
+    <p><code>K 23 % · Z 42 %</code> znamená využitie času v klasickom tréningu a v zručnostiach. Počíta sa <strong>len z vyriešených úloh</strong> — pri neúspechu hráč zvyčajne vyčerpá celý limit a priemer by to skreslilo.</p>
+    <div class="tip">Nízke číslo znamená rezervu — hráč znesie ťažšie úlohy. Vysoké číslo znamená, že je na hranici a pri prvom zaváhaní nestihne.</div>
+
+    <h3>Rozpis po kategóriách</h3>
+    <p>Klikni na meno hráča a rozbalí sa rozpis: koľko času venoval taktike, stratégii, koncovkám, mixu a zručnostiam, a aké je využitie limitu v každej z nich. Obdobie sa prepína tlačidlami.</p>
+    <p>Práve tu sa dá zachytiť prípad <em>„taktiku zvláda s rezervou, ale v stratégii je na hranici"</em> — čo je iné odporúčanie než „trénuj viac".</p>
+    <div class="pozor">Za percentom je uvedené, <strong>z koľkých úloh</strong> vychádza. Percento z troch úloh nemá rovnakú váhu ako z tristo.</div>
+  </div>
+
+  <div class="karta">
+    <h2>Mesačný report</h2>
+    <p>Zhrnutie za mesiac pre každého hráča: čas, počet úloh, posun ELO po kategóriách, najslabšia zručnosť a stav zadaní.</p>
+
+    <h3>Neúspešné pokusy</h3>
+    <p>Riadok rozlišuje, <strong>prečo</strong> hráč neuspel. To je rozdiel, ktorý mení odporúčanie:</p>
+    <table>
+      <tr><th>Prevažuje</th><th>Znamená to</th></tr>
+      <tr><td>chybný ťah</td><td>Vzor nepozná — treba vysvetľovať a trénovať rozpoznávanie.</td></tr>
+      <tr><td>nestihol čas</td><td>Riešenie vidí, ale pomaly — treba trénovať rýchlosť, nie obsah.</td></tr>
+      <tr><td>pozrel riešenie</td><td>Vzdáva to skoro — možno sú úlohy priťažké.</td></tr>
+      <tr><td>opustil úlohu</td><td>Nesústredí sa, alebo klikal náhodne.</td></tr>
+    </table>
+    <p>Pod tým je rozpis podľa kategórií, takže vidíš aj <em>kde</em> tie neúspechy vznikli.</p>
+  </div>
+
+  <div class="karta">
+    <h2>Zadania</h2>
+    <p>Zadanie sa vytvára priamo v slabinovej mape — vyberieš hráčov, zručnosť a cieľ.</p>
+    <ul>
+      <li><strong>Počet úloh</strong> — napríklad „vyriešiť 20 úloh z vidličiek".</li>
+      <li><strong>Cieľové ELO</strong> — napríklad „dosiahnuť 1400 v taktike".</li>
+    </ul>
+    <p>Pri type „počet úloh" sa počítajú <strong>len úlohy vyriešené na prvý pokus</strong> od momentu zadania. Opakovanie tej istej pozície zadanie nesplní.</p>
+  </div>
+
+  <div class="karta">
+    <h2>Súťaže</h2>
+    <h3>Vytvorenie</h3>
+    <p>V sekcii Súťaže zadáš názov, popis, typ, kategóriu, obdobie a zapojené skupiny. Tréner môže zapojiť len skupiny, ku ktorým má prístup.</p>
+    <table>
+      <tr><th>Typ súťaže</th><th>Ako sa počíta</th></tr>
+      <tr><td>Počet vyriešených úloh</td><td>Úlohy vyriešené na prvý pokus v danej kategórii, v období súťaže.</td></tr>
+      <tr><td>Nárast ELO</td><td>Rozdiel oproti ELU, ktoré mal hráč pri vyhlásení súťaže.</td></tr>
+    </table>
+    <div class="pozor">Súťaž na <strong>nárast ELO sa nedá vyhlásiť spätne</strong>. Východiskové ELO sa odfotí v okamihu vytvorenia a bez neho by sa nárast nedal spočítať.</div>
+
+    <h3>Výsledky</h3>
+    <p>Dva pohľady: <strong>hráči</strong> a <strong>skupiny</strong>. Prepínač sa objaví, len keď sú zapojené aspoň dve skupiny.</p>
+    <p>Skupiny sa radia <strong>podľa priemeru na hráča</strong>, nie podľa súčtu — inak by veľká skupina porazila malú bez ohľadu na snahu. Súčet je uvedený vedľa. Do priemeru sa počítajú <strong>všetci hráči skupiny</strong>, aj tí, čo netrénovali.</p>
+  </div>
+
+  <div class="karta">
+    <h2>Skupinový tréner</h2>
+    <p>Tréner štandardne vidí len svojich hráčov. Ak vedie viac skupín, admin mu môže prideliť prístup k skupinám ďalších trénerov.</p>
+    <p>Vtedy sa v mapách, štatistike, reporte aj súťažiach objaví <strong>prepínač skupín</strong> s voľbou „všetci moji hráči". Kto má prístup k jedinej skupine, prepínač nevidí.</p>
+  </div>
+
+  <div class="karta">
+    <h2>Export chýb do PGN</h2>
+    <p>V štatistike sa dajú stiahnuť dva súbory PGN s pozíciami, ktoré hráč pokazil — zvlášť klasický tréning a zvlášť zručnosti.</p>
+    <p>Pri každej pozícii je uvedené riešenie a <strong>ťah, ktorý hráč skutočne zahral</strong>. To je pri rozbore najcennejšie: nestačí vedieť, že úlohu pokazil — treba vidieť čo zahral a spýtať sa prečo.</p>
+  </div>
+</div>
+
+<!-- ══════════════════════════ ČO HĽADÁM ══════════════════════════ -->
+<div class="sekcia" id="s-zrucnosti">
+
+  <div class="karta">
+    <h2>Ako program rozhoduje, čo je riešenie</h2>
+    <p>Tento prehľad hovorí, podľa akých pravidiel sa určuje riešenie. Slúži na to, aby hráč aj tréner vedeli odpovedať na otázku <em>„prečo sa tento ťah nepočíta"</em>.</p>
+    <div class="info">
+      <strong>Jeden pojem na začiatok.</strong> Zisk sa počíta po <strong>celej výmene</strong> na danom poli, nie len z prvého brania. Berie sa vždy najlacnejšou figúrkou, striedavo, kým sa to niektorej strane oplatí.<br><br>
+      <strong>Dôležité:</strong> figúrka, ktorá je viazaná, sa za obrancu nepočíta — nemôže brať, lebo by odkryla vlastného kráľa. Rovnako sa počíta aj to, že kráľ nemôže dobrať na pole, ktoré súper kryje.
+    </div>
+  </div>
+
+  <div class="zruc-mriezka">
+
+    <div class="zruc modra">
+      <h3>Brania so ziskom</h3>
+      <div class="zadanie">Nájdi všetky brania, ktoré prinesú zisk.</div>
+      <div class="krok"><span class="cis">1.</span><span class="txt">Beriem niečo?</span><span class="odp ano">ÁNO</span></div>
+      <div class="krok"><span class="cis">2.</span><span class="txt">Je zisk po celej výmene väčší než 0?</span><span class="odp ano">ÁNO</span></div>
+      <div class="pozn">Rovnocenná výmena sa nepočíta — nie je to zisk. Pozor na viazaného obrancu, ten nekryje.</div>
+    </div>
+
+    <div class="zruc fialova">
+      <h3>Vidličky</h3>
+      <div class="zadanie">Nájdi ťahy, ktoré vytvoria vidličku.</div>
+      <div class="krok"><span class="cis">1.</span><span class="txt">Prežije tam figúrka?</span><span class="odp ano">ÁNO</span></div>
+      <div class="krok"><span class="cis">2.</span><span class="txt">Sú terče NOVÉ — nenapádala ich už predtým?</span><span class="odp ano">ÁNO</span></div>
+      <div class="krok"><span class="cis">3.</span><span class="txt">Je branie na terči ziskové, alebo je terč cennejší?</span><span class="odp ano">ÁNO</span></div>
+      <div class="krok"><span class="cis">4.</span><span class="txt">Sú aspoň dva takéto terče?</span><span class="odp ano">ÁNO</span></div>
+      <div class="pozn">Kráľ je terč len vtedy, ak druhý terč prežije každý jeho ústup. Namiesto druhého terča stačí aj hrozba matu — ale na iné pole než napadnutá figúrka.</div>
+    </div>
+
+    <div class="zruc oranz">
+      <h3>Priame hrozby</h3>
+      <div class="zadanie">Nájdi tiché ťahy, po ktorých niečo hrozí.</div>
+      <div class="krok"><span class="cis">1.</span><span class="txt">Je to branie?</span><span class="odp nie">NIE</span></div>
+      <div class="krok"><span class="cis">2.</span><span class="txt">Dáva šach?</span><span class="odp nie">NIE</span></div>
+      <div class="krok"><span class="cis">3.</span><span class="txt">Vznikol mne nový ziskový terč ALEBO hrozba matu?</span><span class="odp ano">ÁNO</span></div>
+      <div class="krok"><span class="cis">4.</span><span class="txt">Vznikol súperovi nový ziskový terč ALEBO mat na ťah?</span><span class="odp nie">NIE</span></div>
+      <div class="pozn">Stačí jedno z dvoch: nový terč alebo mat na ťah. Posledný bod je najčastejší dôvod, prečo ťah neplatí — neodíď z poľa, kde niečo kryješ, nezataraš vlastnú obrannú líniu a neodkry si vlastného kráľa.</div>
+    </div>
+
+    <div class="zruc zelena">
+      <h3>Slabo pokryté figúrky</h3>
+      <div class="zadanie">Klikni na figúrky, nie na ťahy.</div>
+      <div class="krok"><span class="cis">1.</span><span class="txt">Spočítaj útočníkov a obrancov.</span><span class="odp">&nbsp;</span></div>
+      <div class="krok"><span class="cis">2.</span><span class="txt">Je obrancov MENEJ alebo ROVNAKO ako útočníkov?</span><span class="odp ano">ÁNO</span></div>
+      <div class="pozn">Platí aj 0 útočníkov a 0 obrancov — nekrytá figúrka sa počíta, aj keď ju nikto nenapáda. Počítajú sa biele aj čierne, kráľ nie.</div>
+    </div>
+
+  </div>
+
+  <div class="hodnoty">
+    Hodnoty figúrok: pešiak 1 · jazdec a strelec 3 · veža 5 · dáma 9.
+  </div>
+
+  <div class="karta" style="margin-top:18px;">
+    <h2>Ostatné zručnosti</h2>
+    <p>Zvyšných päť má pravidlá jednoduché a dajú sa vysvetliť jednou vetou:</p>
+    <table>
+      <tr><th>Zručnosť</th><th>Čo hľadáš</th></tr>
+      <tr><td><strong>Šachy</strong></td><td>Všetky ťahy, ktoré dávajú šach.</td></tr>
+      <tr><td><strong>Brania</strong></td><td>Všetky brania — bez ohľadu na to, či sa oplatia.</td></tr>
+      <tr><td><strong>Pešiakové prielomy</strong></td><td>Pešiakové ťahy, ktoré prerazia súperovu štruktúru.</td></tr>
+      <tr><td><strong>Absolútne väzby</strong></td><td>Figúrky, ktoré sa nemôžu pohnúť, lebo by odkryli vlastného kráľa.</td></tr>
+      <tr><td><strong>Relatívne väzby</strong></td><td>Figúrky, za ktorými stojí niečo cennejšie než ony samy. Pohnúť sa môžu, ale niečo to stojí.</td></tr>
+    </table>
+  </div>
+
+  <div class="karta">
+    <h2>Keď sa hráč pýta, prečo sa ťah nepočíta</h2>
+    <p>Tieto otázky v tomto poradí vedú k odpovedi takmer vždy:</p>
+    <ol>
+      <li>Prežila by figúrka na tom poli? <em>(vidličky)</em></li>
+      <li>Nenapádala tú figúrku už predtým? <em>(vidličky, hrozby)</em></li>
+      <li>Je branie na terči naozaj ziskové, alebo ho niekto kryje?</li>
+      <li>Neodišla figúrka z poľa, kde niečo kryla? <em>(hrozby)</em></li>
+      <li>Nezataraší ťah vlastnú obrannú líniu? <em>(hrozby)</em></li>
+    </ol>
+    <div class="pozor">
+      <strong>Čo program nevie.</strong> Nepočíta ďalej než na jeden ťah a neváži, či sa hrozba vyplatí. Nepozná iniciatívu, tempo ani dlhodobý tlak. Preto sa môže stať, že dobrý šachový ťah medzi riešeniami nie je — a je to v poriadku. Zručnosti trénujú <strong>rozpoznávanie vzorov</strong>, nie hodnotenie pozície. To je práca trénera.
+    </div>
+  </div>
+</div>
+
+</div>
+
+<script>
+// Prepínanie sekcií. Zvolená sa uloží do adresy, aby sa dal poslať odkaz
+// priamo na časť dokumentácie — napríklad hráčovi na „Čo hľadám".
+document.querySelectorAll('.taby button').forEach(b => {
+  b.addEventListener('click', () => prepni(b.dataset.s));
+});
+
+function prepni(s) {
+  document.querySelectorAll('.taby button').forEach(x =>
+    x.classList.toggle('akt', x.dataset.s === s));
+  document.querySelectorAll('.sekcia').forEach(x =>
+    x.classList.toggle('akt', x.id === 's' + '-' + s));
+  history.replaceState(null, '', '#' + s);
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// Otvorenie priamo na sekcii cez #hrac, #trener alebo #zrucnosti
+const zHash = (location.hash || '').replace('#', '');
+if (['hrac', 'trener', 'zrucnosti'].includes(zHash)) prepni(zHash);
+</script>
+
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(e =>
+      console.warn('Service worker sa nezaregistroval:', e));
+  });
+}
+</script>
+</body>
+</html>
