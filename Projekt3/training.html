@@ -1054,8 +1054,7 @@ async function loadExcludedPuzzleIds() {
 }
 
 // Zatvorenie karty alebo obnovenie stránky. Bežný zápis by prehliadač zrušil,
-// preto sa použije odosielanie s keepalive. Nové ELO sa počíta z lokálne
-// udržiavanej hodnoty, aby stačil jediný zápis bez čítania z databázy.
+// preto sa použije odosielanie s keepalive.
 // event.persisted = stránka ide do pamäte a môže sa vrátiť — vtedy nič.
 window.addEventListener('pagehide', function (e) {
   if (e.persisted) return;
@@ -1064,18 +1063,17 @@ window.addEventListener('pagehide', function (e) {
   const cas = uplynulyCasUlohy();
   if (cas < MILOST_SEKUND) return;
 
-  sbZapisPriOdchode('training_log', {
-    player_id: currentPlayer.id, puzzle_id: current.id,
-    result: 'loss', time_spent: Math.round(cas), source: 'puzzles',
-    loss_reason: 'odchod'
+  // Jediné volanie namiesto dvoch zápisov. Server si sám vyhodnotí, či ide
+  // o prvý pokus, a podľa toho pohne ELO — prehliadač už nič nepočíta.
+  zapisVysledokPriOdchode({
+    puzzleId:   current.id,
+    source:     'puzzles',
+    result:     'loss',
+    mode:       getTrainingMode() || 'mix',
+    timeSpent:  Math.round(cas),
+    lossReason: 'odchod',
+    timeLimit:  normalizeTimeValue(current.time)
   });
-
-  if (isEloEligible(current.id)) {
-    const pole = getEloField(getTrainingMode());
-    const stare = Number(currentPlayer[pole] || 1500);
-    const nove = Math.max(100, stare + eloZmena(stare, current.elo, 'loss'));
-    sbUpravPriOdchode(`players?id=eq.${currentPlayer.id}`, { [pole]: nove });
-  }
 });
 
 // ─── Opustenie úlohy ────────────────────────────────────────────────────────
@@ -1109,45 +1107,44 @@ async function recordResultOnce(result, dovod = null, chybnyTah = null) {
 
   const usedTime = Math.max(0, normalizeTimeValue(current.time) - timerRemaining);
 
-  // Jediná podmienka pre "prvý plnohodnotný pokus o túto úlohu".
-  // Rozhoduje o ELO aj o agregátoch v players (played/solved/total_time).
-  // Zápis do training_log ju NEPOUŽÍVA — každý pokus sa loguje, aj opakovanie.
-  const countsForProgress =
-    !currentPuzzleIsAdmin &&
-    (!everFailed || result === 'loss') &&
-    isEloEligible(current.id);
-
   if (!currentPuzzleIsAdmin) {
-    // História — vždy úplná, vrátane opakovaného riešenia už známej pozície
+    // Jediný zápis. História sa uloží vždy (aj opakované riešenie), o pohybe
+    // ELO a agregátov rozhoduje SERVER — pozrie sa do training_log, či hráč
+    // túto úlohu už riešil. Prehliadač to už neposudzuje ani neprepočítava.
+    //
     // Chybný ťah a hĺbka majú zmysel len pri skutočnej chybe — pri vypršanom
     // čase ani pri ukázanom riešení žiadny chybný ťah neexistuje.
     const jeChyba = (result === 'loss' && dovod === 'chyba');
-    await addTrainingResult(currentPlayer.id, current.id, result, usedTime, dovod,
-                            jeChyba ? chybnyTah : null,
-                            jeChyba ? spravnychTahov + 1 : null,
-                            normalizeTimeValue(current.time), prvyTahMs);
+    const _mode = getTrainingMode() || 'mix';
 
-    if (countsForProgress) {
+    const r = await zapisVysledok({
+      puzzleId:    current.id,
+      source:      'puzzles',
+      result:      result,
+      mode:        _mode,
+      timeSpent:   usedTime,
+      lossReason:  dovod,
+      wrongMove:   jeChyba ? chybnyTah : null,
+      ply:         jeChyba ? spravnychTahov + 1 : null,
+      timeLimit:   normalizeTimeValue(current.time),
+      firstMoveMs: prvyTahMs
+    });
+
+    if (r && r.prvy_pokus) {
       eloAwardedPuzzleIds.add(String(current.id));
 
-      // Agregáty hráča — len za prvý pokus, aby opakovanie neskresľovalo úspešnosť
-      await registerPlayerResult(currentPlayer.id, result, usedTime);
+      // Lokálny objekt sa zosúladí s tým, čo server naozaj uložil
+      currentPlayer[r.elo_pole] = r.elo_nove;
+      if (r.kalib_pole && r.kalib_odohrane != null) {
+        currentPlayer[r.kalib_pole] = r.kalib_odohrane;
+      }
+      currentPlayer.played     = Number(currentPlayer.played || 0) + 1;
+      currentPlayer.total_time = Number(currentPlayer.total_time || 0) + usedTime;
+      if (result === 'win') {
+        currentPlayer.solved = Number(currentPlayer.solved || 0) + 1;
+      }
 
-      await updatePlayerElo(currentPlayer.id, current.elo, result, getTrainingMode());
-      // Okamžite aktualizuj lokálny objekt — rovnaký vzorec ako v player.js
-      const _mode   = getTrainingMode();
-      const _field  = getEloField(_mode);
-      const _curElo = Number(currentPlayer[_field] || 1500);
-      // Rovnaký výpočet ako v player.js vrátane kalibrácie — inak by číslo
-      // v hlavičke nesedelo s tým, čo sa uložilo do databázy.
-      const _kPole = kalibPole(_mode);
-      const _kOdohrane = _kPole ? (Number(currentPlayer[_kPole]) || 0) : 0;
-      const _K = _kPole ? kalibK(_kOdohrane) : null;
-      const _change = eloZmena(_curElo, current.elo, result, _K);
-      currentPlayer[_field] = Math.max(_K != null ? KALIB_MIN_ELO : 100, _curElo + _change);
-      if (_K != null) currentPlayer[_kPole] = _kOdohrane + 1;
-      // Skutočná zmena môže byť menšia, ak ELO narazilo na spodnú hranicu 100
-      ukazZmenuElo(currentPlayer[_field] - _curElo);
+      ukazZmenuElo(r.zmena);
       oznamKalibraciu(_mode);
     }
     // Súhrn session zachytáva skutočnú aktivitu, teda aj opakované pokusy
