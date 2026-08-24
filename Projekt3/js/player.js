@@ -92,6 +92,62 @@ function _sbOdchod(path, method, telo) {
 function sbZapisPriOdchode(path, telo)  { _sbOdchod(path, 'POST',  telo); }
 function sbUpravPriOdchode(path, telo)  { _sbOdchod(path, 'PATCH', telo); }
 
+// ─── Zápis výsledku tréningu ────────────────────────────────────────────────
+// Jediná cesta, ktorou sa výsledok dostane do databázy. Nahrádza trojicu
+// addTrainingResult + registerPlayerResult + updatePlayerElo.
+//
+// PREČO: tie tri volania boli tri samostatné zápisy z prehliadača, čo znamenalo
+// dve veci. Po prvé, ELO si počítal prehliadač, takže sa dalo z konzoly zapísať
+// čokoľvek (bod A1 auditu). Po druhé, šlo o čítaj-uprav-zapíš bez zámku: dve
+// otvorené karty si výsledok navzájom prepísali a jeden tréning zmizol (bod B1).
+//
+// Serverová funkcia zapis_vysledok si silu úlohy načíta z databázy, spočíta nové
+// ELO tým istým vzorcom ako eloZmena() nižšie a zapíše training_log, players aj
+// elo_history v jednej transakcii so zamknutým riadkom hráča.
+//
+// VRACIA to, čo sa naozaj uložilo:
+//   { zapisane, prvy_pokus, elo_pole, elo_stare, elo_nove, zmena,
+//     elo_zrucnosti, kalib_pole, kalib_odohrane, kalib_zostava }
+// Pri opakovanom riešení tej istej úlohy len { zapisane, prvy_pokus: false }.
+// V prehliadači sa už ELO NEPREPOČÍTAVA — jediná pravda je táto odpoveď.
+function _teloVysledku(d) {
+  const cislo = (v, min) => (Number.isFinite(Number(v)) && Number(v) >= min)
+                            ? Math.round(Number(v)) : null;
+  return {
+    p_puzzle_id:     Number(d.puzzleId),
+    p_source:        d.source,                    // 'puzzles' | 'skill_puzzles'
+    p_result:        d.result,                    // 'win' | 'loss'
+    p_mode:          d.mode || null,              // taktika/strategia/koncovka/mix
+    p_time_spent:    Math.max(0, Math.round(Number(d.timeSpent) || 0)),
+    p_loss_reason:   d.result === 'loss' ? (d.lossReason || 'chyba') : null,
+    p_wrong_move:    d.wrongMove || null,
+    p_ply:           cislo(d.ply, 0),
+    p_time_limit:    cislo(d.timeLimit, 1),
+    p_first_move_ms: cislo(d.firstMoveMs, 0),
+    p_proti_sebe:    !!d.protiSebe                // komplexný tréning zručností
+  };
+}
+
+async function zapisVysledok(d) {
+  try {
+    return await sbFetch('rpc/zapis_vysledok', {
+      method: 'POST',
+      body: JSON.stringify(_teloVysledku(d))
+    });
+  } catch (e) {
+    console.error('Zápis výsledku zlyhal:', e);
+    reportPlayerError('zapis_vysledok zlyhal', e);
+    return null;
+  }
+}
+
+// Verzia pre odchod zo stránky (pagehide). Bežné volanie by prehliadač zrušil,
+// preto ide cez keepalive. Odpoveď sa už nedá prečítať — a netreba, hráč
+// stránku opúšťa.
+function zapisVysledokPriOdchode(d) {
+  _sbOdchod('rpc/zapis_vysledok', 'POST', _teloVysledku(d));
+}
+
 // ─── ELO podľa režimu ───────────────────────────────────────────────────────
 
 // Zručnosti, ktoré majú v tabuľke players vlastný ELO stĺpec (elo_<typ>).
@@ -851,6 +907,9 @@ async function getCurrentPlayer() {
   }
 }
 
+// ZASTARANÉ — nahradila ju serverová funkcia zapis_vysledok (viď zapisVysledok
+// vyššie). Po odobratí práva zapisovať do players prestane fungovať. Zostáva tu
+// len ako referencia na pôvodný výpočet; nič ju už nevolá.
 async function updatePlayerElo(playerId, puzzleElo, result, mode) {
   try {
     const players = await sbFetch(`players?id=eq.${playerId}&limit=1`);
@@ -901,6 +960,7 @@ async function updatePlayerElo(playerId, puzzleElo, result, mode) {
   }
 }
 
+// ZASTARANÉ — agregáty played/solved/total_time zapisuje zapis_vysledok.
 async function registerPlayerResult(playerId, result, timeSpent = 0) {
   try {
     const players = await sbFetch(`players?id=eq.${playerId}&limit=1`);
