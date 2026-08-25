@@ -332,13 +332,6 @@ async function zistiUdrzbu() {
 }
 
 async function login() {
-  // Údržba sa kontroluje UŽ TU, aby hráč nedostal chybu až v tréningu.
-  const _u = await zistiUdrzbu();
-  if (_u.zapnuta) {
-    setStatus('loginStatus', '🔧 ' + (_u.text ||
-      'Prebieha údržba tréningového programu. Skús sa prihlásiť o chvíľu.'), 'error');
-    return;
-  }
   const email = document.getElementById('loginEmail').value.trim();
   const password = document.getElementById('loginPassword').value;
 
@@ -364,6 +357,25 @@ async function login() {
     return;
   }
 
+  // ─── Údržba ────────────────────────────────────────────────────────────────
+  // Kontroluje sa AŽ TERAZ, keď je známa rola. Pôvodne stála hneď na začiatku
+  // login(), teda ešte pred prihlásením — lenže v tej chvíli sa nedá zistiť,
+  // kto sa prihlasuje. Zapnutá údržba preto zamkla dvere aj administrátorovi,
+  // a keďže sa vypína zvnútra aplikácie, jediná cesta späť viedla cez SQL
+  // editor v Supabase. Rovnaká výnimka pre personál je aj v player.js
+  // (vyzadujBezUdrzby), tu len konečne funguje.
+  const udrzba = await zistiUdrzbu();
+  const jePersonal = (profile.role === 'admin' || profile.role === 'hlavny_trener');
+
+  if (udrzba.zapnuta && !jePersonal) {
+    // Odhlásiť, nech nezostane rozpracovaná session — rovnako ako pri
+    // vypršanej platnosti nižšie.
+    await sb.auth.signOut();
+    setStatus('loginStatus', '🔧 ' + (udrzba.text ||
+      'Prebieha údržba tréningového programu. Skús sa prihlásiť o chvíľu.'), 'error');
+    return;
+  }
+
   // Kontrola platnosti účtu (valid_to) — admin a hlavný tréner nemajú obmedzenie
   if (profile.role === 'hrac' || profile.role === 'trener') {
     if (profile.valid_to && new Date(profile.valid_to) < new Date()) {
@@ -381,11 +393,15 @@ async function login() {
   sessionStorage.setItem('user_name', profile.name || '');
   sessionStorage.setItem('user_surname', profile.surname || '');
 
-  setStatus('loginStatus', 'Prihlásenie úspešné! Presmerovanie...', 'success');
+  // Personálu, ktorý prešiel cez zapnutú údržbu, to treba pripomenúť — inak sa
+  // ľahko stane, že zostane zapnutá aj po nasadení a hráči sa nedostanú dnu.
+  setStatus('loginStatus', udrzba.zapnuta
+    ? '🔧 Prebieha ÚDRŽBA — prihlásený s právami personálu. Nezabudni ju vypnúť.'
+    : 'Prihlásenie úspešné! Presmerovanie...', 'success');
 
   setTimeout(() => {
     location.href = 'index.html';
-  }, 800);
+  }, udrzba.zapnuta ? 2600 : 800);
 }
 
 async function register() {
