@@ -638,6 +638,11 @@ let meta = null;
 let current = null;
 let selected = null;
 let xMarked = new Map();  // pole → počet použití (farba krížika podľa počtu)
+// NÁJDENÉ ťahy (4-znakové odpovede) sa označujú šípkou, nie dvoma krížikmi.
+// Krížiky povedia „tieto polia si už použil", šípka povie „tento ťah si našiel" —
+// a pri braniach či hrozbách je smer podstatná informácia.
+// Políčkové zručnosti (slabo pokryté, väzby) majú naďalej krížik.
+let najdeneTahy = new Set();   // 'e2e4'
 let flipped = false;
 
 let pendingPromotion = null;
@@ -1178,9 +1183,13 @@ function handleMoveAttempt(tah) {
   if (isCorrect) {
     foundMoves.push(attempted);
     skutocneNajdene.add(attempted);
-    // X ostane na políčkach po dokončení; obe polia ťahu počítame samostatne
-    xInc(attempted.substring(0,2));
-    if (attempted.length === 4) xInc(attempted.substring(2,4));
+    // Pri ťahoch šípka z východiska na cieľ, pri políčkach krížik ako doteraz
+    if (attempted.length === 4) {
+      najdeneTahy.add(attempted);
+      prekresliVrstvu();
+    } else {
+      xInc(attempted.substring(0, 2));
+    }
     selected = null;
     render();
     updateRemainingUI();
@@ -1289,33 +1298,61 @@ function stredPolicka(sq) {
   return { x: c * 12.5 + 6.25, y: r * 12.5 + 6.25 };
 }
 
-function vykresliSipku(tah) {
-  const ov = document.getElementById('boardOverlay');
-  if (!ov) return;
-  ov.innerHTML = '';
-  if (!tah) return;
-
-  if (tah.length === 2) {                     // políčko — len zvýrazniť
-    const p = stredPolicka(tah);
-    ov.innerHTML = `<circle cx="${p.x}" cy="${p.y}" r="5.2" fill="none"
-        stroke="#1d4ed8" stroke-width="1.6" opacity=".9"/>`;
-    return;
-  }
-
+// Jedna šípka ako SVG. skratenie = o koľko sa hrot zastaví pred stredom poľa,
+// aby nezakryl figúrku.
+function sipkaSvg(tah, farba, hrubka, priehl, id) {
   const a = stredPolicka(tah.slice(0, 2));
   const b = stredPolicka(tah.slice(2, 4));
-  // Šípka sa skráti pred cieľom, aby hrot nezakryl figúrku
   const dx = b.x - a.x, dy = b.y - a.y;
   const d = Math.hypot(dx, dy) || 1;
   const kon = { x: b.x - dx / d * 4.2, y: b.y - dy / d * 4.2 };
-
-  ov.innerHTML = `
-    <defs><marker id="hrot" markerWidth="4" markerHeight="4" refX="2.6" refY="2"
-        orient="auto"><path d="M0,0 L4,2 L0,4 z" fill="#1d4ed8"/></marker></defs>
+  return `
+    <marker id="${id}" markerWidth="4" markerHeight="4" refX="2.6" refY="2"
+        orient="auto"><path d="M0,0 L4,2 L0,4 z" fill="${farba}"/></marker>
     <line x1="${a.x}" y1="${a.y}" x2="${kon.x}" y2="${kon.y}"
-      stroke="#1d4ed8" stroke-width="1.8" opacity=".85"
-      marker-end="url(#hrot)" stroke-linecap="round"/>
-    <circle cx="${a.x}" cy="${a.y}" r="2" fill="#1d4ed8" opacity=".85"/>`;
+      stroke="${farba}" stroke-width="${hrubka}" opacity="${priehl}"
+      marker-end="url(#${id})" stroke-linecap="round"/>
+    <circle cx="${a.x}" cy="${a.y}" r="${hrubka * 0.9}" fill="${farba}" opacity="${priehl}"/>`;
+}
+
+// Prekreslí celú vrstvu nad šachovnicou: najprv chybné ťahy hráča (jemné),
+// navrchu vysvetlenie k riešeniu (výrazné), ak je práve zobrazené.
+function prekresliVrstvu() {
+  const ov = document.getElementById('boardOverlay');
+  if (!ov) return;
+  let html = '<defs>';
+  let telo = '';
+  let i = 0;
+
+  najdeneTahy.forEach(tah => {
+    if (tah.length !== 4) return;
+    // Jemná zelenkastá — pripomenie, čo už našiel, ale neprekričí figúrky
+    const svg = sipkaSvg(tah, '#16a34a', 1.3, 0.5, 'hrotN' + (i++));
+    const rez = svg.indexOf('<line');
+    html += svg.slice(0, rez);
+    telo += svg.slice(rez);
+  });
+
+  if (_vysvetlenieTah) {
+    if (_vysvetlenieTah.length === 2) {
+      const p = stredPolicka(_vysvetlenieTah);
+      telo += `<circle cx="${p.x}" cy="${p.y}" r="5.2" fill="none"
+          stroke="#1d4ed8" stroke-width="1.6" opacity=".9"/>`;
+    } else {
+      const svg = sipkaSvg(_vysvetlenieTah, '#1d4ed8', 1.8, 0.85, 'hrotVys');
+      const rez = svg.indexOf('<line');
+      html += svg.slice(0, rez);
+      telo += svg.slice(rez);
+    }
+  }
+  ov.innerHTML = html + '</defs>' + telo;
+}
+
+let _vysvetlenieTah = null;
+
+function vykresliSipku(tah) {
+  _vysvetlenieTah = tah || null;
+  prekresliVrstvu();
 }
 
 function ukazVysvetlenie(tah, badge) {
@@ -1411,23 +1448,31 @@ function markSolved() {
 }
 
 // Zatvorenie karty alebo obnovenie stránky — rovnaké pravidlo, ale zápis musí
-// prežiť odchod, preto keepalive. Priemer elo_zrucnosti aj to, či sa ELO vôbec
-// pohne, rieši server; prehliadač posiela len holý výsledok.
+// prežiť odchod, preto keepalive. Priemer elo_zrucnosti sa prepočíta z lokálne
+// známych hodnôt, aby stačil jediný zápis.
 window.addEventListener('pagehide', function (e) {
   if (e.persisted) return;
   if (resultLogged || puzzleDone || !currentPlayer || !current) return;
   const cas = uplynulyCasUlohy();
   if (cas < MILOST_SEKUND) return;
 
-  zapisVysledokPriOdchode({
-    puzzleId:   current.id,
-    source:     'skill_puzzles',
-    result:     'loss',
-    timeSpent:  Math.round(cas),
-    lossReason: 'odchod',
-    timeLimit:  Number(aktualnyLimit) > 0 ? Math.round(Number(aktualnyLimit)) : null,
-    protiSebe:  isCompleteMode()
+  sbZapisPriOdchode('training_log', {
+    player_id: currentPlayer.id, puzzle_id: current.id,
+    result: 'loss', time_spent: Math.round(cas), source: 'skill_puzzles',
+    loss_reason: 'odchod'
   });
+
+  if (isSkillEloEligible(current.id)) {
+    const pole = updateEloField();
+    const stare = Number(currentPlayer[pole] || 1500);
+    const nove = Math.max(100, stare + eloZmena(stare, Number(current.elo || 1200), 'loss'));
+    const zmeny = { [pole]: nove };
+    const priemer = priemerZrucnosti({ ...currentPlayer, [pole]: nove });
+    if (priemer != null && SKILL_ELO_TYPES.includes(updateEloCategory())) {
+      zmeny.elo_zrucnosti = priemer;
+    }
+    sbUpravPriOdchode(`players?id=eq.${currentPlayer.id}`, zmeny);
+  }
 });
 
 // ─── Opustenie úlohy ────────────────────────────────────────────────────────
@@ -1480,67 +1525,105 @@ async function recordResult(result, dovod = null, chybnyTah = null) {
   const puzzleTime = Math.max(0, aktualnyLimit || Math.round(current.time || 120));
   const usedTime = Math.max(0, puzzleTime - Math.max(0, timerRemaining));
 
-  // Jediný zápis — training_log, players aj elo_history naraz, na serveri.
-  //
-  // Stĺpec elo v skill_puzzles nie je mierou náročnosti pozície, ale iba
-  // značkou úrovne, na ktorej bola úloha vygenerovaná (get_elo v
-  // generate_vision.py: „nezávisí od počtu riešení"). Náročnosť určuje ČAS,
-  // a ten sa od zavedenia SKILL_TIME_TABLE počíta z úrovne hráča.
-  // Pri jednotlivej zručnosti výber servíruje úlohu z úrovne hráča, takže
-  // značka aj tak zodpovedá jeho sile a dá sa použiť. V komplexnom tréningu
-  // je pozícia náhodná, takže by sa počítalo proti cudzej úrovni — preto sa
-  // tam porovnáva hráč sám so sebou: úspech +10, neúspech −10. To je zmysel
-  // príznaku protiSebe.
-  //
-  // Chybný ťah/políčko a počet už nájdených odpovedí sa posielajú len pri chybe.
-  // Pri zručnostiach hovorí ply, po koľkých správnych sa hráč pomýlil:
-  // chyba pri nule znamená, že vzor nevidí vôbec.
-  const jeChyba = (result === 'loss' && (dovod || 'chyba') === 'chyba');
-
-  const r = await zapisVysledok({
-    puzzleId:    current.id,
-    source:      'skill_puzzles',
-    result:      result,
-    timeSpent:   usedTime,
-    lossReason:  dovod,
-    wrongMove:   jeChyba ? (chybnyTah || null) : null,
-    ply:         jeChyba ? foundMoves.length : null,
-    timeLimit:   Number(aktualnyLimit) > 0 ? Math.round(Number(aktualnyLimit)) : null,
-    firstMoveMs: prvyTahMs,
-    protiSebe:   isCompleteMode()
-  });
-
-  if (!r) {
-    setStatus('Výsledok sa nepodarilo uložiť — skontroluj pripojenie.', 'error');
-    return;
+  // Zaznamenaj do training_log
+  try {
+    await sbFetch("training_log", {
+      method: "POST",
+      prefer: "return=minimal",
+      body: JSON.stringify({
+        player_id: currentPlayer.id,
+        puzzle_id: current.id,
+        result: result,
+        time_spent: usedTime,
+        source: "skill_puzzles",  // úloha z tabuľky skill_puzzles (tréning zručností)
+        loss_reason: result === 'loss' ? (dovod || 'chyba') : null,
+        // Chybný ťah/políčko a počet už nájdených odpovedí — len pri chybe.
+        // Pri zručnostiach hovorí ply, po koľkých správnych sa hráč pomýlil:
+        // chyba pri nule znamená, že vzor nevidí vôbec.
+        wrong_move: (result === 'loss' && (dovod || 'chyba') === 'chyba') ? (chybnyTah || null) : null,
+        ply: (result === 'loss' && (dovod || 'chyba') === 'chyba') ? foundMoves.length : null,
+        time_limit: Number(aktualnyLimit) > 0 ? Math.round(Number(aktualnyLimit)) : null,
+        first_move_ms: prvyTahMs != null ? Math.round(prvyTahMs) : null
+      })
+    });
+  } catch(e) {
+    console.error("Chyba pri zápise logu:", e);
   }
 
-  // O tom, či sa pokrok pohne, rozhoduje server: pozrie sa do training_log,
-  // či hráč túto úlohu už riešil. Opakované riešenie zostáva v histórii,
-  // ale ELO ani agregáty nemení.
-  if (!r.prvy_pokus) {
+  // Aktualizuj ELO (vlastné pre danú zručnosť, v komplexnom režime spoločné),
+  // total_time a štatistiky — len pri prvom pokuse o túto úlohu.
+  // Opakované riešenie zostáva v training_log, ale pokrok už nemení.
+  if (!eloEligible) {
     setStatus('Túto úlohu si už riešil — zapísala sa do histórie, ELO sa nemení.', 'info');
     return;
   }
 
-  // Lokálny objekt sa zosúladí s tým, čo server naozaj uložil
-  currentPlayer[r.elo_pole] = r.elo_nove;
-  if (r.elo_zrucnosti != null) currentPlayer.elo_zrucnosti = r.elo_zrucnosti;
-  currentPlayer.played     = Number(currentPlayer.played || 0) + 1;
-  currentPlayer.total_time = Number(currentPlayer.total_time || 0) + usedTime;
-  if (result === 'win') {
-    currentPlayer.solved = Number(currentPlayer.solved || 0) + 1;
-  }
+  try {
+    const players = await sbFetch(`players?id=eq.${currentPlayer.id}&limit=1`);
+    if (players && players.length) {
+      const player = players[0];
+      const eloField = updateEloField();      // konkrétna zručnosť, nie priemer
+      const currentElo = Number(player[eloField] || 1500);
+      // Stĺpec elo v skill_puzzles nie je mierou náročnosti pozície, ale iba
+      // značkou úrovne, na ktorej bola úloha vygenerovaná (get_elo v
+      // generate_vision.py: „nezávisí od počtu riešení"). Náročnosť určuje ČAS,
+      // a ten sa od zavedenia SKILL_TIME_TABLE počíta z úrovne hráča.
+      // Pri jednotlivej zručnosti výber servíruje úlohu z úrovne hráča, takže
+      // značka aj tak zodpovedá jeho sile a dá sa použiť. V komplexnom tréningu
+      // je pozícia náhodná, takže by sa počítalo proti cudzej úrovni — preto sa
+      // tam porovnáva hráč sám so sebou: úspech +10, neúspech −10.
+      const puzzleElo = isCompleteMode() ? currentElo : Number(current.elo || 1200);
+      let change = eloZmena(currentElo, puzzleElo, result);
+      // Ak hráč chyboval alebo ukázal riešenie, ELO pri výhre sa nepočíta
+      if (everFailed && result === 'win') change = 0;
+      const newElo = Math.max(100, currentElo + change);
 
-  // V hlavičke sa v komplexnom tréningu zobrazuje priemer, inak daná zručnosť
-  const zobraz = isCompleteMode()
-    ? (currentPlayer.elo_zrucnosti != null ? currentPlayer.elo_zrucnosti : r.elo_nove)
-    : r.elo_nove;
-  document.getElementById('playerElo').textContent = zobraz + ' (' + activeEloTag() + ')';
-  // Zmena sa vzťahuje na ELO KONKRÉTNEJ zručnosti, aj v komplexnom tréningu,
-  // kde sa v hlavičke zobrazuje priemer — inak by pri +10 v jednej zručnosti
-  // hráč videl priemer o bod vyšší a nechápal by, odkiaľ sa to vzalo.
-  ukazZmenuElo(r.zmena);
+      const updates = {
+        [eloField]: newElo,
+        played: Number(player.played || 0) + 1,
+        total_time: Number(player.total_time || 0) + usedTime
+      };
+      if (result === 'win') {
+        updates.solved = Number(player.solved || 0) + 1;
+      }
+
+      // elo_zrucnosti je odvodený priemer — prepočítaj ho v tom istom zápise
+      const kategoria = updateEloCategory();
+      let priemer = null;
+      if (SKILL_ELO_TYPES.includes(kategoria)) {
+        priemer = priemerZrucnosti({ ...player, [eloField]: newElo });
+        if (priemer != null) updates.elo_zrucnosti = priemer;
+      }
+
+      await sbFetch(`players?id=eq.${currentPlayer.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(updates)
+      });
+      currentPlayer[eloField] = newElo;
+      if (priemer != null) currentPlayer.elo_zrucnosti = priemer;
+
+      // Zaloguj ELO do histórie pre grafy (len ak sa ELO zmenilo).
+      // Priemer sa loguje pod kategóriou 'zrucnosti', aby jej graf nezhasol.
+      if (change !== 0) {
+        await logEloHistory(currentPlayer.id, kategoria, newElo);
+        if (priemer != null && kategoria !== 'zrucnosti') {
+          await logEloHistory(currentPlayer.id, 'zrucnosti', priemer);
+        }
+      }
+
+      // V hlavičke sa v komplexnom tréningu zobrazuje priemer, inak daná zručnosť
+      const zobraz = isCompleteMode()
+        ? (currentPlayer.elo_zrucnosti != null ? currentPlayer.elo_zrucnosti : newElo)
+        : newElo;
+      document.getElementById('playerElo').textContent = zobraz + ' (' + activeEloTag() + ')';
+      // Zmena sa vzťahuje na ELO KONKRÉTNEJ zručnosti, aj v komplexnom tréningu,
+      // kde sa v hlavičke zobrazuje priemer — inak by pri +10 v jednej zručnosti
+      // hráč videl priemer o bod vyšší a nechápal by, odkiaľ sa to vzalo.
+      ukazZmenuElo(newElo - currentElo);
+    }
+  } catch(e) {
+    console.error("Chyba pri aktualizácii ELO zručností:", e);
+  }
 }
 
 // sbFetch je dostupný z player.js
@@ -1819,6 +1902,7 @@ function loadPuzzle(puzzle) {
   skryZmenuElo();
   skryVysvetlenie();
   xMarked = new Map();
+  najdeneTahy = new Set();
   puzzleDone = false;
   puzzleFailed = false;
   resultLogged = false;
