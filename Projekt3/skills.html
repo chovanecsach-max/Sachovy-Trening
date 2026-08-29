@@ -1900,9 +1900,12 @@ function loadPuzzle(puzzle) {
   ulohaZobrazenaOd = Date.now();
   prvyTahMs = null;
   skryZmenuElo();
-  skryVysvetlenie();
+  // Poradie je dôležité: najprv vyprázdniť zoznamy, až potom prekresliť vrstvu.
+  // skryVysvetlenie() vrstvu prekresľuje — keby bežalo skôr, nakreslilo by
+  // šípky ešte podľa starého zoznamu a tie by na novej pozícii zostali.
   xMarked = new Map();
   najdeneTahy = new Set();
+  skryVysvetlenie();
   puzzleDone = false;
   puzzleFailed = false;
   resultLogged = false;
