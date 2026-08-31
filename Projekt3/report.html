@@ -135,7 +135,10 @@ const BASIC_COLS = [
   { f: 'elo_koncovka',  k: 'koncovka',  n: 'Koncovka' },
   { f: 'elo',           k: 'mix',       n: 'Mix' }
 ];
-const DEF_SKILL = 1200, DEF_BASIC = 1000;
+// Od resetu 1. 9. 2026 začína všetko na 1000 — zručnosti mali predtým vlastný
+// základ 1200. Slúži ako východisko pri výpočte posunu ELO za mesiac, keď hráč
+// ešte nemá v elo_history žiadny starší záznam.
+const DEF_SKILL = 1000, DEF_BASIC = 1000;
 const ALL_FIELDS = [...new Set([...SKILL_COLS, ...BASIC_COLS].map(c => c.f))].join(',');
 
 function goHome() { location.href = 'index.html'; }
