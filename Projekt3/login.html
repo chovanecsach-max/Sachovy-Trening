@@ -216,10 +216,12 @@ button {
         <option value="">— bez trénera —</option>
       </select>
     </div>
-    <div class="field">
-      <label>Vstupné ELO (nepovinné)</label>
-      <input id="regElo" type="number" min="1000" max="3000" placeholder="napr. 1200 (1000–3000) — ak nevyplníš, nastaví sa 1000">
-    </div>
+    <!-- Políčko „Vstupné ELO" tu bolo do 1. 9. 2026. Dovoľovalo komukoľvek
+         zaregistrovať sa s hodnotou 3000 a sadnúť si na čelo rebríčka bez
+         jedinej vyriešenej úlohy — a pri preklepe dostávalo dieťa úlohy pre
+         majstra, ktoré nemalo šancu vyriešiť. Odkedy je kalibrácia, program
+         si úroveň nájde sám za 10–15 úloh a spoľahlivejšie, než ju odhadne
+         rodič pri registrácii. Tréner vie ELO kedykoľvek upraviť v admin paneli. -->
     <button class="btn-primary" onclick="register()">Zaregistrovať sa</button>
     <div id="registerStatus" class="status"></div>
   </div>
@@ -413,8 +415,9 @@ async function register() {
   const role = 'hrac'; // Rola je vždy hráč — tréner/admin sa nastaví cez admin panel
   const trenerIdRaw = document.getElementById('regTrener').value;
   const trenerId = trenerIdRaw || null;
-  const eloInput = parseInt(document.getElementById('regElo').value);
-  const baseElo = (!isNaN(eloInput) && eloInput >= 1000 && eloInput <= 3000) ? eloInput : 1000;
+  // Každý začína na 1000 — vstupné ELO sa už pri registrácii nezadáva.
+  // Hodnota sa naďalej posiela v metadátach, aby verify.html nebolo treba meniť.
+  const baseElo = 1000;
 
   if (!name || !surname || !nick || !email || !password) {
     setStatus('registerStatus', 'Vyplň všetky povinné polia.', 'error');
