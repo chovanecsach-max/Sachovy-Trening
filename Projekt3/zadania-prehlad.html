@@ -158,7 +158,7 @@ function clamp01(x) { return Math.max(0, Math.min(1, x)); }
 // ─── Pokrok (rovnaká logika ako na stránke hráča) ───────────────────────────
 function computeProgress(a, player, logRows, meta) {
   if (a.target_type === 'elo' && !a.endgame_type) {
-    const cur  = Number(player?.['elo_' + a.skill] ?? 1200);
+    const cur  = Number(player?.['elo_' + a.skill] ?? 1000);   // od 1. 9. 2026 je základ 1000
     const base = (a.baseline_elo != null) ? Number(a.baseline_elo) : null;
     const pct  = (base != null && a.target_value > base)
       ? clamp01((cur - base) / (a.target_value - base))
