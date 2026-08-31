@@ -1,0 +1,959 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Šachový tréning</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0f1117">
+<link rel="apple-touch-icon" href="ikona-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Šach tréning">
+<link rel="icon" type="image/svg+xml" href="logo2_favicon.svg">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Segoe UI', Arial, sans-serif;
+  background: #e8eaf0;
+  min-height: 100vh;
+}
+
+/* ── Header — celá šírka, hore ── */
+.header {
+  background: #0f1117;
+  padding: 16px 40px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.logo { display: flex; align-items: center; gap: 12px; }
+.logo-icon { line-height: 0; }
+.logo-icon svg { display: block; border-radius: 9px; }
+.logo-text { font-size: 22px; font-weight: 600; color: #d4a843; letter-spacing: 0.4px; }
+
+.user-chip {
+  display: flex; align-items: center; gap: 8px;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.14);
+  border-radius: 20px;
+  padding: 6px 14px 6px 8px;
+}
+
+.avatar {
+  width: 28px; height: 28px; border-radius: 50%;
+  background: #d4a843;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 700; color: #1a1209;
+  flex-shrink: 0;
+}
+
+.chip-name { font-size: 13px; color: rgba(255,255,255,0.75); }
+
+.logout-btn {
+  background: none; border: none;
+  color: rgba(255,255,255,0.4);
+  font-size: 15px; cursor: pointer;
+  padding: 0 0 0 6px; line-height: 1;
+  transition: color 0.15s;
+}
+.logout-btn:hover { color: #d4a843; }
+
+/* ── Stats bar ── */
+.validity-banner {
+  padding: 10px 24px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+}
+.validity-banner.ok {
+  background: #14321f;
+  color: #7ed99a;
+}
+.validity-banner.warn {
+  background: #3a2f0d;
+  color: #f5c542;
+}
+.validity-banner.urgent {
+  background: #3a1414;
+  color: #ff7a7a;
+  animation: pulse-urgent 1.8s ease-in-out infinite;
+}
+@keyframes pulse-urgent {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.65; }
+}
+
+.stats-bar {
+  background: #1a1d27;
+  display: flex;
+  justify-content: center;
+  gap: 0;
+}
+
+.stat-item {
+  padding: 14px 48px; text-align: center;
+  border-right: 1px solid rgba(255,255,255,0.06);
+}
+.stat-item:last-child { border-right: none; }
+.stat-val { font-size: 24px; font-weight: 600; color: #d4a843; line-height: 1; }
+.stat-lbl { font-size: 11px; color: rgba(255,255,255,0.38); text-transform: uppercase; letter-spacing: 0.9px; margin-top: 5px; }
+
+/* Streak — plameň + počet */
+.streak-val { display: inline-flex; align-items: center; gap: 4px; }
+.streak-fire { font-size: 22px; line-height: 1; }
+.streak-fire.active { animation: flicker 1.4s ease-in-out infinite alternate; }
+@keyframes flicker {
+  0%   { filter: drop-shadow(0 0 3px #f97316) brightness(1); }
+  50%  { filter: drop-shadow(0 0 8px #fb923c) brightness(1.15); }
+  100% { filter: drop-shadow(0 0 4px #fbbf24) brightness(1.05); }
+}
+.streak-zero { color: rgba(255,255,255,0.25); font-size: 22px; line-height: 1; }
+
+/* ── Hlavný obsah ── */
+.main {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 32px 40px 40px;
+}
+
+/* ── Nav mriežka ── */
+.nav-row {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.nav-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 20px 8px;
+  border-radius: 14px;
+  background: #ffffff;
+  color: #1a1d2e;
+  border: 1px solid #e2e5ef;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.2;
+  text-align: center;
+  transition: border-color 0.15s, background 0.15s, transform 0.1s;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+.nav-btn:hover  { background: #f1f3f9; border-color: #c8cde0; transform: translateY(-1px); }
+.nav-btn:active { transform: translateY(0); }
+.nav-btn.active { border-color: #e11d48; background: #fff1f2; }
+
+.nav-icon {
+  width: 48px; height: 48px; border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px; flex-shrink: 0;
+}
+
+.i-skills    { background: #fff1f2; color: #e11d48; }
+.i-taktika   { background: #eff6ff; color: #2563eb; }
+.i-strategia { background: #f5f3ff; color: #7c3aed; }
+.i-koncovka  { background: #fefce8; color: #a16207; }
+.i-mix       { background: #f0fdf4; color: #16a34a; }
+.i-stat      { background: #eff6ff; color: #2563eb; }
+.i-admin     { background: rgba(212,168,67,0.15); color: #a07828; }
+
+.nav-btn.nav-admin {
+  background: #0f1117; color: #d4a843; border-color: #0f1117;
+  box-shadow: none;
+}
+.nav-btn.nav-admin:hover { background: #1a1d27; border-color: #1a1d27; }
+.nav-btn.nav-admin .nav-icon { background: rgba(212,168,67,0.15); color: #d4a843; }
+
+/* ── Submenu zručnosti ── */
+.submenu {
+  display: none;
+  grid-template-columns: repeat(10, 1fr);
+  gap: 10px;
+  padding: 16px;
+  background: #f8f9fc;
+  border: 1px solid #e2e5ef;
+  border-radius: 14px;
+  animation: fadeIn 0.15s ease;
+}
+.submenu.open { display: grid; }
+/* Podmenu trénera má len 3 položky — nech sa netiahnu cez celú šírku */
+.submenu-trener { grid-template-columns: repeat(4, 1fr); }
+.submenu-koncovky { grid-template-columns: repeat(4, 1fr); }
+.sub-count { font-size: 11px; color: #94a3b8; margin-left: 4px; }
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.sub-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 8px;
+  border-radius: 10px;
+  background: #ffffff;
+  border: 1px solid #e2e5ef;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  color: #1a1d2e;
+  text-align: center;
+  line-height: 1.2;
+  transition: border-color 0.15s, background 0.15s;
+}
+.sub-btn:hover { background: #f1f3f9; border-color: #c8cde0; }
+
+.sub-icon {
+  width: 36px; height: 36px; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 17px;
+}
+
+/* ── Rebríčky ── */
+.leaderboards {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 14px;
+  margin-top: 20px;
+}
+
+.lb-card {
+  background: #ffffff;
+  border: 1px solid #e2e5ef;
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.lb-header {
+  padding: 10px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #ffffff;
+  text-align: center;
+  letter-spacing: 0.5px;
+}
+
+.lb-taktika   { background: #2563eb; }
+.lb-strategia { background: #7c3aed; }
+.lb-koncovka  { background: #a16207; }
+.lb-mix       { background: #16a34a; }
+.lb-zrucnosti { background: #e11d48; }
+
+.lb-body { padding: 8px 10px; }
+
+.lb-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 4px;
+  border-radius: 6px;
+  font-size: 12px;
+  color: #334155;
+  border-bottom: 1px solid #f1f3f9;
+}
+.lb-row:last-child { border-bottom: none; }
+.lb-row.me {
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-weight: 600;
+}
+
+.lb-rank { width: 20px; text-align: center; font-size: 13px; flex-shrink: 0; }
+.lb-name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lb-elo  { font-weight: 600; color: #1e3a5f; flex-shrink: 0; font-size: 12px; }
+.lb-row.me .lb-elo { color: #1d4ed8; }
+
+.lb-loading {
+  padding: 12px;
+  text-align: center;
+  color: #94a3b8;
+  font-size: 12px;
+  font-style: italic;
+}
+
+/* ─── Mobil a tablet ──────────────────────────────────────────────────────── */
+@media (max-width: 780px) {
+  body { overflow-x: hidden; }
+
+  .header { padding: 10px 14px; flex-wrap: wrap; gap: 8px; }
+  .logo-text { font-size: 18px; }
+  .logo-icon svg { width: 38px; height: 38px; }
+
+  .main { padding: 14px 12px 24px; }
+
+  /* Hlavne menu: 4 stlpce (2 rady) */
+  .nav-row { grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .nav-btn { padding: 14px 6px; font-size: 12px; gap: 8px; min-height: 88px;
+             touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+  .nav-icon { width: 40px; height: 40px; font-size: 19px; }
+
+  /* Podmenu zrucnosti: 5 stlpcov (2 rady) */
+  .submenu { grid-template-columns: repeat(5, 1fr); gap: 8px; padding: 10px; }
+  .submenu-trener { grid-template-columns: repeat(3, 1fr); }
+  .submenu-koncovky { grid-template-columns: repeat(2, 1fr); }
+  .sub-btn { padding: 12px 4px; font-size: 11px; gap: 6px; min-height: 74px;
+             touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+  .sub-icon { width: 32px; height: 32px; font-size: 15px; }
+
+  /* Rebricky pod seba (2 stlpce na tablete) */
+  .leaderboards { grid-template-columns: 1fr 1fr; gap: 10px; }
+}
+
+@media (max-width: 560px) {
+  .nav-row { grid-template-columns: repeat(4, 1fr); }
+  .submenu { grid-template-columns: repeat(4, 1fr); }
+  .submenu-trener { grid-template-columns: repeat(3, 1fr); }
+  .submenu-koncovky { grid-template-columns: repeat(2, 1fr); }
+  .leaderboards { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body oncontextmenu="return false;">
+
+<!-- Header — celá šírka -->
+<div class="header">
+  <div class="logo">
+    <div class="logo-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="46" height="46" role="img" aria-label="Logo Šachový tréning">
+      <rect x="0" y="0" width="200" height="200" rx="34" fill="#16304F"/>
+      <rect x="32"  y="130" width="36" height="36" fill="#F5B301"/>
+      <rect x="70"  y="130" width="36" height="36" fill="#FFF8E7"/>
+      <rect x="70"  y="92"  width="36" height="36" fill="#F5B301"/>
+      <rect x="108" y="130" width="36" height="36" fill="#F5B301"/>
+      <rect x="108" y="92"  width="36" height="36" fill="#FFF8E7"/>
+      <rect x="108" y="54"  width="36" height="36" fill="#F5B301"/>
+      <circle cx="50" cy="100" r="9" fill="#FFF8E7"/>
+      <path d="M44.5,108 C44,115 41.5,122 39.5,126 L60.5,126 C58.5,122 56,115 55.5,108 Z" fill="#FFF8E7"/>
+      <rect x="37" y="125" width="26" height="6.5" rx="3.2" fill="#D9CBAA"/>
+      <circle cx="46.7" cy="98.3" r="1.5" fill="#1F3A5F"/>
+      <circle cx="53.3" cy="98.3" r="1.5" fill="#1F3A5F"/>
+      <path d="M46.7,102.3 Q50,105.2 53.3,102.3" stroke="#1F3A5F" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+      <path d="M62,88 Q94,40 114,36" stroke="#7FD1E8" stroke-width="3.2" stroke-linecap="round" stroke-dasharray="1 9" fill="none"/>
+      <path d="M108,44 L144,44 L140,22 L132.5,33 L126,18 L119.5,33 L112,22 Z" fill="#F5B301"/>
+      <rect x="108" y="44" width="36" height="5.5" rx="2.7" fill="#E08E00"/>
+      <circle cx="126" cy="38" r="2.8" fill="#FF6B57"/>
+      <path d="M156,22 l2.8,6.4 6.4,2.8 -6.4,2.8 -2.8,6.4 -2.8,-6.4 -6.4,-2.8 6.4,-2.8 Z" fill="#FFF8E7"/>
+      <path d="M96,18 l2,4.6 4.6,2 -4.6,2 -2,4.6 -2,-4.6 -4.6,-2 4.6,-2 Z" fill="#7FD1E8"/>
+    </svg></div>
+    <div class="logo-text">Šachový tréning</div>
+  </div>
+  <div class="user-chip">
+    <div class="avatar" id="userAvatar">?</div>
+    <span class="chip-name" id="userName">...</span>
+    <button class="logout-btn" onclick="logout()" title="Odhlásiť">✕</button>
+  </div>
+</div>
+
+<!-- Banner platnosti prístupu — zobrazí sa len hráčom/trénerom -->
+<div class="validity-banner" id="validityBanner" style="display:none;"></div>
+
+<!-- Stats bar -->
+<div class="stats-bar">
+  <div class="stat-item">
+    <div class="stat-val" id="statElo">—</div>
+    <div class="stat-lbl" id="statEloLbl">ELO</div>
+  </div>
+  <div class="stat-item">
+    <div class="stat-val" id="statAcc">—</div>
+    <div class="stat-lbl">Úspešnosť</div>
+  </div>
+  <div class="stat-item">
+    <div class="stat-val" id="statPlayed">—</div>
+    <div class="stat-lbl">Riešené</div>
+  </div>
+  <div class="stat-item">
+    <div class="stat-val" id="statStreak">—</div>
+    <div class="stat-lbl">Séria dní</div>
+  </div>
+</div>
+
+<!-- Hlavný obsah -->
+<div class="main">
+
+  <!-- 7 tlačidiel v jednom rade -->
+  <div class="nav-row">
+    <button class="nav-btn" id="btnSkills" onclick="toggleSkillsMenu()">
+      <div class="nav-icon i-skills">♞</div>
+      Zručnosti
+    </button>
+    <button class="nav-btn" onclick="goTraining('taktika')">
+      <div class="nav-icon i-taktika">⚔</div>
+      Taktika
+    </button>
+    <button class="nav-btn" onclick="goTraining('strategia')">
+      <div class="nav-icon i-strategia">♜</div>
+      Stratégia
+    </button>
+    <button class="nav-btn" id="btnKoncovky" onclick="toggleKoncovkyMenu()">
+      <div class="nav-icon i-koncovka">♚</div>
+      Koncovka
+    </button>
+    <button class="nav-btn" onclick="goTraining('mix')">
+      <div class="nav-icon i-mix">⚡</div>
+      Mix
+    </button>
+    <button class="nav-btn" id="asgBtn" onclick="goZadania()" style="position:relative;display:none;">
+      <div class="nav-icon i-stat">📌</div>
+      Zadania
+      <span id="asgBadge" style="display:none;position:absolute;top:6px;right:10px;background:#dc2626;color:#fff;font-size:11px;font-weight:bold;min-width:18px;height:18px;line-height:18px;border-radius:9px;padding:0 4px;">0</span>
+    </button>
+    <button class="nav-btn" id="sutazBtn" onclick="goMojeSutaze()" style="position:relative;display:none;">
+      <div class="nav-icon i-taktika">🏆</div>
+      Súťaže
+      <span id="sutazBadge" style="display:none;position:absolute;top:6px;right:10px;background:#d97706;color:#fff;font-size:11px;font-weight:bold;min-width:18px;height:18px;line-height:18px;border-radius:9px;padding:0 4px;">0</span>
+    </button>
+    <button class="nav-btn" onclick="goStats()">
+      <div class="nav-icon i-stat">📊</div>
+      Štatistika
+    </button>
+    <button class="nav-btn" onclick="goDokumentacia()">
+      <div class="nav-icon i-stat">📖</div>
+      Dokumentácia
+    </button>
+    <button class="nav-btn nav-admin" id="trenerBtn" onclick="toggleTrenerMenu()" style="display:none;">
+      <div class="nav-icon i-admin">🧑‍🏫</div>
+      Tréner
+    </button>
+  </div>
+
+  <!-- Submenu trénera — nástroje pre trénerov a adminov -->
+  <div id="trenerSubmenu" class="submenu submenu-trener">
+    <button class="sub-btn" onclick="goSlabiny()">
+      <div class="sub-icon i-taktika">🎯</div>Slabinová mapa
+    </button>
+    <button class="sub-btn" onclick="goKoncovkyMapa()">
+      <div class="sub-icon i-koncovka">♚</div>Mapa koncoviek
+    </button>
+    <button class="sub-btn" onclick="goSutaze()">
+      <div class="sub-icon i-taktika">🏆</div>Súťaže
+    </button>
+    <button class="sub-btn" onclick="goCasovaMapa()">
+      <div class="sub-icon i-mix">⏱</div>Časová mapa
+    </button>
+    <button class="sub-btn" onclick="goPrehlad()">
+      <div class="sub-icon i-strategia">📋</div>Prehľad zadaní
+    </button>
+    <button class="sub-btn" onclick="goReport()">
+      <div class="sub-icon i-koncovka">📄</div>Mesačný report
+    </button>
+    <button class="sub-btn" id="koncovkySubBtn" onclick="goKoncovky()" style="display:none;">
+      <div class="sub-icon i-strategia">🔍</div>Analýza koncoviek
+    </button>
+    <button class="sub-btn" id="adminSubBtn" onclick="goAdmin()" style="display:none;">
+      <div class="sub-icon i-admin">⚙</div>Administrácia
+    </button>
+  </div>
+
+  <!-- Submenu zručnosti — 10 v rade -->
+  <!-- Submenu typov koncoviek — napĺňa sa až pri prvom otvorení -->
+  <div id="koncovkySubmenu" class="submenu submenu-koncovky">
+    <button class="sub-btn" onclick="goKoncovka('')">
+      <div class="sub-icon i-koncovka">♚</div>Všetky koncovky
+    </button>
+  </div>
+
+  <div id="skillsSubmenu" class="submenu">
+    <button class="sub-btn" onclick="goSkills('checks')">
+      <div class="sub-icon i-skills">♞</div>Šachy
+    </button>
+    <button class="sub-btn" onclick="goSkills('captures')">
+      <div class="sub-icon i-skills">✂</div>Brania
+    </button>
+    <button class="sub-btn" onclick="goSkills('direct_attack')">
+      <div class="sub-icon i-taktika">⚔</div>Brania so ziskom
+    </button>
+    <button class="sub-btn" onclick="goSkills('pawn_breakthrough')">
+      <div class="sub-icon i-mix">♙</div>Pešiakové prielomy
+    </button>
+    <button class="sub-btn" onclick="goSkills('underdefended')">
+      <div class="sub-icon i-strategia">♜</div>Slabo pokryté figúrky
+    </button>
+    <button class="sub-btn" onclick="goSkills('pin')">
+      <div class="sub-icon i-taktika">📌</div>Absolútne väzby
+    </button>
+    <button class="sub-btn" onclick="goSkills('relative_pin')">
+      <div class="sub-icon i-taktika">📍</div>Relatívne väzby
+    </button>
+    <button class="sub-btn" onclick="goSkills('fork')">
+      <div class="sub-icon i-taktika">🍴</div>Vidličky
+    </button>
+    <button class="sub-btn" onclick="goSkills('direct_threat')">
+      <div class="sub-icon i-koncovka">!</div>Priama hrozba
+    </button>
+    <button class="sub-btn" onclick="goSkills('complete')" style="border:2px solid #2E75B6;">
+      <div class="sub-icon i-taktika">🧩</div>Komplexný tréning
+    </button>
+  </div>
+
+  <!-- 5 rebríčkov vedľa seba -->
+  <div class="leaderboards">
+    <div class="lb-card">
+      <div class="lb-header lb-zrucnosti">♞ Zručnosti</div>
+      <div class="lb-body" id="lb-zrucnosti"><div class="lb-loading">Načítavam...</div></div>
+    </div>
+    <div class="lb-card">
+      <div class="lb-header lb-taktika">⚔ Taktika</div>
+      <div class="lb-body" id="lb-taktika"><div class="lb-loading">Načítavam...</div></div>
+    </div>
+    <div class="lb-card">
+      <div class="lb-header lb-strategia">♜ Stratégia</div>
+      <div class="lb-body" id="lb-strategia"><div class="lb-loading">Načítavam...</div></div>
+    </div>
+    <div class="lb-card">
+      <div class="lb-header lb-koncovka">♚ Koncovka</div>
+      <div class="lb-body" id="lb-koncovka"><div class="lb-loading">Načítavam...</div></div>
+    </div>
+    <div class="lb-card">
+      <div class="lb-header lb-mix">⚡ Mix</div>
+      <div class="lb-body" id="lb-mix"><div class="lb-loading">Načítavam...</div></div>
+    </div>
+  </div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/auth.js"></script>
+<script src="js/player.js"></script>
+<script>
+async function initPage() {
+  const ok = await refreshSession();
+  if (!ok) { location.href = 'login.html'; return; }
+
+  const user = getCurrentUser();
+  const nick = user.nick || user.name || user.email || '?';
+  const role = user.role;
+
+  document.getElementById('userAvatar').textContent = nick.charAt(0).toUpperCase();
+  document.getElementById('userName').textContent = nick;
+
+  if (role === 'trener' || role === 'hlavny_trener' || role === 'admin') {
+    document.getElementById('trenerBtn').style.display = 'flex';
+  }
+  // "Moje zadania" je hráčska položka — tréner/admin ju uvidí len vtedy,
+  // ak mu niekto zadanie naozaj pridelil (rieši loadAssignmentBadge).
+  if (role === 'hrac') {
+    document.getElementById('asgBtn').style.display = 'flex';
+  }
+  if (role === 'admin') {
+    document.getElementById('adminSubBtn').style.display = 'flex';
+    document.getElementById('koncovkySubBtn').style.display = 'flex';
+  }
+
+  // Platnosť prístupu — zobraz len hráčom a trénerom (admin/hlavný tréner majú neobmedzený prístup)
+  if (!await vyzadujBezUdrzby()) return;   // pri nasadení zmien odstav hráčov
+  hlasPritomnost();
+
+  checkValidity(role);
+
+  // Počet nesplnených zadaní na odznak pri tlačidle Zadania
+  loadAssignmentBadge();
+
+  // Prebiehajúce súťaže na odznak pri tlačidle Súťaže
+  loadSutazBadge();
+
+  try {
+    const player = await getCurrentPlayer();
+    if (player) {
+      const played = Number(player.played || 0);
+      const solved = Number(player.solved || 0);
+      const acc = played > 0 ? Math.round((solved / played) * 100) : 0;
+
+      const lastMode = localStorage.getItem('lastTrainingMode') || 'mix';
+      let eloVal, eloLabel;
+
+      if (lastMode === 'taktika') {
+        eloVal = eloHodnota(player.elo_taktika); eloLabel = 'ELO Taktika';
+      } else if (lastMode === 'strategia') {
+        eloVal = eloHodnota(player.elo_strategia); eloLabel = 'ELO Stratégia';
+      } else if (lastMode === 'koncovka') {
+        eloVal = eloHodnota(player.elo_koncovka); eloLabel = 'ELO Koncovka';
+      } else if (lastMode.startsWith('skill_')) {
+        // Zo zručností ukazujeme na menu vždy ELO komplexného tréningu (elo_zrucnosti).
+        // Jednotlivé zručnosti majú vlastné ELO — to nájdeš v štatistike, nie tu.
+        eloVal = eloHodnota(player.elo_zrucnosti); eloLabel = 'ELO Zručnosti';
+      } else {
+        eloVal = eloHodnota(player.elo); eloLabel = 'ELO Mix';
+      }
+
+      document.getElementById('statElo').textContent    = eloVal;
+      document.getElementById('statEloLbl').textContent = eloLabel;
+      document.getElementById('statAcc').textContent    = acc + '%';
+      document.getElementById('statPlayed').textContent = played;
+
+      // Streak — denná séria nepretržitého tréningu
+      computeStreak(player.id);
+
+      // Načítaj rebríčky — pošli meno hráča pre zvýraznenie
+      const myName = `${player.name || ''} ${player.surname || ''}`.trim();
+      loadLeaderboards(myName);
+    } else {
+      loadLeaderboards(null);
+    }
+  } catch(e) {
+    console.error('Chyba načítania štatistík:', e);
+    loadLeaderboards(null);
+  }
+}
+
+async function checkValidity(role) {
+  // Admin a hlavný tréner majú neobmedzený prístup — banner sa im nezobrazuje
+  if (role === 'admin' || role === 'hlavny_trener') return;
+
+  const banner = document.getElementById('validityBanner');
+  const userId = sessionStorage.getItem('user_id');
+  if (!banner || !userId) return;
+
+  try {
+    const rows = await sbFetch(`profiles?id=eq.${userId}&select=valid_to&limit=1`);
+    const validTo = rows && rows[0] && rows[0].valid_to;
+    if (!validTo) return;   // bez nastavenej platnosti — nič nezobrazuj
+
+    const now = new Date();
+    const expiry = new Date(validTo);
+    const msPerDay = 24 * 60 * 60 * 1000;
+    // Zaokrúhli na celé dni (ceil, aby "dnes večer vyprší" ukázalo 1, nie 0)
+    const daysLeft = Math.ceil((expiry - now) / msPerDay);
+    const dateStr = expiry.toLocaleDateString('sk-SK');
+
+    let cls, text;
+    if (daysLeft <= 0) {
+      cls = 'urgent';
+      text = `⚠️ Platnosť prístupu vypršala ${dateStr}. Kontaktujte trénera pre predĺženie.`;
+    } else if (daysLeft <= 3) {
+      cls = 'urgent';
+      text = `⚠️ Platnosť prístupu vyprší už o ${daysLeft} ${daysLeft === 1 ? 'deň' : 'dni'} (${dateStr}). Kontaktujte trénera.`;
+    } else if (daysLeft <= 14) {
+      cls = 'warn';
+      text = `⏳ Platnosť prístupu: ešte ${daysLeft} ${daysWord(daysLeft)} (do ${dateStr}). Zvážte predĺženie u trénera.`;
+    } else {
+      cls = 'ok';
+      text = `✓ Platnosť prístupu: ešte ${daysLeft} ${daysWord(daysLeft)} (do ${dateStr}).`;
+    }
+
+    banner.className = 'validity-banner ' + cls;
+    banner.textContent = text;
+    banner.style.display = '';
+  } catch(e) {
+    console.error('Chyba pri kontrole platnosti:', e);
+  }
+}
+
+function daysWord(n) {
+  // Slovenské skloňovanie: 1 deň, 2-4 dni, 5+ dní
+  if (n === 1) return 'deň';
+  if (n >= 2 && n <= 4) return 'dni';
+  return 'dní';
+}
+
+async function computeStreak(playerId) {
+  const el = document.getElementById('statStreak');
+  if (!el) return;
+  try {
+    // Načítaj unikátne dni tréningu (posledných 365 dní stačí)
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - 365);
+    const logs = await sbFetch(
+      `training_log?player_id=eq.${playerId}` +
+      `&created_at=gte.${cutoff.toISOString()}` +
+      `&select=created_at&order=created_at.desc`
+    );
+
+    if (!logs || !logs.length) {
+      el.innerHTML = '<span class="streak-zero">🔥</span>';
+      el.nextElementSibling.textContent = 'Séria dní';
+      return;
+    }
+
+    // Zisti unikátne dátumy (v lokálnom čase používateľa) vo formáte YYYY-MM-DD
+    const days = [...new Set(
+      logs.map(l => localDay(l.created_at))
+    )].sort().reverse();  // sv-SE dáva formát YYYY-MM-DD, zostupne
+
+    // Počítaj streak spätne od dnes (alebo včera — hráč možno ešte dnes nehrál)
+    const today = todayLocal();
+    const yesterday = localDay(Date.now() - 86400000);
+
+    let streak = 0;
+    // Začni od dnes alebo včera
+    let cursor = days[0] === today ? today : (days[0] === yesterday ? yesterday : null);
+    if (!cursor) {
+      // Posledný tréning bol pred viac ako dňom — séria prerušená
+      el.innerHTML = '<span class="streak-zero">🔥</span>';
+      el.nextElementSibling.textContent = 'Séria dní';
+      return;
+    }
+
+    for (const day of days) {
+      if (day === cursor) {
+        streak++;
+        // Posuň cursor o 1 deň dozadu
+        const d = new Date(cursor);
+        d.setDate(d.getDate() - 1);
+        cursor = d.toLocaleDateString('sv-SE');
+      } else {
+        break;
+      }
+    }
+
+    const isActive = days[0] === today;
+    el.innerHTML =
+      `<span class="streak-val">` +
+      `<span class="streak-fire${isActive ? ' active' : ''}" title="${isActive ? 'Dnes si trénoval!' : 'Séria zo včera'}">🔥</span>` +
+      `<span>${streak}</span>` +
+      `</span>`;
+    el.nextElementSibling.textContent = streak === 1 ? 'Deň v sérii' : 'Dní v sérii';
+  } catch(e) {
+    console.error('Streak chyba:', e);
+  }
+}
+
+initPage();
+
+function goTraining(mode) { location.href = "training.html?mode=" + mode; }
+function goAdmin()         { location.href = "admin.html"; }
+function goStats()         { location.href = "statistika.html"; }
+function goSlabiny()       { location.href = "slabinova-mapa.html"; }
+function goZadania()       { location.href = "zadania.html"; }
+function goPrehlad()       { location.href = "zadania-prehlad.html"; }
+function goReport()        { location.href = "report.html"; }
+function goKoncovky()      { location.href = "koncovky-analyza.html"; }
+function goKoncovkyMapa()  { location.href = "koncovky-mapa.html"; }
+function goCasovaMapa()   { location.href = 'casova-mapa.html'; }
+function goSutaze()       { location.href = 'sutaze.html'; }
+function goMojeSutaze()   { location.href = 'moje-sutaze.html'; }
+
+// Odznak s počtom nesplnených zadaní. Splnenie sa vyhodnocuje rovnako ako na
+// stránke zadania.html: pri cieli na ELO podľa aktuálneho elo_<zručnosť>,
+// pri počte úloh podľa úloh vyriešených na prvý pokus po zadaní.
+// Tlačidlo Súťaže sa zobrazí len hráčovi, ktorého sa nejaká súťaž týka —
+// prázdna položka v menu by len zavadzala. Odznak ukazuje počet prebiehajúcich;
+// ak je medzi nimi niečo, čo hráč ešte nevidel, odznak dostane výkričník.
+async function loadSutazBadge() {
+  try {
+    const hrac = await getCurrentPlayer();
+    if (!hrac) return;
+
+    const dnes = todayLocal();
+    const vsetky = await sbFetch('sutaze?select=id,nazov,skupiny,datum_od,datum_do,created_at') || [];
+
+    const moje = vsetky.filter(s =>
+      !s.skupiny || !s.skupiny.length || (hrac.trener_id && s.skupiny.includes(hrac.trener_id)));
+    if (!moje.length) return;
+
+    document.getElementById('sutazBtn').style.display = 'flex';
+
+    const bezia = moje.filter(s => dnes >= s.datum_od && dnes <= s.datum_do);
+    if (!bezia.length) return;
+
+    // Nové = vytvorené po poslednej návšteve stránky so súťažami
+    let videneOd = 0;
+    try { videneOd = Number(localStorage.getItem('sutazeVidene')) || 0; } catch (e) {}
+    const nove = bezia.filter(s => new Date(s.created_at).getTime() > videneOd);
+
+    const b = document.getElementById('sutazBadge');
+    b.textContent = nove.length && videneOd > 0 ? '!' : bezia.length;
+    b.style.display = '';
+  } catch (e) {
+    console.warn('Odznak súťaží sa nenačítal:', e);
+  }
+}
+
+async function loadAssignmentBadge() {
+  try {
+    const player = await getCurrentPlayer();
+    if (!player) return;
+    const rows = await sbFetch(`assignments?player_id=eq.${player.id}&select=skill,endgame_type,target_type,target_value,created_at,completed_at`);
+    if (!rows || !rows.length) return;
+
+    // Má aspoň jedno zadanie — zobraz tlačidlo aj trénerovi/adminovi
+    document.getElementById('asgBtn').style.display = 'flex';
+
+    // Ciele na počet úloh (vrátane koncoviek) — z training_log, počítajú sa
+    // len úlohy vyriešené na prvý pokus po zadaní. Čas z PostgREST končí na
+    // "+00:00"; znak "+" sa v URL číta ako medzera, preto normalizujeme cez toISOString().
+    let logRows = [], meta = { puzzles: new Map(), skills: new Map() };
+    const needLog = rows.filter(r => (r.target_type === 'count' || r.endgame_type) && !r.completed_at);
+    if (needLog.length) {
+      const from = new Date(needLog.map(r => r.created_at).sort()[0]).toISOString();
+      logRows = await loadAssignmentLog([player.id], from);
+      meta    = await loadAssignmentPuzzleMeta(logRows);
+    }
+
+    const open = rows.filter(a => {
+      if (a.completed_at) return false;                 // ručne uzavreté trénerom
+      if (a.target_type === 'elo' && !a.endgame_type) {
+        // 1000 = predvolená hodnota ELO stĺpcov v databáze (do resetu 1200)
+        return Number(player['elo_' + a.skill] ?? 1000) < a.target_value;
+      }
+      return countFirstAttemptWins(logRows, a, meta) < a.target_value;
+    }).length;
+
+    if (open > 0) {
+      const b = document.getElementById('asgBadge');
+      b.textContent = open;
+      b.style.display = '';
+    }
+  } catch (e) {
+    console.warn('Odznak zadaní sa nenačítal:', e);
+  }
+}
+function goSkills(type)    { location.href = "skills.html?type=" + type; }
+function goDokumentacia()  { location.href = "dokumentacia.html"; }
+
+function goKoncovka(type) {
+  location.href = "training.html?mode=koncovka" + (type ? "&endgame=" + encodeURIComponent(type) : "");
+}
+
+// Typy koncoviek sa načítajú až pri prvom otvorení podmenu — nezaťažuje to
+// štart stránky. Zobrazia sa len typy, ktoré naozaj majú úlohy.
+let koncovkyLoaded = false;
+async function loadKoncovkyTypes() {
+  if (koncovkyLoaded) return;
+  koncovkyLoaded = true;
+  try {
+    const rows = await sbFetch('puzzles?category=eq.Koncovka&select=endgame_type');
+    if (!rows || !rows.length) return;
+    const counts = {};
+    rows.forEach(r => { const t = r.endgame_type || 'Neklasifikované'; counts[t] = (counts[t] || 0) + 1; });
+    const menu = document.getElementById('koncovkySubmenu');
+    Object.entries(counts)
+      .filter(([t]) => t !== 'Neklasifikované')
+      .sort((a, b) => b[1] - a[1])
+      .forEach(([t, n]) => {
+        const b = document.createElement('button');
+        b.className = 'sub-btn';
+        b.onclick = () => goKoncovka(t);
+        b.innerHTML = `<div class="sub-icon i-koncovka">♚</div>${t}<span class="sub-count">${n}</span>`;
+        menu.appendChild(b);
+      });
+  } catch (e) {
+    console.warn('Typy koncoviek sa nenačítali:', e);
+  }
+}
+
+function toggleKoncovkyMenu() {
+  const menu = document.getElementById('koncovkySubmenu');
+  const btn  = document.getElementById('btnKoncovky');
+  const isOpen = menu.classList.contains('open');
+  closeSkillsMenu(); closeTrenerMenu();
+  menu.classList.toggle('open');
+  btn.classList.toggle('active', !isOpen);
+  if (!isOpen) loadKoncovkyTypes();
+}
+
+function closeKoncovkyMenu() {
+  const m = document.getElementById('koncovkySubmenu');
+  const b = document.getElementById('btnKoncovky');
+  if (m) m.classList.remove('open');
+  if (b) b.classList.remove('active');
+}
+
+function toggleSkillsMenu() {
+  const menu = document.getElementById('skillsSubmenu');
+  const btn  = document.getElementById('btnSkills');
+  const isOpen = menu.classList.contains('open');
+  closeTrenerMenu(); closeKoncovkyMenu();
+  menu.classList.toggle('open');
+  btn.classList.toggle('active', !isOpen);
+}
+
+function toggleTrenerMenu() {
+  const menu = document.getElementById('trenerSubmenu');
+  const btn  = document.getElementById('trenerBtn');
+  const isOpen = menu.classList.contains('open');
+  closeSkillsMenu(); closeKoncovkyMenu();
+  menu.classList.toggle('open');
+  btn.classList.toggle('active', !isOpen);
+}
+
+function closeSkillsMenu() {
+  document.getElementById('skillsSubmenu').classList.remove('open');
+  document.getElementById('btnSkills').classList.remove('active');
+}
+
+function closeTrenerMenu() {
+  const m = document.getElementById('trenerSubmenu');
+  const b = document.getElementById('trenerBtn');
+  if (m) m.classList.remove('open');
+  if (b) b.classList.remove('active');
+}
+
+// ─── Rebríčky ────────────────────────────────────────────────────────────────
+
+const LB_CATEGORIES = [
+  { id: 'zrucnosti', field: 'elo_zrucnosti',  label: 'Zručnosti' },
+  { id: 'taktika',   field: 'elo_taktika',    label: 'Taktika' },
+  { id: 'strategia', field: 'elo_strategia',  label: 'Stratégia' },
+  { id: 'koncovka',  field: 'elo_koncovka',   label: 'Koncovka' },
+  { id: 'mix',       field: 'elo',            label: 'Mix' }
+];
+
+const MEDALS = ['🥇','🥈','🥉'];
+
+async function loadLeaderboards(myName) {
+  // Načítaj všetkých hráčov raz — potom sortuj lokálne
+  let players = [];
+  try {
+    // POZOR: musí ísť cez sbFetch, ktoré pripojí token prihláseného používateľa.
+    // Pôvodne tu bol vlastný fetch s verejným kľúčom v hlavičke Authorization —
+    // dotaz teda odchádzal ako neprihlásený a po zavretí tabuľky players
+    // pre neprihlásených sa rebríček prestal načítavať.
+    // Rebríček číta z pohľadu rebricek — ten zverejňuje len meno a ELO,
+    // žiadne emaily, a adminov vylučuje priamo v databáze, takže sa už
+    // nemusia dočítavať role z tabuľky profiles.
+    players = await sbFetch(
+      'rebricek?select=name,surname,elo,elo_taktika,elo_strategia,elo_koncovka,elo_zrucnosti'
+    ) || [];
+  } catch(e) {
+    LB_CATEGORIES.forEach(cat => {
+      document.getElementById('lb-' + cat.id).innerHTML =
+        '<div class="lb-loading">Chyba načítania</div>';
+    });
+    return;
+  }
+
+  LB_CATEGORIES.forEach(cat => {
+    const sorted = [...players]
+      .sort((a, b) => eloHodnota(b[cat.field]) - eloHodnota(a[cat.field]))
+      .slice(0, 10);
+
+    const el = document.getElementById('lb-' + cat.id);
+    if (!sorted.length) {
+      el.innerHTML = '<div class="lb-loading">Žiadni hráči</div>';
+      return;
+    }
+
+    el.innerHTML = sorted.map((p, i) => {
+      const name = `${p.name || ''} ${p.surname || ''}`.trim() || '?';
+      const elo  = eloHodnota(p[cat.field]);
+      const isMe = myName && name === myName;
+      const rank = MEDALS[i] || `${i + 1}.`;
+      return `<div class="lb-row${isMe ? ' me' : ''}">
+        <span class="lb-rank">${rank}</span>
+        <span class="lb-name" title="${escapeHtml(name)}">${escapeHtml(name)}</span>
+        <span class="lb-elo">${elo}</span>
+      </div>`;
+    }).join('');
+  });
+}
+</script>
+<script>
+// Registrácia service workera — bez neho prehliadač neponúkne inštaláciu ikony.
+// Chyba pri registrácii nesmie nič zhodiť, preto len tichý zápis do konzoly.
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(e =>
+      console.warn('Service worker sa nezaregistroval:', e));
+  });
+}
+</script>
+</body>
+</html>
