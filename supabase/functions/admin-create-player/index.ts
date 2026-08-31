@@ -42,7 +42,12 @@ const POVOLENE_ROLE = ["admin"];
 // takže keby sa líšilo, nový hráč by mal v rebríčku iné číslo, než po prvej
 // vyriešenej úlohe. Nastavuje sa explicitne, aby nezáviselo od nastavenia
 // stĺpcov v databáze.
-const SKILL_BASE_ELO = 1200;
+//
+// Od resetu 1. 9. 2026 je to 1000, rovnako ako pri základných kategóriách.
+// Predtým mali zručnosti vlastný základ 1200 — dva rôzne štarty sa ukázali
+// ako zbytočná komplikácia a robili rebríčky neporovnateľnými podľa toho,
+// ktorou cestou hráč vznikol.
+const SKILL_BASE_ELO = 1000;
 
 // Ako dlho platí novo vytvorený účet.
 const PLATNOST_DNI = 14;
