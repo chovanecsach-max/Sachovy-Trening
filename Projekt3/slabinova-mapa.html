@@ -297,7 +297,11 @@ function activeLabel()   { return colSet === 'basic' ? 'základných kategórií
 function activeLabel1()  { return colSet === 'basic' ? 'V kategórii' : 'V zručnosti'; }
 // akuzatív — po predložke „pre": pre zručnosti / pre základné kategórie
 function activeLabelAk() { return colSet === 'basic' ? 'základné kategórie' : 'zručnosti'; }
-function activeDefault() { return colSet === 'basic' ? 1000 : 1200; }    // východiskové ELO
+// Východiskové ELO. Od resetu 1. 9. 2026 začínajú zručnosti rovnako ako
+// základné kategórie na 1000 — predtým mali vlastný základ 1200. Táto hodnota
+// zároveň rozhoduje, ktorá bunka sa označí ako „zatiaľ netrénovaná" (biely
+// rámček), takže keby tu zostala 1200, po resete by sa neoznačila ani jedna.
+function activeDefault() { return 1000; }
 
 // Kategórie v elo_history (activeEloCategory v skills.html) + farby čiar
 const SKILL_CATS = [
