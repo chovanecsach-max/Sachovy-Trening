@@ -261,6 +261,7 @@ button {
     <button id="tabPuzzles" class="primary" onclick="switchTab('puzzles')" style="padding:8px 18px;font-size:14px;">Taktické puzzle</button>
     <button id="tabSkills" class="secondary" onclick="switchTab('skills')" style="padding:8px 18px;font-size:14px;">Šachové zručnosti</button>
     <button id="tabUsers" class="secondary" onclick="switchTab('users')" style="padding:8px 18px;font-size:14px;">👥 Používatelia</button>
+    <button id="tabErrors" class="secondary" onclick="switchTab('errors')" style="padding:8px 18px;font-size:14px;">⚠️ Chyby</button>
   </div>
 
   <div id="puzzleSection">
@@ -675,6 +676,32 @@ button {
   </div>
 </div>
 
+<!-- ─── Posledné chyby ────────────────────────────────────────────────────────
+     Tabuľku error_log plní automatické hlásenie z js/auth.js. Do 1. 9. 2026
+     sa do nej nikto nepozeral a mesiac v nej ležal záznam o tom, že sa
+     hráčom nezapisuje ELO zo zručností. Preto je to teraz záložka tu, a nie
+     dotaz, ktorý si treba pamätať. -->
+<div id="errorSection" style="display:none;">
+  <div class="card">
+    <h2>Posledné chyby</h2>
+    <div class="row" style="align-items:center;">
+      <select id="errRozsah" onchange="nacitajChyby()" style="flex:none;min-width:170px;">
+        <option value="7">za posledných 7 dní</option>
+        <option value="30" selected>za posledných 30 dní</option>
+        <option value="0">všetko</option>
+      </select>
+      <button class="primary" style="flex:none;" onclick="nacitajChyby()">Obnoviť</button>
+    </div>
+    <div class="tip">
+      Rovnaké chyby sú zlúčené do jedného riadku. Klikni na riadok a uvidíš
+      celé znenie poslednej z nich aj so stopou v kóde.
+    </div>
+    <div id="errSuhrn" style="margin-top:12px;">
+      <div class="tip">Načítavam…</div>
+    </div>
+  </div>
+</div>
+
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/auth.js"></script>
@@ -971,7 +998,7 @@ let activeTab = 'puzzles';
 
 function switchTab(tab) {
   activeTab = tab;
-  const tabs = ['puzzles', 'skills', 'users'];
+  const tabs = ['puzzles', 'skills', 'users', 'errors'];
   tabs.forEach(t => {
     document.getElementById('tab' + t.charAt(0).toUpperCase() + t.slice(1)).className =
       t === tab ? 'primary' : 'secondary';
@@ -979,6 +1006,8 @@ function switchTab(tab) {
   document.getElementById('puzzleSection').style.display = tab === 'puzzles' ? 'block' : 'none';
   document.getElementById('skillSection').style.display  = tab === 'skills'  ? 'block' : 'none';
   document.getElementById('userSection').style.display   = tab === 'users'   ? 'block' : 'none';
+  document.getElementById('errorSection').style.display  = tab === 'errors'  ? 'block' : 'none';
+  if (tab === 'errors') nacitajChyby();
   if (tab === 'users') {
     loadUsers();
     // Zoznam trénerov pre správu skupinových prístupov — naplní sa raz
@@ -1218,6 +1247,120 @@ async function nacitajPritomnych() {
   } catch (e) {
     box.innerHTML = '<div class="tip">Zoznam sa nepodarilo načítať: ' + escapeHtml(e.message) + '</div>';
   }
+}
+
+// ─── Posledné chyby ─────────────────────────────────────────────────────────
+// Číta error_log (politika admin_read_error_log ho púšťa len adminovi).
+// Rovnaké chyby sa zlučujú podľa stránky a začiatku správy — inak by sa jedna
+// chyba, ktorá padla stokrát, tvárila ako sto rôznych problémov a v zozname by
+// prekryla to podstatné.
+
+const ERR_KLUC_DLZKA = 90;   // koľko znakov správy rozhoduje, či ide o tú istú chybu
+
+async function nacitajChyby() {
+  const box = document.getElementById('errSuhrn');
+  if (!box) return;
+  box.innerHTML = '<div class="tip">Načítavam…</div>';
+
+  try {
+    const dni = Number(document.getElementById('errRozsah').value || 30);
+    let q = 'error_log?select=created_at,page,message,stack,user_agent,user_id'
+          + '&order=created_at.desc&limit=500';
+    if (dni > 0) {
+      const od = new Date(Date.now() - dni * 24 * 60 * 60 * 1000).toISOString();
+      q += '&created_at=gte.' + od;
+    }
+    const rows = await sbFetch(q) || [];
+    vykresliChyby(rows, dni);
+  } catch (e) {
+    box.innerHTML = '<div class="tip">Chyby sa nepodarilo načítať: '
+                  + escapeHtml(e.message) + '</div>';
+  }
+}
+
+function vykresliChyby(rows, dni) {
+  const box = document.getElementById('errSuhrn');
+  const obdobie = dni > 0 ? ('za posledných ' + dni + ' dní') : 'za celý čas';
+
+  if (!rows.length) {
+    box.innerHTML = '<div style="padding:10px 12px;border-radius:9px;background:#f0fdf4;'
+      + 'border:1px solid #86efac;color:#166534;font-size:13px;">'
+      + '✅ Žiadne chyby ' + obdobie + '.</div>';
+    return;
+  }
+
+  // Zlúčenie: kľúčom je stránka + začiatok správy
+  const skupiny = new Map();
+  rows.forEach(r => {
+    const kluc = (r.page || '') + '|' + String(r.message || '').slice(0, ERR_KLUC_DLZKA);
+    let g = skupiny.get(kluc);
+    if (!g) {
+      // rows sú zoradené od najnovšej, takže prvý výskyt je ten posledný v čase
+      g = { posledna: r, pocet: 0, prvyCas: r.created_at, pouzivatelia: new Set() };
+      skupiny.set(kluc, g);
+    }
+    g.pocet++;
+    g.prvyCas = r.created_at;              // prepisuje sa až po najstarší
+    if (r.user_id) g.pouzivatelia.add(r.user_id);
+  });
+
+  const zoznam = [...skupiny.values()].sort((a, b) => b.pocet - a.pocet);
+  const cas = t => t ? new Date(t).toLocaleString('sk-SK') : '—';
+
+  box.innerHTML =
+    '<div style="font-size:13px;color:#334155;margin-bottom:8px;">'
+    + `<strong>${rows.length}</strong> záznamov ${obdobie}, `
+    + `zlúčených do <strong>${zoznam.length}</strong> `
+    + (zoznam.length === 1 ? 'druhu' : 'druhov') + ' chyby.'
+    + (rows.length >= 500 ? ' <em>(zobrazených je najnovších 500)</em>' : '')
+    + '</div>'
+    + zoznam.map((g, i) => {
+        const r = g.posledna;
+        return `
+        <div style="border:1px solid #e2e8f0;border-radius:10px;margin-bottom:6px;background:#fff;">
+          <div onclick="prepniChybu(${i})" style="display:flex;gap:10px;align-items:center;
+               padding:9px 11px;cursor:pointer;">
+            <span style="flex:none;min-width:44px;text-align:center;font-weight:bold;
+                  font-size:13px;padding:3px 7px;border-radius:999px;
+                  background:${g.pocet > 5 ? '#fee2e2' : '#f1f5f9'};
+                  color:${g.pocet > 5 ? '#b91c1c' : '#334155'};">${g.pocet}×</span>
+            <span style="flex:1;min-width:0;font-size:13px;color:#0f172a;
+                  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+              ${escapeHtml(String(r.message || '').slice(0, 120))}
+            </span>
+            <span style="flex:none;font-size:12px;color:#94a3b8;white-space:nowrap;">
+              ${escapeHtml((r.page || '').split('/').pop())} · ${escapeHtml(cas(r.created_at))}
+            </span>
+          </div>
+          <div id="errDetail${i}" style="display:none;padding:0 11px 11px 11px;">
+            <div style="font-size:12px;color:#64748b;margin-bottom:6px;">
+              Prvý výskyt ${escapeHtml(cas(g.prvyCas))} · posledný ${escapeHtml(cas(r.created_at))}
+              · ${g.pouzivatelia.size || 0} ${sklonujPouzivatelov(g.pouzivatelia.size)}
+              · ${escapeHtml(r.page || '')}
+            </div>
+            <pre style="margin:0 0 6px 0;padding:9px;background:#f8fafc;border:1px solid #e2e8f0;
+                 border-radius:8px;font-size:12px;white-space:pre-wrap;word-break:break-word;
+                 color:#0f172a;">${escapeHtml(r.message || '')}</pre>
+            ${r.stack ? `<pre style="margin:0 0 6px 0;padding:9px;background:#f8fafc;
+                 border:1px solid #e2e8f0;border-radius:8px;font-size:12px;white-space:pre-wrap;
+                 word-break:break-word;color:#475569;">${escapeHtml(r.stack)}</pre>` : ''}
+            <div style="font-size:11px;color:#94a3b8;word-break:break-word;">
+              ${escapeHtml(r.user_agent || '')}
+            </div>
+          </div>
+        </div>`;
+      }).join('');
+}
+
+// 1 používateľ, 2–4 používatelia, 5 a viac používateľov
+function sklonujPouzivatelov(n) {
+  if (n === 1) return 'používateľ';
+  return n < 5 ? 'používatelia' : 'používateľov';
+}
+
+function prepniChybu(i) {
+  const el = document.getElementById('errDetail' + i);
+  if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
 }
 
 // ─── Skupinový tréner ───────────────────────────────────────────────────────
