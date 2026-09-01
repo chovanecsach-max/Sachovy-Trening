@@ -5,8 +5,18 @@ const SUPABASE_URL = "https://wdjsilryllqksdtmaehy.supabase.co";
 const SUPABASE_KEY = "sb_publishable_45gFQhgPScrDjDCVC0B4Iw_q6uZKf9m";
 
 // Inicializácia Supabase klienta pre Auth
-const { createClient } = supabase;
-const sbClient = createClient(SUPABASE_URL, SUPABASE_KEY);
+// POZOR na try/catch: `supabase` je globálna premenná z knižnice, ktorá sa ťahá
+// z CDN. Keď sa knižnica nenačíta (výpadok siete, blokovanie), pôvodné
+// `const { createClient } = supabase;` vyhodilo chybu hneď na tomto riadku a
+// NIČ ďalšie z auth.js už nevzniklo — vrátane hlásenia chýb aj poistky na konci
+// súboru. Stránka potom ostala nemá a v error_log nebolo ani slovo. Takto
+// klient síce nebude, ale zvyšok súboru dobehne a hráč sa aspoň dozvie prečo.
+let sbClient = null;
+try {
+  sbClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+} catch (e) {
+  console.error('Knižnica Supabase sa nenačítala:', e);
+}
 
 // ─── Pomocné funkcie ──────────────────────────────────────────────────────────
 
@@ -158,5 +168,62 @@ async function refreshSession() {
   window.addEventListener('unhandledrejection', function (ev) {
     const r = ev.reason;
     reportError(r && r.message ? r.message : String(r), r && r.stack);
+  });
+
+  // ─── Poistka: načítala sa stránka celá? ───────────────────────────────────
+  // Keď výpadok siete zhltne jeden zo súborov — najčastejšie js/player.js —
+  // stránka sa vykreslí a vyzerá normálne, ale nefunguje na nej nič. Hráč
+  // nevidí dôvod, zavrie to a povie, že „to nejde"; v error_log ostane len
+  // následok v tvare „getCurrentPlayer is not defined".
+  //
+  // Chybu pri sťahovaní súboru bežný listener na 'error' NEZACHYTÍ: taká
+  // udalosť nebublá. Loví sa v zachytávacej fáze, teda s tretím parametrom
+  // true. Sledujú sa len značky <script> — chýbajúci obrázok figúrky je
+  // nepríjemnosť, nie dôvod strašiť hráča pruhom cez pol obrazovky.
+
+  // Ak je na stránke tento súbor, po načítaní musí existovať táto funkcia.
+  // Stačí jedna zo súboru: keď chýba ona, chýba celý súbor.
+  const KONTROLY = [
+    { subor: 'js/player.js',   funkcia: 'sbFetch' },
+    { subor: 'js/training.js', funkcia: 'getExcludedPuzzleIds' },
+    { subor: 'js/sounds.js',   funkcia: 'playSound' },
+    { subor: 'js/koncovky.js', funkcia: 'classifyEndgame' }
+  ];
+
+  function ukazPruh() {
+    if (document.getElementById('nacitanieChyba')) return;   // stačí raz
+    const ciel = document.body || document.documentElement;
+    if (!ciel) return;
+    const d = document.createElement('div');
+    d.id = 'nacitanieChyba';
+    d.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;'
+      + 'padding:10px 14px;background:#fef2f2;border-bottom:2px solid #fca5a5;'
+      + 'color:#b91c1c;font:600 14px/1.4 Arial,sans-serif;text-align:center;';
+    d.innerHTML = '⚠️ Stránka sa nenačítala celá, preto nemusí fungovať. '
+      + '<button type="button" style="margin-left:8px;padding:5px 12px;border:none;'
+      + 'border-radius:8px;background:#b91c1c;color:#fff;font-size:13px;'
+      + 'cursor:pointer;">Načítať znova</button>';
+    d.querySelector('button').onclick = function () { location.reload(); };
+    ciel.appendChild(d);
+  }
+
+  window.addEventListener('error', function (ev) {
+    const el = ev.target;
+    // Neošetrená chyba v kóde má za cieľ window — tú rieši listener vyššie
+    if (!el || el === window || el.tagName !== 'SCRIPT') return;
+    reportError('súbor sa nenačítal: ' + (el.src || '(bez src)'), 'výpadok pri sťahovaní');
+    ukazPruh();
+  }, true);
+
+  window.addEventListener('load', function () {
+    const chyba = [];
+    if (typeof supabase === 'undefined' || !sbClient) chyba.push('knižnica Supabase');
+    KONTROLY.forEach(function (k) {
+      const jeNaStranke = !!document.querySelector('script[src*="' + k.subor + '"]');
+      if (jeNaStranke && typeof window[k.funkcia] !== 'function') chyba.push(k.subor);
+    });
+    if (!chyba.length) return;
+    reportError('stránka sa nenačítala celá — chýba: ' + chyba.join(', '), '');
+    ukazPruh();
   });
 })();
