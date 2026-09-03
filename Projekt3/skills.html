@@ -631,6 +631,11 @@ button:disabled { opacity: 0.6; cursor: not-allowed; }
 <script src="js/sounds.js"></script>
 <script src="js/player.js"></script>
 <script>
+// ZNAČKA VERZIE — pri každej úprave tohto súboru prepíš dátum.
+// Vypíše sa v konzole, alebo na mobile po pridaní ?verzia do adresy.
+// Mechanika je v player.js pri funkcii verzie().
+(window.VERZIE = window.VERZIE || {})['skills.html'] = '2026-09-03';
+
 const files = ['a','b','c','d','e','f','g','h'];
 
 let currentPlayer = null;
