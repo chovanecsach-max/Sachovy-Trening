@@ -790,7 +790,8 @@ async function loadAssignmentBadge() {
     const open = rows.filter(a => {
       if (a.completed_at) return false;                 // ručne uzavreté trénerom
       if (a.target_type === 'elo' && !a.endgame_type) {
-        return Number(player['elo_' + a.skill] ?? 1200) < a.target_value;
+        // 1000 = predvolená hodnota ELO stĺpcov v databáze (do resetu 1200)
+        return Number(player['elo_' + a.skill] ?? 1000) < a.target_value;
       }
       return countFirstAttemptWins(logRows, a, meta) < a.target_value;
     }).length;
