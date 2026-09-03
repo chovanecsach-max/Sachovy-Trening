@@ -687,19 +687,14 @@ let puzzleFailed = false;
 let resultLogged = false;
 let everFailed = false; // true ak hráč raz chyboval/ukázal riešenie — ELO sa nezapočíta
 
-// Úlohy, za ktoré už v tejto session padlo ELO (win aj loss). Spolu so
-// solvedSkillIds (história z training_log) zabraňuje opakovanému získavaniu
-// ELO na tej istej úlohe cez "Skús znova".
-const eloAwardedSkillIds = new Set();
-
-// ELO a agregáty v players sa počítajú len pri PRVOM pokuse o danú úlohu.
-// Opakovanie sa naďalej zapisuje do training_log, ale nemení pokrok.
-function isSkillEloEligible(puzzleId) {
-  if (puzzleId == null) return false;
-  if (eloAwardedSkillIds.has(puzzleId)) return false;
-  if (solvedSkillIds.has(puzzleId)) return false;   // už vyriešená / nedávno neúspešná
-  return true;
-}
+// O tom, či sa za úlohu pripíše ELO, rozhoduje SERVER. Funkcia zapis_vysledok
+// si v training_log overí, či nejde o opakovanie (vyriešená úloha je vylúčená
+// natrvalo, neúspešná 14 dní), a v odpovedi to povie ako prvy_pokus.
+//
+// Prehliadač si to už nepočíta sám zámerne: dve karty otvorené naraz si vedeli
+// za tú istú úlohu odklepnúť ELO dvakrát (bod B1 auditu), lebo každá videla len
+// svoj vlastný zoznam. solvedSkillIds tu zostáva, ale slúži už len na VÝBER
+// ďalšej úlohy — to je iná otázka než nárok na ELO.
 let isAdminMode = false;
 let puzzleCounted = false;
 let puzzleSolvedCounted = false;
@@ -1451,31 +1446,27 @@ function markSolved() {
 }
 
 // Zatvorenie karty alebo obnovenie stránky — rovnaké pravidlo, ale zápis musí
-// prežiť odchod, preto keepalive. Priemer elo_zrucnosti sa prepočíta z lokálne
-// známych hodnôt, aby stačil jediný zápis.
+// prežiť odchod, preto keepalive. Ide o jediné volanie serverovej funkcie:
+// ELO, agregáty aj elo_history si dopočíta a zapíše ona. Odpoveď sa už nedá
+// prečítať — a netreba, hráč stránku opúšťa.
 window.addEventListener('pagehide', function (e) {
   if (e.persisted) return;
   if (resultLogged || puzzleDone || !currentPlayer || !current) return;
   const cas = uplynulyCasUlohy();
   if (cas < MILOST_SEKUND) return;
+  resultLogged = true;
 
-  sbZapisPriOdchode('training_log', {
-    player_id: currentPlayer.id, puzzle_id: current.id,
-    result: 'loss', time_spent: Math.round(cas), source: 'skill_puzzles',
-    loss_reason: 'odchod'
+  zapisVysledokPriOdchode({
+    puzzleId:    current.id,
+    source:      'skill_puzzles',
+    result:      'loss',
+    timeSpent:   Math.round(cas),
+    lossReason:  'odchod',
+    timeLimit:   Number(aktualnyLimit) > 0 ? Math.round(Number(aktualnyLimit)) : null,
+    firstMoveMs: prvyTahMs,
+    protiSebe:   isCompleteMode(),
+    foundList:   [...skutocneNajdene]
   });
-
-  if (isSkillEloEligible(current.id)) {
-    const pole = updateEloField();
-    const stare = Number(currentPlayer[pole] || 1500);
-    const nove = Math.max(100, stare + eloZmena(stare, Number(current.elo || 1200), 'loss'));
-    const zmeny = { [pole]: nove };
-    const priemer = priemerZrucnosti({ ...currentPlayer, [pole]: nove });
-    if (priemer != null && SKILL_ELO_TYPES.includes(updateEloCategory())) {
-      zmeny.elo_zrucnosti = priemer;
-    }
-    sbUpravPriOdchode(`players?id=eq.${currentPlayer.id}`, zmeny);
-  }
 });
 
 // ─── Opustenie úlohy ────────────────────────────────────────────────────────
@@ -1504,6 +1495,17 @@ async function opustitUlohu() {
 }
 
 // dovod: prečo hráč neuspel — 'chyba' | 'cas' | 'riesenie' | 'odchod'.
+//
+// Výsledok sa zapisuje JEDINÝM volaním serverovej funkcie zapis_vysledok.
+// Predtým odtiaľto odchádzali tri samostatné požiadavky — POST do training_log,
+// PATCH na players a zápis do elo_history — a po sprísnení prístupu (krok 6)
+// neprešla ani jedna: na training_log nezostalo pravidlo na zápis, PATCH na
+// players ticho neupravil ani jeden riadok a logEloHistory rovno vyhodí chybu.
+// Zručnosti tak od 31. 8. 2026 nezapisovali nič a hráč o tom nevedel, lebo
+// jediná stopa bola hláška v konzole.
+//
+// Kto má nárok na ELO (prvý pokus vs. opakovanie) rozhoduje tiež server —
+// v prehliadači sa to nedá obísť ani dvoma otvorenými kartami.
 async function recordResult(result, dovod = null, chybnyTah = null) {
   if (resultLogged || !currentPlayer || !current) return;
   resultLogged = true;
@@ -1514,12 +1516,6 @@ async function recordResult(result, dovod = null, chybnyTah = null) {
     return;
   }
 
-  // POZOR: vyhodnoť oprávnenosť SYNCHRÓNNE, ešte pred prvým await.
-  // Volajúci po spustení recordResult('win') hneď pridáva id do solvedSkillIds,
-  // takže po await by sa prvé riešenie javilo ako opakovanie a ELO by nepadlo.
-  const eloEligible = isSkillEloEligible(current.id);
-  if (eloEligible) eloAwardedSkillIds.add(current.id);
-
   // Ulož posledný typ zručnosti pre zobrazenie ELO v menu
   const skillType = new URLSearchParams(window.location.search).get('type') || 'checks_captures';
   localStorage.setItem('lastTrainingMode', 'skill_' + skillType);
@@ -1528,110 +1524,67 @@ async function recordResult(result, dovod = null, chybnyTah = null) {
   const puzzleTime = Math.max(0, aktualnyLimit || Math.round(current.time || 120));
   const usedTime = Math.max(0, puzzleTime - Math.max(0, timerRemaining));
 
-  // Zaznamenaj do training_log
-  try {
-    await sbFetch("training_log", {
-      method: "POST",
-      prefer: "return=minimal",
-      body: JSON.stringify({
-        player_id: currentPlayer.id,
-        puzzle_id: current.id,
-        result: result,
-        time_spent: usedTime,
-        source: "skill_puzzles",  // úloha z tabuľky skill_puzzles (tréning zručností)
-        loss_reason: result === 'loss' ? (dovod || 'chyba') : null,
-        // Chybný ťah/políčko a počet už nájdených odpovedí — len pri chybe.
-        // Pri zručnostiach hovorí ply, po koľkých správnych sa hráč pomýlil:
-        // chyba pri nule znamená, že vzor nevidí vôbec.
-        wrong_move: (result === 'loss' && (dovod || 'chyba') === 'chyba') ? (chybnyTah || null) : null,
-        ply: (result === 'loss' && (dovod || 'chyba') === 'chyba') ? foundMoves.length : null,
-        // Ktoré riešenia hráč našiel SÁM. Ukladá sa pri každom neúspechu —
-        // „našiel tri zo štyroch" je iná diagnóza než „nenašiel nič".
-        // skutocneNajdene obsahuje len naozaj nájdené; po odhalení riešenia sa
-        // do foundMoves doplnia všetky, čo by výsledok skreslilo.
-        found_list: result === 'loss' ? [...skutocneNajdene] : null,
-        time_limit: Number(aktualnyLimit) > 0 ? Math.round(Number(aktualnyLimit)) : null,
-        first_move_ms: prvyTahMs != null ? Math.round(prvyTahMs) : null
-      })
-    });
-  } catch(e) {
-    console.error("Chyba pri zápise logu:", e);
-  }
+  const jeChyba = result === 'loss' && (dovod || 'chyba') === 'chyba';
 
-  // Aktualizuj ELO (vlastné pre danú zručnosť, v komplexnom režime spoločné),
-  // total_time a štatistiky — len pri prvom pokuse o túto úlohu.
-  // Opakované riešenie zostáva v training_log, ale pokrok už nemení.
-  if (!eloEligible) {
-    setStatus('Túto úlohu si už riešil — zapísala sa do histórie, ELO sa nemení.', 'info');
+  // JEDINÝ zápis. Server si silu úlohy načíta z databázy, spočíta ELO, zapíše
+  // training_log, players aj elo_history v jednej transakcii a vráti, čo sa
+  // naozaj uložilo.
+  const odpoved = await zapisVysledok({
+    puzzleId:   current.id,
+    source:     'skill_puzzles',   // úloha z tabuľky skill_puzzles
+    result:     result,
+    // mode sa zámerne neposiela: ELO stĺpec si server určí zo skill_type
+    // úlohy, takže sa nedá z prehliadača podstrčiť cudzia zručnosť.
+    timeSpent:  usedTime,
+    lossReason: result === 'loss' ? (dovod || 'chyba') : null,
+    // Chybný ťah/políčko a počet už nájdených odpovedí — len pri chybe.
+    // Pri zručnostiach hovorí ply, po koľkých správnych sa hráč pomýlil:
+    // chyba pri nule znamená, že vzor nevidí vôbec.
+    wrongMove:  jeChyba ? (chybnyTah || null) : null,
+    ply:        jeChyba ? foundMoves.length : null,
+    timeLimit:  Number(aktualnyLimit) > 0 ? Math.round(Number(aktualnyLimit)) : null,
+    firstMoveMs: prvyTahMs,
+    // Komplexný tréning: pozícia je náhodná, preto sa hráč porovnáva sám so
+    // sebou (±10), nie so silou úlohy, ktorá by bola z cudzej úrovne.
+    protiSebe:  isCompleteMode(),
+    // Ktoré riešenia hráč našiel SÁM. Ukladá sa pri každom neúspechu —
+    // „našiel tri zo štyroch" je iná diagnóza než „nenašiel nič".
+    // skutocneNajdene obsahuje len naozaj nájdené; po odhalení riešenia sa
+    // do foundMoves doplnia všetky, čo by výsledok skreslilo.
+    foundList:  result === 'loss' ? [...skutocneNajdene] : null
+  });
+
+  // Neúspešný zápis sa hráčovi POVIE. Doteraz skončil len v konzole a tréning
+  // navonok vyzeral, že beží — pritom sa neukladalo nič.
+  if (!odpoved || !odpoved.zapisane) {
+    setStatus('Výsledok sa nepodarilo uložiť. Skús obnoviť stránku (F5).', 'error');
     return;
   }
 
-  try {
-    const players = await sbFetch(`players?id=eq.${currentPlayer.id}&limit=1`);
-    if (players && players.length) {
-      const player = players[0];
-      const eloField = updateEloField();      // konkrétna zručnosť, nie priemer
-      const currentElo = Number(player[eloField] || 1500);
-      // Stĺpec elo v skill_puzzles nie je mierou náročnosti pozície, ale iba
-      // značkou úrovne, na ktorej bola úloha vygenerovaná (get_elo v
-      // generate_vision.py: „nezávisí od počtu riešení"). Náročnosť určuje ČAS,
-      // a ten sa od zavedenia SKILL_TIME_TABLE počíta z úrovne hráča.
-      // Pri jednotlivej zručnosti výber servíruje úlohu z úrovne hráča, takže
-      // značka aj tak zodpovedá jeho sile a dá sa použiť. V komplexnom tréningu
-      // je pozícia náhodná, takže by sa počítalo proti cudzej úrovni — preto sa
-      // tam porovnáva hráč sám so sebou: úspech +10, neúspech −10.
-      const puzzleElo = isCompleteMode() ? currentElo : Number(current.elo || 1200);
-      let change = eloZmena(currentElo, puzzleElo, result);
-      // Ak hráč chyboval alebo ukázal riešenie, ELO pri výhre sa nepočíta
-      if (everFailed && result === 'win') change = 0;
-      const newElo = Math.max(100, currentElo + change);
-
-      const updates = {
-        [eloField]: newElo,
-        played: Number(player.played || 0) + 1,
-        total_time: Number(player.total_time || 0) + usedTime
-      };
-      if (result === 'win') {
-        updates.solved = Number(player.solved || 0) + 1;
-      }
-
-      // elo_zrucnosti je odvodený priemer — prepočítaj ho v tom istom zápise
-      const kategoria = updateEloCategory();
-      let priemer = null;
-      if (SKILL_ELO_TYPES.includes(kategoria)) {
-        priemer = priemerZrucnosti({ ...player, [eloField]: newElo });
-        if (priemer != null) updates.elo_zrucnosti = priemer;
-      }
-
-      await sbFetch(`players?id=eq.${currentPlayer.id}`, {
-        method: 'PATCH',
-        body: JSON.stringify(updates)
-      });
-      currentPlayer[eloField] = newElo;
-      if (priemer != null) currentPlayer.elo_zrucnosti = priemer;
-
-      // Zaloguj ELO do histórie pre grafy (len ak sa ELO zmenilo).
-      // Priemer sa loguje pod kategóriou 'zrucnosti', aby jej graf nezhasol.
-      if (change !== 0) {
-        await logEloHistory(currentPlayer.id, kategoria, newElo);
-        if (priemer != null && kategoria !== 'zrucnosti') {
-          await logEloHistory(currentPlayer.id, 'zrucnosti', priemer);
-        }
-      }
-
-      // V hlavičke sa v komplexnom tréningu zobrazuje priemer, inak daná zručnosť
-      const zobraz = isCompleteMode()
-        ? (currentPlayer.elo_zrucnosti != null ? currentPlayer.elo_zrucnosti : newElo)
-        : newElo;
-      document.getElementById('playerElo').textContent = zobraz + ' (' + activeEloTag() + ')';
-      // Zmena sa vzťahuje na ELO KONKRÉTNEJ zručnosti, aj v komplexnom tréningu,
-      // kde sa v hlavičke zobrazuje priemer — inak by pri +10 v jednej zručnosti
-      // hráč videl priemer o bod vyšší a nechápal by, odkiaľ sa to vzalo.
-      ukazZmenuElo(newElo - currentElo);
-    }
-  } catch(e) {
-    console.error("Chyba pri aktualizácii ELO zručností:", e);
+  // Opakované riešenie zostáva v training_log, ale pokrok už nemení.
+  if (odpoved.prvy_pokus === false) {
+    setStatus(result === 'win'
+      ? '🎉 Výborne! Túto úlohu si už riešil, ELO sa preto nemení.'
+      : 'Túto úlohu si už riešil — zapísala sa do histórie, ELO sa nemení.',
+      result === 'win' ? 'success' : 'info');
+    return;
   }
+
+  // ELO sa v prehliadači UŽ NEPOČÍTA. Jediná pravda je odpoveď servera, takže
+  // sa nemôže stať, že hráč uvidí „+10" a v databáze nebude nič — presne to sa
+  // dialo od 31. 8., keď PATCH na players prestal mať právo čokoľvek zmeniť.
+  if (odpoved.elo_pole) currentPlayer[odpoved.elo_pole] = odpoved.elo_nove;
+  if (odpoved.elo_zrucnosti != null) currentPlayer.elo_zrucnosti = odpoved.elo_zrucnosti;
+
+  // V hlavičke sa v komplexnom tréningu zobrazuje priemer, inak daná zručnosť
+  const zobraz = isCompleteMode()
+    ? (currentPlayer.elo_zrucnosti != null ? currentPlayer.elo_zrucnosti : odpoved.elo_nove)
+    : odpoved.elo_nove;
+  document.getElementById('playerElo').textContent = zobraz + ' (' + activeEloTag() + ')';
+  // Zmena sa vzťahuje na ELO KONKRÉTNEJ zručnosti, aj v komplexnom tréningu,
+  // kde sa v hlavičke zobrazuje priemer — inak by pri +10 v jednej zručnosti
+  // hráč videl priemer o bod vyšší a nechápal by, odkiaľ sa to vzalo.
+  ukazZmenuElo(odpoved.zmena);
 }
 
 // sbFetch je dostupný z player.js
