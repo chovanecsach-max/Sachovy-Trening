@@ -1,37 +1,12 @@
 const TRAINING_KEY = "trainingLog";
 
-// lossReason: prečo hráč neuspel — 'chyba' | 'cas' | 'riesenie' | 'odchod'.
-// Pri výhre sa neuvádza. Rozdiel medzi chybou a vypršaným časom je pre trénera
-// zásadný: prvé znamená, že hráč vzor nepozná, druhé že ho rozpoznáva pomaly.
-// chybnyTah: čo hráč zahral ('e2e4'), ply: v ktorom ťahu riešenia sa pomýlil.
-// Obidva len pri skutočnej chybe — pri vypršanom čase nie je čo zapisovať.
-// timeLimit: koľko sekúnd mal hráč na úlohu (podiel využitia hovorí o pripravenosti)
-// firstMoveMs: čas do prvého ťahu v ms (nízky pri chybe = impulzívnosť)
-async function addTrainingResult(playerId, puzzleId, result, timeSpent = 0,
-                                 lossReason = null, chybnyTah = null, ply = null,
-                                 timeLimit = null, firstMoveMs = null) {
-  try {
-    await sbFetch("training_log", {
-      method: "POST",
-      prefer: "return=minimal",
-      body: JSON.stringify({
-        player_id: playerId,
-        puzzle_id: puzzleId,
-        result: result,
-        time_spent: Math.max(0, Math.round(timeSpent)),
-        source: "puzzles",       // úloha z tabuľky puzzles (klasický tréning)
-        loss_reason: result === 'loss' ? (lossReason || 'chyba') : null,
-        wrong_move: chybnyTah || null,
-        ply: Number.isFinite(Number(ply)) ? Number(ply) : null,
-        time_limit: Number.isFinite(Number(timeLimit)) && Number(timeLimit) > 0
-                    ? Math.round(Number(timeLimit)) : null,
-        first_move_ms: Number.isFinite(Number(firstMoveMs)) && Number(firstMoveMs) >= 0
-                    ? Math.round(Number(firstMoveMs)) : null
-      })
-    });
-  } catch (e) {
-    console.error("Chyba pri ukladaní tréningového logu:", e);
-  }
+// ZASTARANÉ — výsledok tréningu zapisuje serverová funkcia zapis_vysledok
+// (zapisVysledok v js/player.js). Priamy POST do training_log tu bol do kroku 6;
+// odvtedy politika insert_own_training_log neexistuje a taký zápis by skončil
+// chybou 403. Funkcia zostáva len ako hlasná zátka: keby ju niekto omylom
+// použil, dozvie sa to hneď, a nie o mesiac z prázdnej štatistiky.
+function addTrainingResult() {
+  throw new Error('addTrainingResult je zrušená — použi zapisVysledok() z js/player.js');
 }
 
 const RETRY_AFTER_DAYS = 14;   // po tomto počte dní sa nevyriešená (loss) úloha vráti do výberu
