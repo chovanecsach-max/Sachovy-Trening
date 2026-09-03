@@ -375,6 +375,28 @@ function logEloHistory() {
   throw new Error('logEloHistory je zrušená — elo_history zapisuje zapis_vysledok()');
 }
 
+// ─── Zadania a súťaže ───────────────────────────────────────────────────────
+
+// Prevod režimu na kategóriu úlohy. Zadanie aj súťaž nesú režim malými
+// písmenami ('taktika'), kým puzzles.category je uložená s veľkým začiatočným
+// ('Taktika') — bez tohto prevodu by sa nespárovala ani jedna úloha.
+//
+// POZOR: musí byť TU, v player.js, nie na jednotlivých stránkach. Používajú ju
+// tri funkcie nižšie (countFirstAttemptWins, countFirstWinsByPlayer,
+// sutazRozpis) a keď ju stránka nedoniesla, spadla celá na
+// „BASIC_ASSIGNMENT_CATEGORY is not defined" — presne to sa dialo na
+// zadania-prehlad.html. Komentár v sutaze.html na ňu odkazoval ako na súčasť
+// player.js, len sa sem nikdy nedopísala.
+//
+// Zručnosti sem nepatria: tie sa nepoznávajú podľa kategórie, ale podľa
+// skill_type v skill_puzzles, a v tých funkciách sa vetví práve tým, že
+// prevod pre daný kľúč neexistuje (vráti null).
+const BASIC_ASSIGNMENT_CATEGORY = {
+  taktika:   'Taktika',
+  strategia: 'Strategia',
+  koncovka:  'Koncovka'
+};
+
 async function loadAssignmentLog(playerIds, fromISO) {
   const ids = [...new Set(playerIds)].filter(Boolean).join(',');
   if (!ids) return [];
