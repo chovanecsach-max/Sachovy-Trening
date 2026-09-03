@@ -570,21 +570,28 @@ function riesenieDoPgn(Chess, p) {
 // Riešenia sa zároveň nakreslia na šachovnicu: ťahy ako zelené šípky (%cal),
 // políčkové zručnosti ako zelené krúžky (%csl). Rozumie tomu ChessBase
 // aj Lichess, takže tréner vidí odpovede rovno na diagrame.
-function rieseniaZrucnostiDoPgn(Chess, p, chybnyTah) {
+function rieseniaZrucnostiDoPgn(Chess, p, chybnyTah, najdeneHracom) {
   const zoznam = Array.isArray(p.solutions) ? p.solutions : [];
   if (!zoznam.length) return '';
 
-  const sanTexty = [], sipky = [], policka = [];
+  // Čo hráč našiel sám. Zelená = našiel, žltá = prehliadol, červená = zahral zle.
+  // Rozdiel medzi „nenašiel nič" a „našiel tri zo štyroch" je pri rozbore
+  // podstatnejší než samotný zoznam správnych odpovedí.
+  const najdene = new Set((Array.isArray(najdeneHracom) ? najdeneHracom : [])
+    .map(x => String(x || '').trim().slice(0, 4)));
+
+  const sanNajdene = [], sanZmeskane = [], sipky = [], policka = [];
 
   zoznam.forEach(raw => {
     const t = String(raw || '').trim();
+    const maNajdene = najdene.has(t.slice(0, 4));
     if (t.length === 2) {                 // políčková zručnosť
-      policka.push('G' + t);
-      sanTexty.push(t);
+      policka.push((maNajdene ? 'G' : 'Y') + t);
+      (maNajdene ? sanNajdene : sanZmeskane).push(t);
       return;
     }
     if (t.length < 4) return;
-    sipky.push('G' + t.slice(0, 4));
+    sipky.push((maNajdene ? 'G' : 'Y') + t.slice(0, 4));
 
     // Zápis do notácie. Ťah môže patriť ktorejkoľvek strane, preto sa skúsi
     // pozícia s bielym aj s čiernym na ťahu.
@@ -601,10 +608,10 @@ function rieseniaZrucnostiDoPgn(Chess, p, chybnyTah) {
         } catch (e) { /* skús druhú farbu */ }
       }
     }
-    sanTexty.push(san || t);
+    (maNajdene ? sanNajdene : sanZmeskane).push(san || t);
   });
 
-  if (!sanTexty.length) return '';
+  if (!sanNajdene.length && !sanZmeskane.length) return '';
 
   // Chybný ťah hráča červenou — nech je hneď vidieť, čím sa líši od riešení
   const ch = String(chybnyTah || '').trim();
@@ -615,8 +622,17 @@ function rieseniaZrucnostiDoPgn(Chess, p, chybnyTah) {
   if (sipky.length)  kresba += ` [%cal ${sipky.join(',')}]`;
   if (policka.length) kresba += ` [%csl ${policka.join(',')}]`;
 
-  const popis = sanTexty.length === 1 ? 'Riešenie: ' : `Riešenia (${sanTexty.length}): `;
-  return '{ ' + popis + sanTexty.join(', ') + kresba + ' }';
+  const spolu = sanNajdene.length + sanZmeskane.length;
+  let popis;
+  if (!sanNajdene.length) {
+    popis = (spolu === 1 ? 'Riešenie: ' : `Riešenia (${spolu}): `) + sanZmeskane.join(', ');
+  } else if (!sanZmeskane.length) {
+    popis = `Našiel všetky (${spolu}): ` + sanNajdene.join(', ');
+  } else {
+    popis = `Našiel ${sanNajdene.length} z ${spolu}: ` + sanNajdene.join(', ')
+          + ' · PREHLIADOL: ' + sanZmeskane.join(', ');
+  }
+  return '{ ' + popis + kresba + ' }';
 }
 
 // ─── Slovenské názvy pre export do PGN ──────────────────────────────────────
@@ -1062,7 +1078,7 @@ async function exportPgn() {
 
     // Načítaj všetky chybné záznamy za obdobie (vrátane puzzle_id)
     const logs = await sbFetchAll(
-      `training_log?player_id=eq.${playerId}&result=eq.loss&created_at=gte.${dateFromFull}&created_at=lte.${dateToFull}&select=puzzle_id,source,created_at,loss_reason,wrong_move,ply&order=created_at.asc,id.asc`
+      `training_log?player_id=eq.${playerId}&result=eq.loss&created_at=gte.${dateFromFull}&created_at=lte.${dateToFull}&select=puzzle_id,source,created_at,loss_reason,wrong_move,ply,found_list&order=created_at.asc,id.asc`
     );
 
     if (!logs || !logs.length) {
@@ -1150,7 +1166,7 @@ async function exportPgn() {
         log.wrong_move ? chybnyTahDoPgn(Chess, fen, log.wrong_move, log.ply) : '',
         // Zručnosti majú vlastný výpis — nie sú to varianty jednej línie
         ((p.skill_type || log.source === 'skill_puzzles')
-          ? (rieseniaZrucnostiDoPgn(Chess, p, log.wrong_move) + ' *').trim()
+          ? (rieseniaZrucnostiDoPgn(Chess, p, log.wrong_move, log.found_list) + ' *').trim()
           : (riesenieDoPgn(Chess, p) + ' *').trim()),
         ``  // prázdny riadok medzi partiami
       );
