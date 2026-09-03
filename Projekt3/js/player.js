@@ -1,5 +1,9 @@
 // SUPABASE_URL a SUPABASE_KEY sú definované v auth.js
 
+// ZNAČKA VERZIE — pri každej úprave tohto súboru prepíš dátum.
+// Vysvetlenie a výpis nájdeš na konci súboru pri funkcii verzie().
+(window.VERZIE = window.VERZIE || {})['player.js'] = '2026-09-03';
+
 const CURRENT_KEY = "currentPlayer";
 
 async function sbFetch(path, options = {}) {
@@ -917,3 +921,92 @@ async function deletePlayer(playerId) {
     alert("Chyba pri mazaní hráča: " + e.message);
   }
 }
+
+// ─── Ktorá verzia súboru je naozaj na webe ──────────────────────────────────
+// 3. 9. 2026 sa pol dňa hľadala chyba, ktorá žiadnou chybou nebola: cez funkčnú
+// skills.html sa nahrala staršia verzia toho istého súboru. Nedalo sa to zistiť
+// inak než čítaním kódu na webe. Odteraz to povedia dve nezávislé veci:
+//
+//   1. ZNAČKA V SÚBORE — dátum, ktorý si pri úprave zapíšeš sám. Odhalí presne
+//      ten prípad: súbor je nahratý dnes, ale jeho obsah je z augusta.
+//   2. ČAS NAHRATIA — hlavička Last-Modified zo servera. Netreba ju udržiavať
+//      a odhalí opak: súbor si upravil, ale zabudol ho nahrať.
+//
+// Značka sa do ktoréhokoľvek súboru píše JEDINÝM riadkom. Nezávisí od poradia
+// načítania skriptov a nemôže sa zraziť s ničím iným, lebo nezavádza nový
+// názov — len pridá položku do spoločného zoznamu:
+//
+//     (window.VERZIE = window.VERZIE || {})['skills.html'] = '2026-09-03';
+//
+// V stránkach patrí na začiatok ich vlastného <script> bloku, v .js súboroch
+// na prvé riadky. Kľúč je názov súboru bez priečinka.
+//
+// Ako sa to prezerá:
+//   • v konzole zavolaj   verzie()
+//   • na mobile, kde konzola nie je, pridaj do adresy  ?verzia
+//     (napr. skills.html?type=checks&verzia)
+//
+// Súbor bez značky sa vypíše tiež, len s pomlčkou — čas nahratia má každý.
+
+async function verzie() {
+  const zoznam = [{
+    subor: location.pathname.split('/').pop() || 'index.html',
+    url:   location.href
+  }];
+
+  document.querySelectorAll('script[src]').forEach(s => {
+    try {
+      const u = new URL(s.src, location.href);
+      if (u.origin === location.origin) {
+        zoznam.push({ subor: u.pathname.split('/').pop(), url: u.href });
+      }
+    } catch (e) { /* cudzia alebo pokazená adresa — preskoč */ }
+  });
+
+  return Promise.all(zoznam.map(async z => {
+    let nahrate = '?';
+    try {
+      // cache:'no-store' je podstatné — inak by odpovedala uložená kópia
+      // a čas nahratia by bol ten starý, teda presne to, čo chceme odhaliť.
+      const r  = await fetch(z.url, { method: 'HEAD', cache: 'no-store' });
+      const lm = r.headers.get('last-modified');
+      if (lm) nahrate = new Date(lm).toLocaleString('sk-SK');
+    } catch (e) { /* HEAD nemusí prejsť, čas potom nevieme */ }
+    return {
+      'súbor':           z.subor,
+      'značka v súbore': (window.VERZIE && window.VERZIE[z.subor]) || '—',
+      'nahraté na web':  nahrate
+    };
+  })).then(riadky => { console.table(riadky); return riadky; });
+}
+
+// Panel pre mobil — konzola tam nie je, a práve na mobile hráč najčastejšie
+// beží na inej verzii, než si myslíš.
+function _verziaPanel(riadky) {
+  const box = document.createElement('div');
+  box.style.cssText =
+    'position:fixed;left:8px;right:8px;bottom:8px;z-index:99999;max-height:60vh;'
+  + 'overflow:auto;background:#111827;color:#e5e7eb;font:12px/1.45 monospace;'
+  + 'padding:10px 12px;border-radius:10px;box-shadow:0 8px 30px rgba(0,0,0,.4);';
+  box.innerHTML =
+    '<div style="font-weight:bold;margin-bottom:6px;">Verzie súborov'
+    + '<span style="float:right;cursor:pointer;padding:0 6px;">✕</span></div>'
+    + riadky.map(r =>
+        escapeHtml(r['súbor']) + '<br>'
+        + '&nbsp;&nbsp;značka: ' + escapeHtml(r['značka v súbore'])
+        + '<br>&nbsp;&nbsp;nahraté: ' + escapeHtml(r['nahraté na web'])
+      ).join('<hr style="border:none;border-top:1px solid #374151;margin:6px 0;">');
+  box.querySelector('span').onclick = () => box.remove();
+  document.body.appendChild(box);
+}
+
+window.addEventListener('load', () => {
+  const stranka = location.pathname.split('/').pop() || 'index.html';
+  const znacka  = (window.VERZIE && window.VERZIE[stranka]) || '—';
+  // Jeden riadok do konzoly, nech netreba nič písať. Hráč ho nikdy neuvidí.
+  console.info('%c' + stranka + ' · značka ' + znacka + ' · verzie() = podrobnosti',
+               'color:#1d4ed8;font-weight:bold');
+  if (/(^|[?&])verzia(=|&|$)/.test(location.search)) {
+    verzie().then(_verziaPanel).catch(() => {});
+  }
+});
