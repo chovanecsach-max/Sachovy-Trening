@@ -1887,7 +1887,10 @@ function loadPuzzle(puzzle) {
   if (puzzle && puzzle.id != null) zobrazeneVSession.add(puzzle.id);
 
   const _skill = puzzle.skill_type || solvedSkillType();
-  const _hracElo = currentPlayer ? Number(currentPlayer[getSkillEloField(_skill)] || 1500) : 1500;
+  // eloHodnota() dosadí ELO_DEFAULT (1000) — rovnakú náhradnú hodnotu ako
+  // zvyšok projektu. Predtým tu bolo 1500 a hráč s prázdnym ELO tej zručnosti
+  // dostával čas o úroveň prísnejší, než mu patrí.
+  const _hracElo = eloHodnota(currentPlayer && currentPlayer[getSkillEloField(_skill)]);
   aktualnyLimit = skillTimeLimit(_skill, _hracElo, solutions.length)
                || Math.round(puzzle.time || 120);
 
