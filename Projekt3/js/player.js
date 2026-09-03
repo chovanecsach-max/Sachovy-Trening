@@ -124,7 +124,11 @@ function _teloVysledku(d) {
     p_ply:           cislo(d.ply, 0),
     p_time_limit:    cislo(d.timeLimit, 1),
     p_first_move_ms: cislo(d.firstMoveMs, 0),
-    p_proti_sebe:    !!d.protiSebe                // komplexný tréning zručností
+    p_proti_sebe:    !!d.protiSebe,               // komplexný tréning zručností
+    // Ktoré riešenia hráč pri zručnostiach našiel sám, kým spravil chybu alebo
+    // mu vypršal čas. Server zoznam ešte oreže (max 40 položiek po 5 znakov) —
+    // ide o údaj z prehliadača. Klasický tréning ho neposiela, tam je null.
+    p_found_list:    Array.isArray(d.foundList) ? d.foundList : null
   };
 }
 
