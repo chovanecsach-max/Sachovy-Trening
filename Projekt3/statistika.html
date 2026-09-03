@@ -533,12 +533,21 @@ function chybnyTahDoPgn(Chess, fen, uci, ply) {
 
   if (!Chess) return `{ Hráč zahral (súradnice): ${t}${popisPly} }`;
   try {
-    const hra = new Chess(fen);
+    // Pri zručnostiach môže byť chybný ťah za KTORÚKOĽVEK stranu, nielen za tú,
+    // čo je na ťahu podľa FEN. Preto sa skúšajú obe — inak by sa ťah vypísal
+    // len v súradniciach.
     const o = _uciNaObjekt(t);
     if (!o) return '';
-    const m = hra.move(o);
-    if (!m) return `{ Hráč zahral: ${t}${popisPly} }`;
-    return `{ Hráč zahral: ${m.san}${popisPly} }`;
+    for (const farba of ['w', 'b']) {
+      try {
+        const c = String(fen).split(' ');
+        c[1] = farba; c[3] = '-';
+        const hra = new Chess(c.join(' '));
+        const m = hra.move(o);
+        if (m) return `{ Hráč zahral: ${m.san}${popisPly} }`;
+      } catch (e) { /* skús druhú farbu */ }
+    }
+    return `{ Hráč zahral: ${t}${popisPly} }`;
   } catch (e) {
     // Chyba v druhom či treťom ťahu variantu — z východiskovej pozície ju
     // prehrať nemožno, tak sa uvedú aspoň súradnice.
@@ -570,7 +579,7 @@ function riesenieDoPgn(Chess, p) {
 // Riešenia sa zároveň nakreslia na šachovnicu: ťahy ako zelené šípky (%cal),
 // políčkové zručnosti ako zelené krúžky (%csl). Rozumie tomu ChessBase
 // aj Lichess, takže tréner vidí odpovede rovno na diagrame.
-function rieseniaZrucnostiDoPgn(Chess, p, chybnyTah, najdeneHracom) {
+function rieseniaZrucnostiDoPgn(Chess, p, chybnyTah, najdeneHracom, pocetNajdenych) {
   const zoznam = Array.isArray(p.solutions) ? p.solutions : [];
   if (!zoznam.length) return '';
 
@@ -625,7 +634,12 @@ function rieseniaZrucnostiDoPgn(Chess, p, chybnyTah, najdeneHracom) {
   const spolu = sanNajdene.length + sanZmeskane.length;
   let popis;
   if (!sanNajdene.length) {
-    popis = (spolu === 1 ? 'Riešenie: ' : `Riešenia (${spolu}): `) + sanZmeskane.join(', ');
+    // Staršie záznamy nemajú zoznam nájdených (stĺpec found_list pribudol
+    // v septembri), ale majú ich POČET v ply. Aspoň to sa dá povedať —
+    // inak by „našiel jedno z piatich" vyzeralo ako „nenašiel nič".
+    const n = Number(pocetNajdenych) || 0;
+    popis = (spolu === 1 ? 'Riešenie: ' : `Riešenia (${spolu}): `) + sanZmeskane.join(', ')
+          + (n > 0 ? ` · hráč našiel ${n} z ${spolu} (ktoré, sa nezaznamenalo)` : '');
   } else if (!sanZmeskane.length) {
     popis = `Našiel všetky (${spolu}): ` + sanNajdene.join(', ');
   } else {
@@ -1166,7 +1180,7 @@ async function exportPgn() {
         log.wrong_move ? chybnyTahDoPgn(Chess, fen, log.wrong_move, log.ply) : '',
         // Zručnosti majú vlastný výpis — nie sú to varianty jednej línie
         ((p.skill_type || log.source === 'skill_puzzles')
-          ? (rieseniaZrucnostiDoPgn(Chess, p, log.wrong_move, log.found_list) + ' *').trim()
+          ? (rieseniaZrucnostiDoPgn(Chess, p, log.wrong_move, log.found_list, log.ply) + ' *').trim()
           : (riesenieDoPgn(Chess, p) + ' *').trim()),
         ``  // prázdny riadok medzi partiami
       );
