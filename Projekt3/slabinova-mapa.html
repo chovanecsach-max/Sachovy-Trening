@@ -473,7 +473,8 @@ function initThresholdPanel(weakestIdx) {
 
 function setDefaultThreshold() {
   const i = Number(document.getElementById('thrSkill').value || 0);
-  document.getElementById('thrValue').value = Math.round(mapColAvg[i] || 1200);
+  // activeDefault() = 1000; predtým tu zostávalo staré 1200 zo zručností
+  document.getElementById('thrValue').value = Math.round(mapColAvg[i] || activeDefault());
 }
 
 function hideBelow() {
