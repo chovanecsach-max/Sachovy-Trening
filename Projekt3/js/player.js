@@ -175,8 +175,9 @@ function getEloField(mode) {
 // Náhradná hodnota, keď hráč nemá ELO vyplnené (NULL alebo 0 v databáze).
 // MUSÍ byť jedna pre celý projekt: predtým sa líšila podľa obrazovky —
 // tréning bral 1500, rebríček na úvodnej stránke 1000 — a tá istá hodnota
-// tak vyzerala na dvoch miestach inak.
-const ELO_DEFAULT = 1500;
+// tak vyzerala na dvoch miestach inak. Od resetu 1. 9. 2026 je to 1000:
+// rovnako ako predvolená hodnota všetkých ELO stĺpcov v databáze.
+const ELO_DEFAULT = 1000;
 
 function eloHodnota(v) {
   const n = Number(v);
@@ -364,38 +365,12 @@ async function reportPlayerError(context, err) {
 
 // ─── ELO história ───────────────────────────────────────────────────────────
 
-async function logEloHistory(playerId, mode, newElo) {
-  try {
-    await sbFetch("elo_history", {
-      method: "POST",
-      prefer: "return=minimal",
-      body: JSON.stringify({
-        player_id: playerId,
-        category:  getEloCategory(mode),
-        elo_value: newElo
-      })
-    });
-  } catch (e) {
-    // Neblokuje tréning, ale chybu už nenecháme zmiznúť — zapíše sa do error_log
-    console.warn("ELO história sa neuložila:", e);
-    reportPlayerError(`elo_history zápis zlyhal (kategória: ${getEloCategory(mode)})`, e);
-  }
+// ZASTARANÉ — riadok do elo_history pridáva zapis_vysledok. Politika
+// insert_own_elo_history bola zrušená (krok 6), takže priamy POST skončí 403.
+function logEloHistory() {
+  throw new Error('logEloHistory je zrušená — elo_history zapisuje zapis_vysledok()');
 }
 
-// ─── Pokrok zadaní ──────────────────────────────────────────────────────────
-// Zadanie sa plní LEN úlohami vyriešenými na prvý pokus po jeho zadaní.
-// Preto sa načítavajú aj neúspechy — bez nich sa nedá odlíšiť „vyriešil hneď"
-// od „najprv pokazil a potom to dal na druhý raz". Rozhodujúci je prvý záznam
-// o danej úlohe po dátume zadania; staršie neúspechy sa proti hráčovi nerátajú,
-// takže úloha vrátená do výberu po RETRY_AFTER_DAYS má plnú hodnotu.
-
-const BASIC_ASSIGNMENT_CATEGORY = {
-  taktika:   'Taktika',
-  strategia: 'Strategia',
-  koncovka:  'Koncovka'
-};
-
-// Záznamy z training_log (výhry aj prehry) pre daných hráčov od zadaného času
 async function loadAssignmentLog(playerIds, fromISO) {
   const ids = [...new Set(playerIds)].filter(Boolean).join(',');
   if (!ids) return [];
@@ -818,35 +793,11 @@ async function loadPlayers(trenerFilter = null) {
   }
 }
 
-// trenerId: UUID trénera, ktorý hráča vytvára (alebo null)
-async function createPlayer(name, surname = '', email = '', elo = 1500, trenerId = null) {
-  const newPlayer = {
-    name: name,
-    surname: surname,
-    email: email,
-    elo: elo,
-    elo_taktika: elo,
-    elo_strategia: elo,
-    elo_koncovka: elo,
-    elo_zrucnosti: elo,
-    played: 0,
-    solved: 0,
-    total_time: 0
-  };
-  if (trenerId) {
-    newPlayer.trener_id = trenerId;
-  }
-  try {
-    await sbFetch("players", {
-      method: "POST",
-      prefer: "return=representation",
-      body: JSON.stringify(newPlayer)
-    });
-    return newPlayer;
-  } catch (e) {
-    console.error("Chyba pri vytváraní hráča:", e);
-    return null;
-  }
+// ZASTARANÉ — hráča zakladá edge funkcia admin-create-player (z admin.html)
+// alebo verify.html pri overení e-mailu. Táto funkcia nastavovala len štyri
+// staré ELO stĺpce, takže by hráčovi chýbalo deväť zručností.
+function createPlayer() {
+  throw new Error('createPlayer je zrušená — hráča zakladá admin-create-player alebo verify.html');
 }
 
 function setCurrentPlayer(id) {
@@ -860,7 +811,10 @@ async function getCurrentPlayer() {
   // 1. Hľadaj podľa user_id (správna cesta)
   if (userId) {
     try {
-      const data = await sbFetch(`players?user_id=eq.${userId}&limit=1`);
+      // order=id.asc je dôležité: zapis_vysledok berie „order by id limit 1".
+      // Bez rovnakého poradia by sa pri dvoch záznamoch na jedno konto
+      // zapisovalo do jedného riadku a čítalo z druhého.
+      const data = await sbFetch(`players?user_id=eq.${userId}&order=id.asc&limit=1`);
       if (data && data.length) {
         localStorage.setItem(CURRENT_KEY, data[0].id);
         return data[0];
@@ -872,20 +826,18 @@ async function getCurrentPlayer() {
     // 2. Fallback: hľadaj podľa emailu (pre existujúcich používateľov bez user_id)
     if (userEmail) {
       try {
-        const data = await sbFetch(`players?email=eq.${userEmail}&limit=1`);
+        const data = await sbFetch(`players?email=eq.${userEmail}&order=id.asc&limit=1`);
         if (data && data.length) {
           const player = data[0];
           localStorage.setItem(CURRENT_KEY, player.id);
 
-          // Automaticky oprav chýbajúci user_id v DB pre budúce prihlásenia
-          try {
-            await sbFetch(`players?id=eq.${player.id}`, {
-              method: "PATCH",
-              body: JSON.stringify({ user_id: userId })
-            });
-          } catch (e) {
-            console.warn("Nepodarilo sa aktualizovať user_id:", e);
-          }
+          // Doplniť chýbajúci user_id sa z prehliadača už NEDÁ — politika
+          // update_own_player bola zrušená (krok 6) a PATCH by ticho neurobil
+          // nič. Taký hráč navyše nemôže trénovať: zapis_vysledok si ho hľadá
+          // podľa user_id a nenájde ho. Preto sa to hlási, nech to niekto
+          // opraví v databáze, a netvárime sa, že je to vybavené.
+          reportPlayerError('hráč nemá naviazané user_id — treba doplniť v DB',
+                            new Error('players.id=' + player.id + ' bez user_id'));
 
           return player;
         }
@@ -907,80 +859,18 @@ async function getCurrentPlayer() {
   }
 }
 
-// ZASTARANÉ — nahradila ju serverová funkcia zapis_vysledok (viď zapisVysledok
-// vyššie). Po odobratí práva zapisovať do players prestane fungovať. Zostáva tu
-// len ako referencia na pôvodný výpočet; nič ju už nevolá.
-async function updatePlayerElo(playerId, puzzleElo, result, mode) {
-  try {
-    const players = await sbFetch(`players?id=eq.${playerId}&limit=1`);
-    if (!players || !players.length) return;
-    const player = players[0];
-
-    const eloField = getEloField(mode);
-    const currentElo = Number(player[eloField] || 1500);
-
-    // Kalibrácia: prvých pár úloh v klasickom tréningu sa počíta s vyšším K,
-    // aby sa hráč rýchlo dostal na svoju úroveň. Počítadlo je v databáze,
-    // takže sa nedá obísť vynulovaním prehliadača.
-    const kPole = kalibPole(mode);
-    const kOdohrane = kPole ? (Number(player[kPole]) || 0) : 0;
-    const K = kPole ? kalibK(kOdohrane) : null;
-
-    const change = eloZmena(currentElo, puzzleElo, result, K);
-    // Počas kalibrácie sa nespadne pod KALIB_MIN_ELO — začiatočník, ktorý
-    // pokazí prvé úlohy, by inak skončil na absurdne nízkej úrovni a dostával
-    // by triviality.
-    const dolnaHranica = (K != null) ? KALIB_MIN_ELO : 100;
-    const newElo = Math.max(dolnaHranica, currentElo + change);
-
-    const zmeny = { [eloField]: newElo };
-
-    // Počítadlo rastie, kým kalibrácia beží
-    if (K != null) zmeny[kPole] = kOdohrane + 1;
-
-    // Ak sa menila zručnosť, prepočítaj aj odvodený priemer elo_zrucnosti.
-    // Ide v tom istom zápise, takže to nestojí ďalšiu cestu po sieti.
-    let priemer = null;
-    if (SKILL_ELO_TYPES.includes(mode)) {
-      priemer = priemerZrucnosti({ ...player, [eloField]: newElo });
-      if (priemer != null) zmeny.elo_zrucnosti = priemer;
-    }
-
-    await sbFetch(`players?id=eq.${playerId}`, {
-      method: "PATCH",
-      body: JSON.stringify(zmeny)
-    });
-
-    // Zaloguj novú ELO hodnotu do histórie pre grafy
-    await logEloHistory(playerId, mode, newElo);
-    if (priemer != null) await logEloHistory(playerId, 'zrucnosti', priemer);
-  } catch (e) {
-    console.error("Chyba pri aktualizácii ELO:", e);
-    reportPlayerError(`aktualizácia ELO zlyhala (režim: ${mode})`, e);
-  }
+// ZASTARANÉ — ELO aj agregáty počíta a zapisuje serverová funkcia
+// zapis_vysledok (viď zapisVysledok vyššie). Od kroku 6 už politika
+// update_own_player neexistuje, takže PATCH na players z prehliadača NEVRÁTI
+// CHYBU — len ticho neupraví ani jeden riadok. Presne na tomto sa 31. 8. 2026
+// stratilo ELO zo zručností: stránka ukázala „+15", databáza nezaznamenala nič.
+// Preto tu zostávajú len zátky, ktoré zakričia hneď.
+function updatePlayerElo() {
+  throw new Error('updatePlayerElo je zrušená — ELO počíta server, použi zapisVysledok()');
 }
 
-// ZASTARANÉ — agregáty played/solved/total_time zapisuje zapis_vysledok.
-async function registerPlayerResult(playerId, result, timeSpent = 0) {
-  try {
-    const players = await sbFetch(`players?id=eq.${playerId}&limit=1`);
-    if (!players || !players.length) return;
-    const player = players[0];
-    const updates = {
-      played: Number(player.played || 0) + 1,
-      total_time: Number(player.total_time || 0) + Number(timeSpent || 0)
-    };
-    if (result === "win") {
-      updates.solved = Number(player.solved || 0) + 1;
-    }
-    await sbFetch(`players?id=eq.${playerId}`, {
-      method: "PATCH",
-      body: JSON.stringify(updates)
-    });
-  } catch (e) {
-    console.error("Chyba pri ukladaní výsledku hráča:", e);
-    reportPlayerError("uloženie výsledku hráča zlyhalo", e);
-  }
+function registerPlayerResult() {
+  throw new Error('registerPlayerResult je zrušená — agregáty zapisuje zapis_vysledok()');
 }
 
 function getPlayerSuccessRate(player) {
