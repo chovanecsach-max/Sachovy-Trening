@@ -561,6 +561,64 @@ function riesenieDoPgn(Chess, p) {
   catch (e) { return ''; }
 }
 
+// ─── Riešenia ZRUČNOSTÍ do PGN ──────────────────────────────────────────────
+// Zručnosti sa nedajú vypísať ako línia s variantmi (to robí riesenieDoPgn pre
+// klasický tréning). Sú to NEZÁVISLÉ odpovede, navyše za obe strany naraz —
+// a keď prvá patrí druhej farbe, funkcia _linia vrátila prázdno a riešenie
+// v PGN úplne chýbalo. Preto majú zručnosti vlastný výpis.
+//
+// Riešenia sa zároveň nakreslia na šachovnicu: ťahy ako zelené šípky (%cal),
+// políčkové zručnosti ako zelené krúžky (%csl). Rozumie tomu ChessBase
+// aj Lichess, takže tréner vidí odpovede rovno na diagrame.
+function rieseniaZrucnostiDoPgn(Chess, p, chybnyTah) {
+  const zoznam = Array.isArray(p.solutions) ? p.solutions : [];
+  if (!zoznam.length) return '';
+
+  const sanTexty = [], sipky = [], policka = [];
+
+  zoznam.forEach(raw => {
+    const t = String(raw || '').trim();
+    if (t.length === 2) {                 // políčková zručnosť
+      policka.push('G' + t);
+      sanTexty.push(t);
+      return;
+    }
+    if (t.length < 4) return;
+    sipky.push('G' + t.slice(0, 4));
+
+    // Zápis do notácie. Ťah môže patriť ktorejkoľvek strane, preto sa skúsi
+    // pozícia s bielym aj s čiernym na ťahu.
+    let san = null;
+    if (Chess) {
+      for (const farba of ['w', 'b']) {
+        try {
+          const c = String(p.fen).split(' ');
+          c[1] = farba; c[3] = '-';
+          const hra = new Chess(c.join(' '));
+          const o = _uciNaObjekt(t);
+          const m = o && hra.move(o);
+          if (m) { san = m.san; break; }
+        } catch (e) { /* skús druhú farbu */ }
+      }
+    }
+    sanTexty.push(san || t);
+  });
+
+  if (!sanTexty.length) return '';
+
+  // Chybný ťah hráča červenou — nech je hneď vidieť, čím sa líši od riešení
+  const ch = String(chybnyTah || '').trim();
+  if (ch.length >= 4) sipky.push('R' + ch.slice(0, 4));
+  else if (ch.length === 2) policka.push('R' + ch);
+
+  let kresba = '';
+  if (sipky.length)  kresba += ` [%cal ${sipky.join(',')}]`;
+  if (policka.length) kresba += ` [%csl ${policka.join(',')}]`;
+
+  const popis = sanTexty.length === 1 ? 'Riešenie: ' : `Riešenia (${sanTexty.length}): `;
+  return '{ ' + popis + sanTexty.join(', ') + kresba + ' }';
+}
+
 // ─── Slovenské názvy pre export do PGN ──────────────────────────────────────
 // Odvodené zo SKILL_COLS, aby názvy zručností existovali v súbore len raz.
 const SKILL_NAZVY_SK = {};
@@ -1090,7 +1148,10 @@ async function exportPgn() {
         `[PuzzleId "${pid}"]`,
         prompt ? `{ ${prompt} }` : '',
         log.wrong_move ? chybnyTahDoPgn(Chess, fen, log.wrong_move, log.ply) : '',
-        (riesenieDoPgn(Chess, p) + ' *').trim(),
+        // Zručnosti majú vlastný výpis — nie sú to varianty jednej línie
+        ((p.skill_type || log.source === 'skill_puzzles')
+          ? (rieseniaZrucnostiDoPgn(Chess, p, log.wrong_move) + ' *').trim()
+          : (riesenieDoPgn(Chess, p) + ' *').trim()),
         ``  // prázdny riadok medzi partiami
       );
     });
