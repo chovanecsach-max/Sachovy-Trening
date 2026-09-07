@@ -410,6 +410,11 @@ tr:hover td { background: #eff6ff; }
 <script src="js/auth.js"></script>
 <script src="js/player.js"></script>
 <script>
+// ZNAČKA VERZIE — pri každej úprave tohto súboru prepíš dátum.
+// Vypíše sa v konzole, alebo na mobile po pridaní ?verzia do adresy.
+// Mechanika je v player.js pri funkcii verzie().
+(window.VERZIE = window.VERZIE || {})['statistika.html'] = '2026-09-07';
+
 // ─── Kontext prihláseného používateľa ───────────────────────────────────────
 const USER_ROLE         = sessionStorage.getItem('user_role') || '';
 // ── Stránkované načítanie: Supabase vracia max. 1000 riadkov na dotaz.
@@ -712,23 +717,49 @@ async function init() {
   initDates();
 }
 
+// ─── Klasický tréning a zručnosti oddelene ──────────────────────────────────
+// Sú to dva rôzne tréningy a v jednom súčte si prekážajú: pri zručnostiach má
+// hráč na úlohu rádovo desiatky sekúnd a spraví ich za sedenie desiatky, takže
+// v spoločnom čísle prevalcujú klasický tréning. Úspešnosť 79 % potom nehovorí
+// ani o jednom z nich. Preto sa počítajú dve nezávislé sady a prepínač
+// „Základné ELO / Zručnosti" prepína aj ich, nielen ELO stĺpce.
+function prazdnyLog() {
+  return { klasika:   { played: 0, solved: 0, timeSpent: 0 },
+           zrucnosti: { played: 0, solved: 0, timeSpent: 0 } };
+}
+
+// Ktorá sada čísel patrí k práve zvolenému pohľadu.
+function obdobie(r) {
+  return (statsView === 'skills' ? r.zrucnosti : r.klasika)
+      || { played: 0, solved: 0, accuracy: 0, time: 0 };
+}
+
+// Slovo do hlavičky, aby bolo na prvý pohľad vidieť, čoho sa čísla týkajú.
+function pohladPopis() {
+  return statsView === 'skills' ? 'zručnosti' : 'klasika';
+}
+
 // ─── Hlavička tabuľky ────────────────────────────────────────────────────────
 function renderTableHead() {
   const head = document.getElementById('statsHead');
   // Stĺpec "Meno trénera" len pre admina / hlavného trénera
   const trenerCol = ( IS_ADMIN || IS_HLAVNY_TRENER) ? '<th>Tréner</th>' : '';
 
-  // Spoločné "ostatné položky" — rovnaké v oboch pohľadoch
+  // Riešené, vyriešené, úspešnosť a čas za obdobie sa týkajú VŽDY len jedného
+  // z dvoch tréningov — toho, ktorý je práve zvolený prepínačom. Slovo
+  // v zátvorke je tam preto, aby to bolo vidieť aj bez čítania návodu.
+  // „(obdobie)" v zátvorke už netreba: obdobie má vlastný stĺpec vedľa.
+  const kt = pohladPopis();
   const commonCols = `
       <th>Meno</th>
       <th>Priezvisko</th>
       ${trenerCol}
-      <th>Riešené (obdobie)</th>
-      <th>Vyriešené (obdobie)</th>
-      <th>Úspešnosť</th>
+      <th>Riešené (${kt})</th>
+      <th>Vyriešené (${kt})</th>
+      <th>Úspešnosť (${kt})</th>
       <th>Hodnotené obdobie</th>
-      <th>Čas celkom</th>
-      <th>Čas za obdobie</th>`;
+      <th title="Celkový čas za celú históriu — klasický tréning aj zručnosti spolu. Tento údaj sa prepínačom nemení.">Čas celkom</th>
+      <th>Čas za obdobie (${kt})</th>`;
 
   // ELO stĺpce podľa pohľadu
   let eloCols;
@@ -865,26 +896,32 @@ async function loadStats() {
     if (realPlayers.length) {
       const idsParam = `(${realPlayers.map(p => p.id).join(',')})`;
       const logs = await sbFetchAll(
-        `training_log?player_id=in.${idsParam}&created_at=gte.${dateFromFull}&created_at=lte.${dateToFull}&select=player_id,result,time_spent&order=id.asc`
+        `training_log?player_id=in.${idsParam}&created_at=gte.${dateFromFull}&created_at=lte.${dateToFull}&select=player_id,result,time_spent,source&order=id.asc`
       );
       (logs || []).forEach(log => {
         const pid = log.player_id;
-        if (!logMap[pid]) logMap[pid] = { played: 0, solved: 0, timeSpent: 0 };
-        logMap[pid].played   += 1;
-        if (log.result === 'win') logMap[pid].solved += 1;
-        logMap[pid].timeSpent += Number(log.time_spent || 0);
+        if (!logMap[pid]) logMap[pid] = prazdnyLog();
+        const c = logMap[pid][log.source === 'skill_puzzles' ? 'zrucnosti' : 'klasika'];
+        c.played += 1;
+        if (log.result === 'win') c.solved += 1;
+        c.timeSpent += Number(log.time_spent || 0);
       });
     }
 
     // Pre pseudo-hráča (tréner/admin) — nemá player_id, zobrazíme nuly
     if (selfPlayer) {
-      logMap[selfPlayer.id] = { played: 0, solved: 0, timeSpent: 0 };
+      logMap[selfPlayer.id] = prazdnyLog();
     }
 
     // Zostav štatistiku
     statsData = players.map(p => {
-      const log = logMap[p.id] || { played: 0, solved: 0, timeSpent: 0 };
-      const acc = log.played > 0 ? Math.round((log.solved / log.played) * 100) : 0;
+      const log = logMap[p.id] || prazdnyLog();
+      const sada = c => ({
+        played:   c.played,
+        solved:   c.solved,
+        accuracy: c.played > 0 ? Math.round((c.solved / c.played) * 100) : 0,
+        time:     c.timeSpent
+      });
       // Pre pseudo-hráča (tréner/admin) zobraz jeho meno s rolou
       const displaySurname = p._isSelf
         ? `${USER_NICK} (${p._roleLabel})`
@@ -893,13 +930,12 @@ async function loadStats() {
         name:         p._isSelf ? '' : (p.name || ''),
         surname:      displaySurname,
         trenerName:   p._isSelf ? '—' : (trenerMap[p.trener_id] || '—'),
-        played:       log.played,
-        solved:       log.solved,
-        accuracy:     acc,
+        // Dve nezávislé sady čísel; ktorá sa ukáže, rozhoduje prepínač
+        klasika:      sada(log.klasika),
+        zrucnosti:    sada(log.zrucnosti),
         dateFrom,
         dateTo,
         totalTime:    Number(p.total_time || 0),
-        periodTime:   log.timeSpent,
         eloTaktika:   p.elo_taktika   ?? 1000,
         eloStrategia: p.elo_strategia ?? 1000,
         eloKoncovka:  p.elo_koncovka  ?? 1000,
@@ -943,18 +979,18 @@ function renderTable() {
 
   statsData.forEach(r => {
     const trenerCol = (IS_ADMIN || IS_HLAVNY_TRENER) ? `<td>${escapeHtml(r.trenerName)}</td>` : '';
+    const o = obdobie(r);   // čísla za zvolený tréning
 
-    // Spoločné bunky (ostatné položky) — rovnaké v oboch pohľadoch
     const commonCells = `
       <td>${escapeHtml(r.name)}</td>
       <td>${escapeHtml(r.surname)}</td>
       ${trenerCol}
-      <td><span class="badge badge-blue">${r.played}</span></td>
-      <td><span class="badge badge-green">${r.solved}</span></td>
-      <td>${r.accuracy}%</td>
+      <td><span class="badge badge-blue">${o.played}</span></td>
+      <td><span class="badge badge-green">${o.solved}</span></td>
+      <td>${o.accuracy}%</td>
       <td>${formatDate(r.dateFrom)} — ${formatDate(r.dateTo)}</td>
       <td>${formatTime(r.totalTime)}</td>
-      <td>${formatTime(r.periodTime)}</td>`;
+      <td>${formatTime(o.time)}</td>`;
 
     // ELO bunky podľa pohľadu (súhrnné ELO zvýraznené tučným)
     let eloCells;
@@ -981,13 +1017,16 @@ function exportXlsx() {
 
   const trenerHeader = (IS_ADMIN || IS_HLAVNY_TRENER) ? ['Tréner'] : [];
 
-  // Spoločné (ostatné položky) — rovnaké v oboch pohľadoch
+  // Rovnako ako v tabuľke: tieto štyri stĺpce sa týkajú len zvoleného tréningu,
+  // preto je jeho názov priamo v hlavičke — v exportovanom súbore inak
+  // po čase nikto nevie, čo v ňom vlastne je.
+  const kt = pohladPopis();
   const commonHeaders = [
     'Meno', 'Priezvisko',
     ...trenerHeader,
-    'Riešené (obdobie)', 'Vyriešené (obdobie)', 'Úspešnosť (%)',
+    `Riešené (${kt})`, `Vyriešené (${kt})`, `Úspešnosť ${kt} (%)`,
     'Obdobie od', 'Obdobie po',
-    'Čas celkom', 'Čas za obdobie'
+    'Čas celkom (spolu)', `Čas za obdobie (${kt})`
   ];
 
   // ELO hlavičky + názov listu/súboru podľa aktívneho pohľadu
@@ -1005,12 +1044,13 @@ function exportXlsx() {
 
   const rows = statsData.map(r => {
     const trenerCol = (IS_ADMIN || IS_HLAVNY_TRENER) ? [r.trenerName] : [];
+    const o = obdobie(r);
     const common = [
       r.name, r.surname,
       ...trenerCol,
-      r.played, r.solved, r.accuracy,
+      o.played, o.solved, o.accuracy,
       r.dateFrom, r.dateTo,
-      formatTime(r.totalTime), formatTime(r.periodTime)
+      formatTime(r.totalTime), formatTime(o.time)
     ];
     const elo = statsView === 'skills'
       ? [...SKILL_COLS.map(c => r.skills[c.field]), r.eloZrucnosti]
