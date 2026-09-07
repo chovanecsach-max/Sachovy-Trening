@@ -117,6 +117,11 @@ tr.late td { background: #fffbfa; }
 <script src="js/auth.js"></script>
 <script src="js/player.js"></script>
 <script>
+// ZNAČKA VERZIE — pri každej úprave tohto súboru prepíš dátum.
+// Vypíše sa v konzole, alebo na mobile po pridaní ?verzia do adresy.
+// Mechanika je v player.js pri funkcii verzie().
+(window.VERZIE = window.VERZIE || {})['zadania-prehlad.html'] = '2026-09-07';
+
 const USER_ROLE        = sessionStorage.getItem('user_role') || '';
 const USER_NICK        = sessionStorage.getItem('user_nick') || sessionStorage.getItem('user_name') || '';
 const IS_ADMIN         = USER_ROLE === 'admin';
@@ -322,13 +327,35 @@ function render() {
 }
 
 // ─── Akcie ───────────────────────────────────────────────────────────────────
+// POZOR na tichý zápis. Keď zmenu odfiltruje pravidlo RLS, PostgREST NEVRÁTI
+// chybu — odpovie „v poriadku, upravil som nula riadkov". Doteraz preto obe
+// akcie hlásili zelený úspech aj vtedy, keď sa nestalo nič: tréner klikol na
+// Uzavrieť pri zadaní, ktoré zadal admin, stránka napísala „Zadanie bolo
+// uzavreté", zoznam sa načítal znova a riadok v ňom zostal otvorený. Tlačidlo,
+// ktoré nič nerobí a nepovie prečo.
+//
+// Riešenie: vypýtať si späť dotknutý riadok (Prefer: return=representation).
+// Keď sa nevráti žiadny, zmena neprešla — a to sa povie nahlas.
+
+// Spoločná hláška pre zápis, ktorý databáza ticho odmietla. Posunie sa aj
+// pohľad, lebo pruh so stavom je nad tabuľkou a pri dlhom zozname by hláška
+// ostala mimo obrazovky — teda znova nepovšimnutá.
+function chybaOpravnenia(co) {
+  setStatus(`Zadanie sa nepodarilo ${co} — databáza zmenu odmietla. `
+          + 'Urobiť to môže ten, kto zadanie zadal, alebo admin.', 'error');
+  const el = document.getElementById('status');
+  if (el && el.scrollIntoView) el.scrollIntoView({ block: 'nearest' });
+}
+
 async function closeAsg(id) {
   if (!confirm('Označiť zadanie ako uzavreté?')) return;
   try {
-    await sbFetch(`assignments?id=eq.${id}`, {
+    const zmenene = await sbFetch(`assignments?id=eq.${id}&select=id`, {
       method: 'PATCH',
+      prefer: 'return=representation',
       body: JSON.stringify({ completed_at: new Date().toISOString() })
     });
+    if (!zmenene || !zmenene.length) { chybaOpravnenia('uzavrieť'); return; }
     setStatus('Zadanie bolo uzavreté.', 'success');
     await load();
   } catch (e) {
@@ -339,7 +366,11 @@ async function closeAsg(id) {
 async function deleteAsg(id) {
   if (!confirm('Naozaj zmazať toto zadanie? Akcia sa nedá vrátiť.')) return;
   try {
-    await sbFetch(`assignments?id=eq.${id}`, { method: 'DELETE' });
+    const zmazane = await sbFetch(`assignments?id=eq.${id}&select=id`, {
+      method: 'DELETE',
+      prefer: 'return=representation'
+    });
+    if (!zmazane || !zmazane.length) { chybaOpravnenia('zmazať'); return; }
     setStatus('Zadanie bolo zmazané.', 'success');
     await load();
   } catch (e) {
