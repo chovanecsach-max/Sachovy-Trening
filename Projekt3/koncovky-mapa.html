@@ -151,6 +151,11 @@ input[type="text"] { min-width: 190px; }
 <script src="js/auth.js"></script>
 <script src="js/player.js"></script>
 <script>
+// ZNAČKA VERZIE — pri každej úprave tohto súboru prepíš dátum.
+// Vypíše sa v konzole, alebo na mobile po pridaní ?verzia do adresy.
+// Mechanika je v player.js pri funkcii verzie().
+(window.VERZIE = window.VERZIE || {})['koncovky-mapa.html'] = '2026-09-07';
+
 const USER_ROLE        = sessionStorage.getItem('user_role') || '';
 const USER_ID          = sessionStorage.getItem('user_id') || '';
 const USER_NICK        = sessionStorage.getItem('user_nick') || sessionStorage.getItem('user_name') || '';
@@ -172,22 +177,42 @@ let egTypes   = [];     // typy koncoviek zoradené podľa počtu úloh
 // Pokrytie (koľko typov už hráč zvládol) je zo svojej podstaty kumulatívne,
 // preto sa počíta vždy z celej histórie. Obdobie sa týka len priemerného ELA,
 // aby sa dalo porovnať "ako to vyzerá celkovo" s "ako to vyzerá teraz".
+// Stačí JEDEN dátum. Predtým sa vyžadovali obidva a vyplnenie len jedného sa
+// ticho ignorovalo — používateľ videl, že sa nič nedeje, a nemal ako zistiť
+// prečo. „Od 1. 6. ďalej" aj „všetko do 30. 6." sú platné otázky.
 function periodBounds() {
   const f = document.getElementById('dateFrom').value;
   const t = document.getElementById('dateTo').value;
-  if (!f || !t) return null;
-  const from = new Date(f + 'T00:00:00').getTime();
-  const to   = new Date(t + 'T23:59:59.999').getTime();
+  if (!f && !t) return null;                    // obdobie nie je nastavené
+
+  const from = f ? new Date(f + 'T00:00:00').getTime()     : -Infinity;
+  const to   = t ? new Date(t + 'T23:59:59.999').getTime() :  Infinity;
   if (isNaN(from) || isNaN(to) || from > to) return null;
-  return { from, to, label: `${f} – ${t}` };
+
+  const label = (f && t) ? `${f} – ${t}` : (f ? `od ${f}` : `do ${t}`);
+  return { from, to, label };
 }
 
 function applyPreset() {
-  const raw = document.getElementById('periodPreset').value;
-  if (raw === 'custom') return;                 // dátumy si nastavuje používateľ sám
-  const m = Number(raw);
+  const raw    = document.getElementById('periodPreset').value;
   const fromEl = document.getElementById('dateFrom');
   const toEl   = document.getElementById('dateTo');
+
+  if (raw === 'custom') {
+    // Dátumy si nastavuje používateľ sám. Keď sú obidve políčka prázdne
+    // (predchádzalo „Celé obdobie"), predvyplní sa posledný štvrťrok a kurzor
+    // skočí do prvého poľa — inak voľba navonok neurobí nič a nie je ani čo
+    // prepisovať, čo pôsobí ako pokazená stránka.
+    if (!fromEl.value && !toEl.value) {
+      const now = new Date();
+      fromEl.value = localDay(new Date(now.getFullYear(), now.getMonth() - 3, now.getDate()));
+      toEl.value   = localDay(now);
+    }
+    try { fromEl.focus(); } catch (e) {}
+    return;
+  }
+
+  const m = Number(raw);
   if (!m) { fromEl.value = ''; toEl.value = ''; return; }   // 0 = celé obdobie
   const now = new Date();
   const start = new Date(now.getFullYear(), now.getMonth() - m, now.getDate());
@@ -253,7 +278,8 @@ function cellHtml(st, per, period) {
       perLine = `<div class="p">Ø${avgPer}${thinP} <span style="font-weight:600;">${arrow}</span></div>`;
       perTip  = ` · za obdobie ${per.solved} vyriešených z ${per.attempts} pokusov`
               + `, priemerné ELO ${avgPer}`
-              + (avgAll ? ` (oproti celku ${d > 0 ? '+' : ''}${d})` : '');
+              + (avgAll ? (d === 0 ? ' (rovnako ako dlhodobý priemer)'
+                                   : ` (oproti dlhodobému priemeru ${d > 0 ? '+' : ''}${d})`) : '');
     }
   }
 
@@ -398,18 +424,23 @@ function render(players, log) {
     + worst.map(w => `${w.t} (${w.n} z ${players.length})`).join(', ');
   fl.style.display = 'block';
 
-  // Poctivé upozornenie na obmedzenie dát
+  // Ako čítať bunku. Odstavec o záznamoch, ktoré sa nedali spätne priradiť,
+  // tu bol do 7. 9. 2026 — vtedy sa overilo, že v training_log už nie je ani
+  // jeden riadok bez zdroja, takže prestal platiť.
   document.getElementById('warnLine').innerHTML =
     `<div class="warn-line">${period
-       ? `Prvý riadok bunky je <strong>pokrytie za celé obdobie</strong> (vyriešené/pokusy) a pod ním
-          priemerné ELO vyriešených. Tretí riadok je priemerné ELO za <strong>${period.label}</strong>
-          a šípka ukazuje rozdiel oproti celku. Pokrytie sa zámerne neoreže — typ zvládnutý dávnejšie
-          nie je medzera a nemá zmysel ho zadávať znova.<br>`
-       : `Obdobie nie je nastavené — zobrazuje sa len celé obdobie.<br>`}
-     Počítajú sa len tréningy, pri ktorých sa dá spoľahlivo určiť pôvod úlohy.
-     Časť starších záznamov sa spätne priradiť nedala, takže skutočné počty môžu byť mierne vyššie.
-     Od zavedenia označovania sú všetky nové tréningy započítané presne.
-     Hviezdička pri priemernom ELO znamená menej než ${THIN_EVIDENCE} vyriešené úlohy — číslo je len orientačné.</div>`;
+       ? `V bunke sú tri riadky. Hore <strong>vyriešené / pokusy za celú históriu</strong>,
+          pod tým <strong>priemerné ELO</strong> tých vyriešených úloh. Tretí riadok je to isté
+          priemerné ELO, ale počítané len z úloh vyriešených v období
+          <strong>${period.label}</strong>. Šípka pri ňom hovorí, o koľko sa líši od dlhodobého
+          priemeru nad ním: <strong>▲</strong> znamená, že v tomto období rieši ťažšie koncovky
+          než zvyčajne, <strong>▼</strong> ľahšie, <strong>=</strong> bez zmeny.<br>
+          Prvý riadok sa na obdobie zámerne neoreže — typ zvládnutý dávnejšie nie je medzera
+          a nemá zmysel ho zadávať znova.<br>`
+       : `Obdobie nie je nastavené — počíta sa celá história. Po zadaní obdobia pribudne
+          v bunke tretí riadok s priemerným ELO za to obdobie.<br>`}
+     Hviezdička pri priemernom ELO znamená menej než ${THIN_EVIDENCE} vyriešené úlohy;
+     také číslo je len orientačné.</div>`;
 }
 
 // ─── Zadávanie úloh podľa typu koncovky ─────────────────────────────────────
