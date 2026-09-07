@@ -160,6 +160,11 @@ table.map td.last { text-align: center; padding: 6px 8px; border-radius: 5px; wh
 <script src="js/auth.js"></script>
 <script src="js/player.js"></script>
 <script>
+// ZNAČKA VERZIE — pri každej úprave tohto súboru prepíš dátum.
+// Vypíše sa v konzole, alebo na mobile po pridaní ?verzia do adresy.
+// Mechanika je v player.js pri funkcii verzie().
+(window.VERZIE = window.VERZIE || {})['casova-mapa.html'] = '2026-09-07';
+
 const USER_ROLE        = sessionStorage.getItem('user_role') || '';
 const USER_ID          = sessionStorage.getItem('user_id') || '';
 const USER_NICK        = sessionStorage.getItem('user_nick') || sessionStorage.getItem('user_name') || '';
@@ -280,11 +285,18 @@ async function spocitaj(players, log) {
         if (r.source === 'skill_puzzles') { c.vyuzitieZ += podiel; c.vyuzitieZn += 1; }
         else                              { c.vyuzitieK += podiel; c.vyuzitieKn += 1; }
       }
-      // Čas do prvého ťahu — rozvaha pred rozhodnutím
-      const prvy = Number(r.first_move_ms);
-      if (Number.isFinite(prvy) && prvy >= 0) {
-        c.prvySucet += prvy;
-        c.prvyPocet += 1;
+      // Čas do prvého ťahu — rozvaha pred rozhodnutím. Počíta sa LEN
+      // z klasického tréningu. Pri zručnostiach má hráč na celú úlohu rádovo
+      // desiatky sekúnd a zadanie znie nájsť riešenia rýchlo, takže krátky čas
+      // tam nie je impulzívnosť, ale splnená úloha. V spoločnom priemere by
+      // každá odtrénovaná zručnosť ťahala číslo nadol a to isté číslo by
+      // u dvoch hráčov znamenalo niečo iné podľa toho, čoho odtrénovali viac.
+      if (r.source !== 'skill_puzzles') {
+        const prvy = Number(r.first_move_ms);
+        if (Number.isFinite(prvy) && prvy >= 0) {
+          c.prvySucet += prvy;
+          c.prvyPocet += 1;
+        }
       }
 
       // Rozdelenie času a využitia limitu podľa kategórie úlohy
@@ -359,7 +371,9 @@ function bunka(c, o, maxVSkupine) {
             + (vyuzK != null ? ` · využitie limitu klasický ${vyuzK} %` : '')
             + (vyuzZ != null ? ` · zručnosti ${vyuzZ} %` : '')
             + ((vyuzK != null || vyuzZ != null) ? ' (z vyriešených úloh)' : '')
-            + (prvy != null ? ` · rozvaha pred prvým ťahom ${prvy.toFixed(1)} s` : '');
+            + (prvy != null
+                ? ` · rozvaha pred prvým ťahom ${prvy.toFixed(1)} s (len klasický tréning)`
+                : '');
 
   return `<td class="cell" style="background:${f.bg};color:${f.fg};border:${f.border};" title="${tip}">
             <div class="n">${fmtCas(c.cas)}</div>
