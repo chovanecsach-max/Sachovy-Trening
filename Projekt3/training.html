@@ -651,6 +651,8 @@ button:disabled {
           <button class="accent" id="retryBtn" onclick="retryPuzzle()">Skús znova</button>
           <button class="accent" id="showSolutionBtn" onclick="showSolution()">Ukáž riešenie</button>
           <button class="secondary" id="analysisBtn" onclick="openAnalysis()" style="display:none;" title="Otvor pozíciu na Lichess Analysis Board">🔍 Analyzovať</button>
+          <button class="secondary" id="prezKoniecBtn" style="display:none;"
+                  onclick="location.href='admin.html'">← Späť do admin panelu</button>
           <button class="secondary" onclick="goHome()">Menu</button>
         </div>
 
@@ -740,6 +742,11 @@ button:disabled {
 <script src="js/training.js"></script>
 
 <script>
+// ZNAČKA VERZIE — pri každej úprave tohto súboru prepíš dátum.
+// Vypíše sa v konzole, alebo na mobile po pridaní ?verzia do adresy.
+// Mechanika je v player.js pri funkcii verzie().
+(window.VERZIE = window.VERZIE || {})['training.html'] = '2026-09-07';
+
 const files = ['a','b','c','d','e','f','g','h'];
 const STATS_STORAGE_KEY = 'sachovy_trening_stats_v2';
 const SOLUTION_STEP_DELAY = 1500;
@@ -805,6 +812,67 @@ function zaznamenajPrvyTah() {
 }
 let currentPuzzleIsAdmin = false;
 
+// ─── Prezentácia ────────────────────────────────────────────────────────────
+// Zoznam ID úloh, ktoré sa majú ukázať v presne zadanom poradí. Zadáva sa
+// v admin paneli a prenáša sa cez sessionStorage: prežije obnovenie stránky
+// (na prednáške sa stane), ale zanikne so zatvorením karty, takže sa
+// neprilepí k bežnému tréningu inokedy.
+//
+// Úlohy sa načítavajú v admin režime, teda BEZ zápisu do štatistík a ELA —
+// rovnako ako dnešný testovací režim. Predvádzané pozície sa tak nemiešajú
+// do skutočných výsledkov.
+let prezentacia = null;          // { ids: [...], index: 0 }
+let prezentaciaKoniec = false;
+
+function nacitajPrezentaciu() {
+  try {
+    const raw = sessionStorage.getItem('prezentaciaIds');
+    if (!raw) return null;
+    const ids = JSON.parse(raw);
+    if (!Array.isArray(ids) || !ids.length) return null;
+    const i = Number(sessionStorage.getItem('prezentaciaIndex')) || 0;
+    return { ids, index: Math.min(Math.max(0, i), ids.length - 1) };
+  } catch (e) { return null; }
+}
+
+// Poradie sa ukladá po každom posune, aby obnovenie stránky nezačalo odznova.
+function ulozPrezentaciu() {
+  if (!prezentacia) return;
+  try { sessionStorage.setItem('prezentaciaIndex', String(prezentacia.index)); } catch (e) {}
+}
+
+function ukonciPrezentaciu() {
+  try {
+    sessionStorage.removeItem('prezentaciaIds');
+    sessionStorage.removeItem('prezentaciaIndex');
+  } catch (e) {}
+}
+
+async function zobrazPrezentacnuUlohu() {
+  const id = prezentacia.ids[prezentacia.index];
+  let puzzle = null;
+  try {
+    // Priamo zo Supabase — lokálne pole má len ľahké stĺpce, tu treba plný
+    // záznam s riešením.
+    const data = await sbFetch(`puzzles?id=eq.${id}&limit=1`);
+    if (data && data.length) puzzle = data[0];
+  } catch (e) {
+    console.error('Chyba načítania úlohy prezentácie:', e);
+  }
+
+  if (!puzzle) {
+    // Zoznam sa overuje už pri spustení v admin paneli, takže sem sa dá dostať
+    // len ak úloha medzitým zmizla. Prednáška sa kvôli tomu nesmie zastaviť —
+    // povie sa to a pokračuje sa ďalšou.
+    setStatus(`Úloha ID ${id} sa nenašla — pokračuj tlačidlom Ďalšia úloha.`, 'error');
+    updateAdminBadge();
+    return;
+  }
+
+  loadPuzzleObject(puzzle, true);   // true = admin režim, teda bez zápisu
+  updateAdminBadge();
+}
+
 let sessionStats = {
   startElo: 0,
   played: 0,
@@ -868,8 +936,19 @@ function updateAdminBadge() {
   const badge = document.getElementById('adminModeBadge');
   const normalText = document.getElementById('normalModeText');
 
-  badge.style.display = currentPuzzleIsAdmin ? 'inline-block' : 'none';
-  normalText.style.display = currentPuzzleIsAdmin ? 'none' : 'inline';
+  // V prezentácii sa v tom istom políčku ukazuje poradie úlohy. Prednášajúci
+  // tak vidí, koľko mu ešte zostáva, bez ďalšieho prvku na obrazovke.
+  if (prezentacia) {
+    badge.textContent = prezentaciaKoniec
+      ? `Prezentácia — koniec (${prezentacia.ids.length})`
+      : `Prezentácia ${prezentacia.index + 1} / ${prezentacia.ids.length}`;
+  } else {
+    badge.textContent = 'Admin test';
+  }
+
+  const zvlastnyRezim = currentPuzzleIsAdmin || !!prezentacia;
+  badge.style.display = zvlastnyRezim ? 'inline-block' : 'none';
+  normalText.style.display = zvlastnyRezim ? 'none' : 'inline';
 }
 
 function getCurrentModeElo() {
@@ -1305,7 +1384,8 @@ function updatePuzzleMetaUI(puzzle) {
 
 function updateUiLocks() {
   const disabled = isAnimatingSolution || pendingPromotion !== null || failed;
-  document.getElementById('nextPuzzleBtn').disabled = isAnimatingSolution || pendingPromotion !== null;
+  document.getElementById('nextPuzzleBtn').disabled =
+    isAnimatingSolution || pendingPromotion !== null || prezentaciaKoniec;
   document.getElementById('retryBtn').disabled = isAnimatingSolution || pendingPromotion !== null;
   document.getElementById('showSolutionBtn').disabled = disabled || solved;
   // Tlačidlo Analyzovať sa zobrazí len keď je úloha dokončená (vyriešená alebo ukázané riešenie)
@@ -2337,7 +2417,30 @@ async function loadPuzzleForPlayer() {
 }
 
 async function nextPuzzle() {
-  if (!puzzles.length || isAnimatingSolution || dragState.active || pendingPromotion) return;
+  if (isAnimatingSolution || dragState.active || pendingPromotion) return;
+
+  // Prezentácia ide podľa zoznamu, nie podľa výberu pre hráča.
+  if (prezentacia) {
+    if (prezentaciaKoniec) return;
+
+    if (prezentacia.index + 1 >= prezentacia.ids.length) {
+      prezentaciaKoniec = true;
+      ukonciPrezentaciu();          // zoznam je odprezentovaný, netreba ho držať
+      updateAdminBadge();
+      updateUiLocks();
+      const btn = document.getElementById('prezKoniecBtn');
+      if (btn) btn.style.display = '';
+      setStatus(`Prezentácia skončila — ${prezentacia.ids.length} z ${prezentacia.ids.length}.`, 'success');
+      return;
+    }
+
+    prezentacia.index += 1;
+    ulozPrezentaciu();
+    await zobrazPrezentacnuUlohu();
+    return;
+  }
+
+  if (!puzzles.length) return;
   await opustitUlohu();
   loadPuzzleForPlayer();
 }
@@ -2428,6 +2531,13 @@ async function init() {
   await loadExcludedPuzzleIds(); // ELO len za úlohy, ktoré sú legitímne vo výbere
   initSessionStats();
   loadLeaderboard(); // načítaj rebríček
+
+  // Prezentácia má prednosť pred jednorazovým admin náhľadom
+  prezentacia = nacitajPrezentaciu();
+  if (prezentacia) {
+    await zobrazPrezentacnuUlohu();
+    return;
+  }
 
   const adminPuzzleId = localStorage.getItem("adminPuzzleId");
   const adminMode = localStorage.getItem("adminMode") === "true";
