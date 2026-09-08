@@ -286,6 +286,18 @@ button {
     </div>
   </div>
 
+  <!-- Prezentácia: vybrané úlohy v zadanom poradí, bez zápisu do štatistík -->
+  <div class="card" style="margin-bottom:16px;">
+    <h2>Prezentácia úloh</h2>
+    <div class="row">
+      <input id="prezIdsInput" type="text" placeholder="napr. 2490, 2470, 1212, 1223, 1226">
+      <button class="primary" onclick="spustitPrezentaciu()">Spustiť prezentáciu</button>
+    </div>
+    <div class="tip">Úlohy sa prehrajú presne v zadanom poradí, tlačidlom „Ďalšia úloha".
+      Oddeľovač môže byť čiarka, medzera aj nový riadok; rovnaké ID sa môže opakovať.
+      Nič sa nezapisuje do štatistík ani do ELA. Pred spustením sa overí, či všetky ID existujú.</div>
+  </div>
+
   <!-- Výsledok + editácia -->
   <div id="resultBox" class="result hidden">
     <h3>Nájdená úloha</h3>
@@ -706,6 +718,11 @@ button {
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/auth.js"></script>
 <script>
+// ZNAČKA VERZIE — pri každej úprave tohto súboru prepíš dátum.
+// Vypíše sa v konzole, alebo na mobile po pridaní ?verzia do adresy.
+// Mechanika je v player.js pri funkcii verzie().
+(window.VERZIE = window.VERZIE || {})['admin.html'] = '2026-09-07';
+
 // SUPABASE_URL a SUPABASE_KEY poskytuje js/auth.js (nedeklarovať znova!)
 
 let puzzles = [];
@@ -944,6 +961,57 @@ function openInAdminTraining() {
   if (!selectedPuzzle) { setStatus("Najprv nájdi úlohu", "error"); return; }
   localStorage.setItem("adminPuzzleId", String(selectedPuzzle.id));
   localStorage.setItem("adminMode", "true");
+  location.href = "training.html";
+}
+
+// ─── Prezentácia ────────────────────────────────────────────────────────────
+// Zoznam ID sa prehrá v training.html v zadanom poradí, v admin režime, teda
+// bez zápisu do štatistík a ELA.
+//
+// Prenáša sa cez sessionStorage, nie cez localStorage: prezentácia patrí
+// k jednej karte prehliadača. Prežije tak obnovenie stránky (na prednáške sa
+// stane), ale nezostane visieť v pamäti a neprilepí sa k bežnému tréningu
+// o dva dni neskôr.
+const PREZ_MAX = 50;   // viac úloh sa na jednu prednášku aj tak nestihne
+
+async function spustitPrezentaciu() {
+  const raw = (document.getElementById("prezIdsInput").value || '').trim();
+  // Čokoľvek, čo nie je číslica, je oddeľovač — čiarka, medzera aj nový riadok.
+  const ids = (raw.match(/\d+/g) || []).map(Number).filter(n => n > 0);
+
+  if (!ids.length) {
+    setStatus("Zadaj aspoň jedno ID úlohy", "error");
+    return;
+  }
+  if (ids.length > PREZ_MAX) {
+    setStatus(`Naraz sa dá prezentovať najviac ${PREZ_MAX} úloh (zadal si ${ids.length}).`, "error");
+    return;
+  }
+
+  // Overenie PRED spustením. Chýbajúce ID sa musí zistiť teraz, nie v polovici
+  // prednášky pred publikom.
+  try {
+    setStatus("Overujem zoznam úloh...");
+    const unikatne = [...new Set(ids)];
+    const najdene  = await sbFetch(`puzzles?id=in.(${unikatne.join(',')})&select=id`);
+    const maju     = new Set((najdene || []).map(r => Number(r.id)));
+    const chybaju  = unikatne.filter(id => !maju.has(id));
+    if (chybaju.length) {
+      setStatus(`V databáze nie sú tieto ID: ${chybaju.join(', ')}. Oprav zoznam a skús znova.`, "error");
+      return;
+    }
+  } catch (e) {
+    setStatus("Zoznam sa nepodarilo overiť: " + e.message, "error");
+    return;
+  }
+
+  try {
+    sessionStorage.setItem("prezentaciaIds", JSON.stringify(ids));
+    sessionStorage.setItem("prezentaciaIndex", "0");
+  } catch (e) {
+    setStatus("Prezentáciu sa nepodarilo pripraviť: " + e.message, "error");
+    return;
+  }
   location.href = "training.html";
 }
 
