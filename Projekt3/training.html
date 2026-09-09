@@ -745,7 +745,7 @@ button:disabled {
 // ZNAČKA VERZIE — pri každej úprave tohto súboru prepíš dátum.
 // Vypíše sa v konzole, alebo na mobile po pridaní ?verzia do adresy.
 // Mechanika je v player.js pri funkcii verzie().
-(window.VERZIE = window.VERZIE || {})['training.html'] = '2026-09-07';
+(window.VERZIE = window.VERZIE || {})['training.html'] = '2026-09-09';
 
 const files = ['a','b','c','d','e','f','g','h'];
 const STATS_STORAGE_KEY = 'sachovy_trening_stats_v2';
@@ -781,6 +781,24 @@ let isAnimatingSolution = false;
 
 let timerInterval = null;
 let timerRemaining = 0;
+
+// ─── Bonus za správny ťah ───────────────────────────────────────────────────
+// Po každom správnom ťahu, po ktorom úloha pokračuje, sa k zostávajúcemu času
+// pripočíta bonus. Je to bežné šachové tempo: hráč dostáva čas za odohraný ťah,
+// takže dlhá úloha netlačí rovnako ako krátka a rozmýšľanie nad štvrtým ťahom
+// nie je trestané tým, že prvé tri niečo trvali.
+//
+// Bonus sa NEPRIDÁVA za posledný ťah, ktorý úlohu ukončí — na čo aj, keď už
+// niet čo hrať. Takto zároveň platí, že každá pripočítaná sekunda bola aj
+// naozaj k dispozícii.
+//
+// Zručnosti bonus nemajú a mať nebudú: tam je zadaním nájsť riešenia rýchlo.
+const BONUS_ZA_TAH = 30;      // sekúnd
+
+// Koľko sekúnd sa v tejto úlohe už pripočítalo. Potrebné na dve veci: aby
+// „strávený čas" nevyšiel záporne (hodiny môžu skončiť vyššie, než začali)
+// a aby sa do štatistík poslal limit, ktorý hráč naozaj mal.
+let pridanyCas = 0;
 let timerExpired = false;
 
 let dragState = {
@@ -1151,7 +1169,7 @@ window.addEventListener('pagehide', function (e) {
     mode:       getTrainingMode() || 'mix',
     timeSpent:  Math.round(cas),
     lossReason: 'odchod',
-    timeLimit:  normalizeTimeValue(current.time)
+    timeLimit:  celkovyLimit()
   });
 });
 
@@ -1162,9 +1180,17 @@ window.addEventListener('pagehide', function (e) {
 // Prvých pár sekúnd sa netrestá — hráč sa môže len pozrieť a rozmyslieť si to.
 const MILOST_SEKUND = 10;
 
+// Čas, ktorý mal hráč na túto úlohu k dispozícii — základný limit úlohy plus
+// bonusy, ktoré si za správne ťahy prihral. Do štatistík ide toto číslo, aby
+// „využitie limitu" hovorilo, koľko z naozaj dostupného času hráč minul.
+function celkovyLimit() {
+  if (!current) return 0;
+  return normalizeTimeValue(current.time) + pridanyCas;
+}
+
 function uplynulyCasUlohy() {
   if (!current) return 0;
-  return Math.max(0, normalizeTimeValue(current.time) - timerRemaining);
+  return Math.max(0, celkovyLimit() - timerRemaining);
 }
 
 // Vráti true, ak sa úloha naozaj započítala ako nevyriešená.
@@ -1184,7 +1210,7 @@ async function opustitUlohu() {
 async function recordResultOnce(result, dovod = null, chybnyTah = null) {
   if (resultLogged || !currentPlayer || !current) return;
 
-  const usedTime = Math.max(0, normalizeTimeValue(current.time) - timerRemaining);
+  const usedTime = Math.max(0, celkovyLimit() - timerRemaining);
 
   if (!currentPuzzleIsAdmin) {
     // Jediný zápis. História sa uloží vždy (aj opakované riešenie), o pohybe
@@ -1205,7 +1231,7 @@ async function recordResultOnce(result, dovod = null, chybnyTah = null) {
       lossReason:  dovod,
       wrongMove:   jeChyba ? chybnyTah : null,
       ply:         jeChyba ? spravnychTahov + 1 : null,
-      timeLimit:   normalizeTimeValue(current.time),
+      timeLimit:   celkovyLimit(),
       firstMoveMs: prvyTahMs
     });
 
@@ -1332,6 +1358,7 @@ function loseOnTime() {
 function startPuzzleTimer(seconds) {
   stopPuzzleTimer();
   timerRemaining = normalizeTimeValue(seconds);
+  pridanyCas = 0;              // nová úloha (aj po „Skús znova") začína bez bonusov
   timerExpired = false;
   updateTimerUI();
 
@@ -2256,6 +2283,13 @@ function finishTurn(playerBranch, playedMove) {
     updateUiLocks();
     return setStatus(currentPuzzleIsAdmin ? '✔ Hotovo – admin kontrola bez zápisu' : '✔ Hotovo', 'success');
   }
+
+  // Úloha pokračuje — hráč dostáva bonus za odohraný ťah. Sem sa program
+  // dostane len vtedy, keď po jeho ťahu aj po odpovedi súpera ešte niečo
+  // zostáva, takže za ukončujúci ťah sa bonus nepripočíta.
+  pridanyCas    += BONUS_ZA_TAH;
+  timerRemaining += BONUS_ZA_TAH;
+  updateTimerUI();
 
   updateUiLocks();
   setStatus('Správne', 'success');
