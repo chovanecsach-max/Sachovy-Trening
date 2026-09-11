@@ -413,7 +413,7 @@ tr:hover td { background: #eff6ff; }
 // ZNAČKA VERZIE — pri každej úprave tohto súboru prepíš dátum.
 // Vypíše sa v konzole, alebo na mobile po pridaní ?verzia do adresy.
 // Mechanika je v player.js pri funkcii verzie().
-(window.VERZIE = window.VERZIE || {})['statistika.html'] = '2026-09-07';
+(window.VERZIE = window.VERZIE || {})['statistika.html'] = '2026-09-11';
 
 // ─── Kontext prihláseného používateľa ───────────────────────────────────────
 const USER_ROLE         = sessionStorage.getItem('user_role') || '';
@@ -1335,51 +1335,71 @@ async function initCharts() {
     }
   } else {
     // Pre trener / hlavny_trener / admin: zobraz select
-    document.getElementById('chartPlayerRow').style.display = '';
-    try {
-      const players = await fetchPlayers();
-      const sel = document.getElementById('chartPlayerSelect');
-      (players || []).forEach(p => {
-        const opt = document.createElement('option');
-        opt.value = p.id;  // pre _isSelf je to 'profile_UUID'
-        opt.textContent = p._isSelf
-          ? `${USER_NICK} (${p._roleLabel})`
-          : `${p.surname} ${p.name}`.trim();
-        sel.appendChild(opt);
-      });
-    } catch(e) {
-      console.warn('Nepodarilo sa načítať hráčov pre grafy:', e);
-    }
+    //
+    // POISTKA: prvky sa hľadajú opatrne. Keď niektorý chýba, funkcia sa len
+    // zastaví a zvyšok stránky beží ďalej. Bez toho spadla celá inicializácia
+    // grafov na „null is not an object" — 8× za týždeň, vždy zo staršej kópie
+    // stránky uloženej v prehliadači, kde to políčko ešte nebolo. Chyba, ktorá
+    // sa nedá opraviť spätne, sa aspoň nesmie šíriť ďalej.
+    const row = document.getElementById('chartPlayerRow');
+    const sel = document.getElementById('chartPlayerSelect');
+    if (row) row.style.display = '';
 
-    document.getElementById('chartPlayerSelect').addEventListener('change', function() {
-      const val = this.value;
-      if (!val) { chartPlayerId = null; clearCharts(); return; }
-      // Pseudo-hráč (tréner/admin) — grafy načítame podľa user_id
-      if (val.startsWith('profile_')) {
-        chartPlayerId = null;
-        chartUserIdOverride = USER_ID;
-        loadChartData();
-      } else {
-        chartUserIdOverride = null;
-        chartPlayerId = Number(val);
-        loadChartData();
+    if (!sel) {
+      // Stránka bez výberu hráča — grafy sa nedajú naplniť, ale zvyšok
+      // štatistiky je v poriadku a nemá dôvod padať s nimi.
+      console.warn('Výber hráča pre grafy na stránke nie je — grafy sa preskočia.');
+      showChartMsg('eloMsg',      'Výber hráča sa nepodarilo zobraziť.');
+      showChartMsg('skillEloMsg', 'Výber hráča sa nepodarilo zobraziť.');
+      showChartMsg('timeMsg',     'Výber hráča sa nepodarilo zobraziť.');
+    } else {
+      try {
+        const players = await fetchPlayers();
+        (players || []).forEach(p => {
+          const opt = document.createElement('option');
+          opt.value = p.id;  // pre _isSelf je to 'profile_UUID'
+          opt.textContent = p._isSelf
+            ? `${USER_NICK} (${p._roleLabel})`
+            : `${p.surname} ${p.name}`.trim();
+          sel.appendChild(opt);
+        });
+      } catch(e) {
+        console.warn('Nepodarilo sa načítať hráčov pre grafy:', e);
       }
-    });
 
-    showChartMsg('eloMsg',      'Vyber hráča pre zobrazenie grafu.');
-    showChartMsg('skillEloMsg', 'Vyber hráča pre zobrazenie grafu.');
-    showChartMsg('timeMsg',     'Vyber hráča pre zobrazenie grafu.');
+      sel.addEventListener('change', function() {
+        const val = this.value;
+        if (!val) { chartPlayerId = null; clearCharts(); return; }
+        // Pseudo-hráč (tréner/admin) — grafy načítame podľa user_id
+        if (val.startsWith('profile_')) {
+          chartPlayerId = null;
+          chartUserIdOverride = USER_ID;
+          loadChartData();
+        } else {
+          chartUserIdOverride = null;
+          chartPlayerId = Number(val);
+          loadChartData();
+        }
+      });
+
+      showChartMsg('eloMsg',      'Vyber hráča pre zobrazenie grafu.');
+      showChartMsg('skillEloMsg', 'Vyber hráča pre zobrazenie grafu.');
+      showChartMsg('timeMsg',     'Vyber hráča pre zobrazenie grafu.');
+    }
   }
 
-  // Period buttons
-  document.getElementById('periodBtns').addEventListener('click', e => {
-    const btn = e.target.closest('.period-btn');
-    if (!btn) return;
-    document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    chartDays = Number(btn.dataset.days);
-    if (chartPlayerId) loadChartData();
-  });
+  // Period buttons — rovnaká opatrnosť, nech posledný riadok nezhodí zvyšok
+  const periodBtns = document.getElementById('periodBtns');
+  if (periodBtns) {
+    periodBtns.addEventListener('click', e => {
+      const btn = e.target.closest('.period-btn');
+      if (!btn) return;
+      document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      chartDays = Number(btn.dataset.days);
+      if (chartPlayerId) loadChartData();
+    });
+  }
 }
 
 // ─── Načítanie dát a render ────────────────────────────────────
@@ -1817,13 +1837,19 @@ function buildSkillEloLegend() {
 }
 
 // ─── Pomocné ──────────────────────────────────────────────────
+// Obe funkcie sa volajú z desiatok miest. Keby hociktorá spadla na chýbajúcom
+// prvku, zhodí celý beh okolo seba — a presne to sa dialo pri grafoch. Preto
+// sa chýbajúci prvok len ticho preskočí.
 function showChartMsg(id, text) {
   const el = document.getElementById(id);
+  if (!el) return;
   el.textContent = text;
   el.style.display = '';
 }
 function hideChartMsg(id) {
-  document.getElementById(id).style.display = 'none';
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.style.display = 'none';
 }
 function clearCharts() {
   if (eloChartInst)      { eloChartInst.destroy();      eloChartInst      = null; }
