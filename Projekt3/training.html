@@ -745,7 +745,7 @@ button:disabled {
 // ZNAČKA VERZIE — pri každej úprave tohto súboru prepíš dátum.
 // Vypíše sa v konzole, alebo na mobile po pridaní ?verzia do adresy.
 // Mechanika je v player.js pri funkcii verzie().
-(window.VERZIE = window.VERZIE || {})['training.html'] = '2026-09-09';
+(window.VERZIE = window.VERZIE || {})['training.html'] = '2026-09-17';
 
 const files = ['a','b','c','d','e','f','g','h'];
 const STATS_STORAGE_KEY = 'sachovy_trening_stats_v2';
@@ -1798,9 +1798,23 @@ function handleMoveAttempt(fromIndex, targetIndex) {
   }
 
   if (isPromotionMove(fromIndex, targetIndex)) {
+    zaznamenajPrvyTah();
     selected = fromIndex;
     legalTargets = getLegalTargets(fromIndex);
     render();
+
+    // Na figúru sa pýtame LEN vtedy, keď je ten ťah naozaj možný.
+    // isPromotionMove() sa pozerá iba na to, či cieľ leží na poslednom rade —
+    // takže pri nelegálnom ťahu (napr. biely pešiak c6 na c8) sa panel otvoril
+    // tiež a hláška „Nelegálny ťah" prišla až po výbere figúry. Legalita sa
+    // skúša so všetkými štyrmi figúrami: keď neprejde ani jedna, ťah nie je
+    // možný bez ohľadu na to, na čo by sa pešiak premenil.
+    const daSaPremenit = ['q', 'r', 'b', 'n']
+      .some(promo => isLegalMove(fromIndex, targetIndex, promo));
+    if (!daSaPremenit) {
+      return setStatus('Nelegálny ťah', 'warning');
+    }
+
     showPromotionPanel(fromIndex, targetIndex);
     return;
   }
