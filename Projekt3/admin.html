@@ -667,6 +667,15 @@ button {
           </select>
           <button class="primary" style="flex:none;padding:6px 14px;font-size:13px;margin-top:0;" onclick="extendValidity()">Predĺžiť</button>
         </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px;">
+          <label style="font-size:13px;color:#374151;white-space:nowrap;">Alebo platnosť do:</label>
+          <input type="date" id="uValidToDate" style="width:auto;flex:1;min-width:150px;font-size:13px;padding:6px 10px;margin:0;">
+          <button class="primary" style="flex:none;padding:6px 14px;font-size:13px;margin-top:0;" onclick="setValidityDate()">Nastaviť dátum</button>
+        </div>
+        <div style="font-size:12px;color:#94a3b8;margin-top:6px;">
+          Zvolený deň sa počíta celý — platnosť skončí až jeho koncom. Dátum sa dá
+          nastaviť aj dozadu; vtedy sa účet odstaví a systém sa spýta na potvrdenie.
+        </div>
       </div>
 
       <!-- Zmena hesla (cez Edge Function, nepotrebuje mail) -->
@@ -721,7 +730,7 @@ button {
 // ZNAČKA VERZIE — pri každej úprave tohto súboru prepíš dátum.
 // Vypíše sa v konzole, alebo na mobile po pridaní ?verzia do adresy.
 // Mechanika je v player.js pri funkcii verzie().
-(window.VERZIE = window.VERZIE || {})['admin.html'] = '2026-09-09';
+(window.VERZIE = window.VERZIE || {})['admin.html'] = '2026-09-17';
 
 // SUPABASE_URL a SUPABASE_KEY poskytuje js/auth.js (nedeklarovať znova!)
 
@@ -1856,6 +1865,20 @@ async function openUserEdit(userId) {
     const validTo = selectedUser.valid_to ? new Date(selectedUser.valid_to) : null;
     const validToEl = document.getElementById('uValidTo');
     validToEl.textContent = fmtDate(selectedUser.valid_to);
+
+    // Do políčka s dátumom sa predvyplní terajšia platnosť — najčastejšie ju
+    // treba len posunúť, nie vypisovať odznova.
+    // Deň sa skladá z miestnych zložiek, nie cez toISOString(): platnosť do
+    // 23:59:59 miestneho času je v UTC už nasledujúci deň a v políčku by
+    // svietil dátum o jeden vyšší. A localDay() z player.js tu nie je —
+    // admin.html player.js nenačítava a má vlastné pomôcky.
+    const dateEl = document.getElementById('uValidToDate');
+    if (dateEl) {
+      const dv = n => String(n).padStart(2, '0');
+      dateEl.value = validTo
+        ? `${validTo.getFullYear()}-${dv(validTo.getMonth() + 1)}-${dv(validTo.getDate())}`
+        : '';
+    }
     if (validTo && new Date() > validTo) {
       validToEl.style.color = '#dc2626'; // červená — vypršané
       validToEl.textContent += ' ⛔ vypršalo';
@@ -1921,6 +1944,39 @@ async function saveUser() {
   }
 }
 
+// Spoločný zápis novej platnosti pre obe cesty — „predĺžiť o X dní" aj
+// „nastaviť dátum". Vypýta si späť upravený riadok: PATCH, ktorý pravidlo RLS
+// odfiltruje, nevráti chybu, len upraví nula riadkov. Bez tejto kontroly by
+// stránka napísala zelené „platnosť predĺžená" aj vtedy, keby sa nezapísalo nič.
+async function zapisPlatnost(novyDatum, hlaska) {
+  const zmenene = await sbFetch(`profiles?id=eq.${selectedUser.id}&select=id,valid_to`, {
+    method: 'PATCH',
+    prefer: 'return=representation',
+    body: JSON.stringify({ valid_to: novyDatum.toISOString() })
+  });
+  if (!zmenene || !zmenene.length) {
+    setUserStatus('Platnosť sa nepodarilo zmeniť — databáza zmenu odmietla.', 'error');
+    return false;
+  }
+
+  selectedUser.valid_to = novyDatum.toISOString();
+
+  // Obnov zobrazenie hodnoty „Platný do"
+  const validToEl = document.getElementById('uValidTo');
+  const dniZostava = Math.ceil((novyDatum - new Date()) / (1000 * 60 * 60 * 24));
+  if (dniZostava > 0) {
+    validToEl.style.color = dniZostava <= 7 ? '#d97706' : '#16a34a';
+    validToEl.textContent = novyDatum.toLocaleDateString('sk-SK') + ` (zostatok: ${dniZostava} dní)`;
+  } else {
+    validToEl.style.color = '#dc2626';
+    validToEl.textContent = novyDatum.toLocaleDateString('sk-SK') + ' ⛔ vypršalo';
+  }
+
+  setUserStatus(hlaska(novyDatum), 'success');
+  renderUserList(window._playerMap || {});   // zoznam nech ukáže novú platnosť
+  return true;
+}
+
 async function extendValidity() {
   if (!selectedUser) return;
   const days = parseInt(document.getElementById('uExtendDays').value);
@@ -1933,22 +1989,40 @@ async function extendValidity() {
 
   try {
     setUserStatus('Predlžujem platnosť...');
-    await sbFetch(`profiles?id=eq.${selectedUser.id}`, {
-      method: 'PATCH',
-      body: JSON.stringify({ valid_to: newValidTo.toISOString() })
-    });
-    // Aktualizuj lokálny objekt
-    selectedUser.valid_to = newValidTo.toISOString();
-
-    // Obnov zobrazenie
-    const validToEl = document.getElementById('uValidTo');
-    const daysLeft = Math.ceil((newValidTo - new Date()) / (1000 * 60 * 60 * 24));
-    validToEl.style.color = '#16a34a';
-    validToEl.textContent = newValidTo.toLocaleDateString('sk-SK') + ` (zostatok: ${daysLeft} dní)`;
-
-    setUserStatus(`✅ Platnosť predĺžená do ${newValidTo.toLocaleDateString('sk-SK')}.`, 'success');
+    await zapisPlatnost(newValidTo,
+      d => `✅ Platnosť predĺžená do ${d.toLocaleDateString('sk-SK')}.`);
   } catch(e) {
     setUserStatus('Chyba pri predĺžení: ' + e.message, 'error');
+  }
+}
+
+// Platnosť ku konkrétnemu dátumu. Na rozdiel od predĺženia o počet dní sa
+// nepočíta od terajšej platnosti — dátum sa nastaví presne tak, ako je zadaný.
+// Hodí sa, keď platnosť viažeš na koniec školského roka, sezóny alebo obdobia,
+// za ktoré je zaplatené.
+async function setValidityDate() {
+  if (!selectedUser) return;
+  const raw = (document.getElementById('uValidToDate').value || '').trim();
+  if (!raw) { setUserStatus('Zadaj dátum.', 'error'); return; }
+
+  // Koniec zvoleného dňa v miestnom čase, nie jeho začiatok. „Platnosť do
+  // 30. 9." znamená, že 30. septembra hráč ešte trénuje — pri polnoci by mu
+  // deň, ktorý si zaplatil, prepadol.
+  const novy = new Date(raw + 'T23:59:59.999');
+  if (isNaN(novy.getTime())) { setUserStatus('Neplatný dátum.', 'error'); return; }
+
+  if (novy < new Date() &&
+      !confirm(`Dátum ${novy.toLocaleDateString('sk-SK')} je v minulosti — `
+             + 'účet sa tým odstaví a hráč sa nedostane do tréningu. Pokračovať?')) {
+    return;
+  }
+
+  try {
+    setUserStatus('Nastavujem platnosť...');
+    await zapisPlatnost(novy,
+      d => `✅ Platnosť nastavená do ${d.toLocaleDateString('sk-SK')} (vrátane).`);
+  } catch(e) {
+    setUserStatus('Chyba pri nastavovaní platnosti: ' + e.message, 'error');
   }
 }
 
