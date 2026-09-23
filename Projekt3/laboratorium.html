@@ -1,0 +1,938 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Laboratórium výmeny</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0f1117">
+<link rel="apple-touch-icon" href="ikona-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Šach tréning">
+
+<style>
+/* Základ je rovnaký ako v training.html — šachovnica aj tlačidlá vyzerajú
+   všade na platforme rovnako. */
+/* Atribút hidden musí platiť aj pre prvky s vlastným display (flex, grid) */
+[hidden] { display: none !important; }
+
+body {
+  font-family: Arial, sans-serif;
+  background: #f4f4f6;
+  margin: 0;
+  padding: 10px;
+  color: #111827;
+}
+
+.app {
+  max-width: 1280px;
+  margin: 0 auto;
+  background: white;
+  border-radius: 14px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+  padding: 12px;
+}
+
+.hlavicka {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 2px 4px 12px;
+}
+.nadpis { font-size: 22px; margin: 0 0 4px; }
+.podnadpis { color: #475569; font-size: 14px; line-height: 1.45; }
+
+.layout {
+  display: grid;
+  grid-template-columns: 1fr 380px;
+  gap: 12px;
+  align-items: start;
+}
+.left-column, .right-column { min-width: 0; }
+
+.board-card, .panel-card {
+  border: 1px solid #d1d5db;
+  border-radius: 12px;
+  background: white;
+}
+.board-card { padding: 10px; }
+.panel-card { padding: 12px 14px; margin-bottom: 12px; }
+.panel-card h2 { margin: 0 0 8px; font-size: 17px; }
+
+.board-area {
+  position: relative;
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 auto;
+}
+
+.board {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  grid-template-rows: repeat(8, 1fr);
+  width: min(100%, 72vh);
+  max-width: 660px;
+  aspect-ratio: 1 / 1;
+  margin: auto;
+  border: 8px solid #5b4636;
+  border-radius: 8px;
+  overflow: hidden;
+  position: relative;
+}
+
+.square {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
+  position: relative;
+  box-sizing: border-box;
+  user-select: none;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+.square img.piece-img {
+  width: 85%;
+  height: 85%;
+  object-fit: contain;
+  pointer-events: none;
+  user-select: none;
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.4));
+  transition: transform .15s ease;
+}
+.light { background: #f4e7c7; }
+.dark  { background: #7a9b76; }
+
+.square.selected {
+  outline: 3px solid #2563eb;
+  outline-offset: -3px;
+  box-shadow: inset 0 0 0 9999px rgba(37, 99, 235, 0.18);
+}
+.square.last-from {
+  box-shadow: inset 0 0 0 9999px rgba(250, 204, 21, 0.45);
+  outline: 3px solid rgba(202, 138, 4, 0.85);
+  outline-offset: -3px;
+}
+.square.last-to {
+  box-shadow: inset 0 0 0 9999px rgba(250, 204, 21, 0.65);
+  outline: 4px solid rgba(180, 83, 9, 1);
+  outline-offset: -4px;
+}
+/* Figúrka, ktorú vybraná figúrka môže zobrať */
+.square.ciel {
+  box-shadow: inset 0 0 0 9999px rgba(220, 38, 38, 0.22);
+  outline: 4px solid rgba(220, 38, 38, 0.9);
+  outline-offset: -4px;
+}
+.square.ciel img.piece-img { transform: scale(0.92); }
+
+.coord-file, .coord-rank {
+  position: absolute;
+  font-size: 10px;
+  font-weight: bold;
+  opacity: 0.75;
+  z-index: 3;
+}
+.coord-file { right: 4px; bottom: 2px; }
+.coord-rank { left: 4px; top: 2px; }
+
+button {
+  padding: 10px 12px;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 14px;
+  font-family: inherit;
+}
+button:disabled { opacity: 0.45; cursor: not-allowed; }
+.primary   { background: #111827; color: white; }
+.secondary { background: #e5e7eb; color: #111827; }
+.accent    { background: #dbeafe; color: #1d4ed8; }
+button.male { padding: 6px 10px; font-size: 13px; }
+
+/* Ovládanie pod šachovnicou */
+.ovladanie {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 8px;
+  margin-top: 10px;
+}
+select, input[type=text] {
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  font-size: 14px;
+  font-family: inherit;
+  background: #fff;
+  color: #111827;
+}
+.fen-riadok {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  margin-top: 8px;
+}
+.fen-riadok input { font-family: Consolas, "Courier New", monospace; font-size: 13px; }
+
+.hlaska {
+  margin-top: 8px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-size: 14px;
+}
+.hlaska.chyba { background: #fef2f2; border: 1px solid #fca5a5; color: #b91c1c; }
+
+/* Úprava pozície */
+.paleta {
+  margin-top: 10px;
+  padding: 10px;
+  border: 1px dashed #94a3b8;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+.paleta-nadpis { font-size: 13px; color: #475569; margin-bottom: 8px; }
+.paleta-figurky {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.paleta-figurky button {
+  padding: 4px;
+  background: #fff;
+  border: 2px solid #e5e7eb;
+  aspect-ratio: 1 / 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.paleta-figurky button img { width: 80%; height: 80%; pointer-events: none; }
+.paleta-figurky button.zvolena { border-color: #2563eb; background: #eff6ff; }
+.paleta-figurky .guma { font-size: 12px; color: #475569; font-weight: bold; }
+.paleta-tlacidla { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* Pravý panel */
+.napoveda { color: #475569; font-size: 14px; line-height: 1.5; }
+.slabo { color: #64748b; }
+.karta-hlava {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.karta-hlava h2 { margin: 0; }
+
+.rebrik-hlava {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.rebrik-tah { font-size: 16px; font-weight: bold; }
+.ucet {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 26px;
+  font-weight: bold;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.minca {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #fef3c7, #f59e0b 60%, #b45309);
+  box-shadow: inset 0 0 0 2px rgba(146, 64, 14, 0.55);
+  flex: none;
+}
+
+table.rebrik, table.zoznam { width: 100%; border-collapse: collapse; font-size: 14px; }
+table.rebrik th {
+  text-align: left;
+  font-size: 11px;
+  color: #64748b;
+  text-transform: uppercase;
+  padding: 4px 6px;
+  border-bottom: 1px solid #e5e7eb;
+}
+table.rebrik td { padding: 7px 6px; border-bottom: 1px solid #f1f5f9; vertical-align: top; }
+table.rebrik tr.skryty td { color: #cbd5e1; }
+table.rebrik tr.aktualny td { background: #fefce8; }
+table.rebrik tr.koniec td { background: #f8fafc; font-size: 13px; }
+.cislo { text-align: right !important; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.plus  { color: #15803d; }
+.minus { color: #b91c1c; }
+.nula  { color: #475569; }
+
+.bodka {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-right: 6px;
+  vertical-align: 0;
+  border: 1.5px solid #111827;
+}
+.bodka.w { background: #fff; }
+.bodka.b { background: #111827; }
+
+.verdikt {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 16px;
+  font-weight: bold;
+  text-align: center;
+  border: 2px solid;
+}
+.verdikt.plus  { background: #f0fdf4; border-color: #4ade80; color: #166534; }
+.verdikt.nula  { background: #f8fafc; border-color: #94a3b8; color: #334155; }
+.verdikt.minus { background: #fef2f2; border-color: #f87171; color: #b91c1c; }
+.veta { margin-top: 8px; font-size: 13px; color: #475569; }
+
+.prehravac-tlacidla {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1.3fr 1fr;
+  gap: 6px;
+  margin-top: 10px;
+}
+.prehravac-tlacidla button { padding: 9px 4px; font-size: 13px; }
+
+/* Zoznam braní */
+.skupina { font-size: 12px; color: #64748b; text-transform: uppercase; margin: 8px 0 4px; }
+.branie {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  margin-bottom: 4px;
+  padding: 8px 10px;
+  border: 1px solid #e5e7eb;
+  background: #fff;
+  text-align: left;
+}
+.branie:hover { background: #f8fafc; }
+.branie.vybrane { border-color: #2563eb; background: #eff6ff; }
+.branie .zisk { font-weight: bold; font-variant-numeric: tabular-nums; }
+
+.riesenie { padding: 7px 0; border-bottom: 1px solid #f1f5f9; font-size: 14px; }
+.riesenie:last-child { border-bottom: none; }
+.riesenie b { display: inline-block; min-width: 64px; }
+
+.pasik {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 10px;
+  padding: 9px 12px;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  font-size: 15px;
+  min-height: 24px;
+}
+.pasik .ucet { font-size: 20px; }
+.pasik .minca { width: 18px; height: 18px; }
+.pasik.plus  { background: #f0fdf4; border-color: #86efac; color: #166534; font-weight: bold; }
+.pasik.minus { background: #fef2f2; border-color: #fca5a5; color: #b91c1c; font-weight: bold; }
+.pasik.nula  { background: #f1f5f9; border-color: #cbd5e1; color: #334155; font-weight: bold; }
+
+.upozornenia { background: #fffbeb; border-color: #fcd34d; color: #92400e; font-size: 14px; }
+.upozornenia ul { margin: 0; padding-left: 18px; }
+
+@media (max-width: 900px) {
+  .layout { grid-template-columns: 1fr; }
+  .board { width: min(100%, 96vw); }
+}
+@media (max-width: 780px) {
+  body { padding: 6px; }
+  .app { padding: 8px; }
+  .nadpis { font-size: 19px; }
+  .board { border-width: 5px; }
+  .ovladanie { grid-template-columns: 1fr 1fr; }
+  .ovladanie select { grid-column: 1 / -1; }
+  button { min-height: 44px; }
+  button.male { min-height: 34px; }
+}
+@media (max-width: 420px) {
+  .board { width: 100%; border-width: 4px; }
+  .paleta-figurky { gap: 4px; }
+}
+</style>
+</head>
+
+<body>
+<div class="app">
+  <div class="hlavicka">
+    <div>
+      <h1 class="nadpis">Laboratórium výmeny</h1>
+      <div class="podnadpis">Klikni na figúrku a potom na figúrku, ktorú má zobrať. Výmena sa prehrá krok po kroku.</div>
+    </div>
+    <button class="secondary" onclick="goHome()">Menu</button>
+  </div>
+
+  <div class="layout">
+    <div class="left-column">
+      <div class="board-card">
+        <div class="board-area">
+          <div id="board" class="board"></div>
+        </div>
+        <!-- Pás pod šachovnicou: na mobile je panel s rebríkom až nižšie,
+             tu je aktuálny krok a účet vidno počas prehrávania. -->
+        <div id="pasik" class="pasik" hidden>
+          <span id="pasikText"></span>
+          <span class="ucet" id="pasikUcetBox" hidden><span class="minca"></span><span id="pasikUcet">0</span></span>
+        </div>
+
+        <div id="paleta" class="paleta" hidden>
+          <div class="paleta-nadpis">Vyber figúrku a klikni na pole. Druhý klik tou istou figúrkou ju odstráni.</div>
+          <div class="paleta-figurky" id="paletaFigurky"></div>
+          <div class="paleta-tlacidla">
+            <button class="secondary male" id="btnVycisti">Vyčistiť šachovnicu</button>
+            <button class="primary male" id="btnHotovo">Hotovo</button>
+          </div>
+        </div>
+
+        <div class="ovladanie">
+          <select id="priklady" aria-label="Pozície z knihy"></select>
+          <button class="secondary" id="btnOtoc">Otočiť</button>
+          <button class="secondary" id="btnUprav">Upraviť pozíciu</button>
+        </div>
+        <div class="fen-riadok">
+          <input type="text" id="fen" aria-label="FEN" spellcheck="false" autocomplete="off">
+          <button class="primary" id="btnFen">Načítaj</button>
+        </div>
+        <div id="fenChyba" class="hlaska chyba" hidden></div>
+      </div>
+    </div>
+
+    <div class="right-column">
+      <div class="panel-card">
+        <h2>Rebrík výmeny</h2>
+        <div id="rebrikPrazdny" class="napoveda"></div>
+        <div id="rebrikObsah" hidden>
+          <div class="rebrik-hlava">
+            <div id="rebrikTah" class="rebrik-tah"></div>
+            <div class="ucet" title="Účet strany, ktorá začala brať"><span class="minca"></span><span id="ucet">0</span></div>
+          </div>
+          <div id="rebrikTabulka"></div>
+          <div id="verdikt" class="verdikt" hidden></div>
+          <div id="vetaGeneratora" class="veta" hidden></div>
+          <div class="prehravac-tlacidla">
+            <button class="secondary" id="btnZaciatok" title="Od začiatku">⏮ Znova</button>
+            <button class="secondary" id="btnSpat" title="Krok späť (šípka vľavo)">◀ Späť</button>
+            <button class="primary"   id="btnPrehraj" title="Prehraj (medzerník)">▶ Prehraj</button>
+            <button class="secondary" id="btnDalej" title="Krok dopredu (šípka vpravo)">Ďalej ▶</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="upozornenia" class="panel-card upozornenia" hidden></div>
+
+      <div class="panel-card">
+        <div class="karta-hlava">
+          <h2>Všetky brania</h2>
+          <button class="accent male" id="btnSkry">Skryť zisky</button>
+        </div>
+        <div id="zoznamBrani"></div>
+      </div>
+
+      <div class="panel-card">
+        <h2>Úloha zo zručností</h2>
+        <div class="slabo" style="font-size:13px;margin-bottom:6px;">Nájdi všetky brania so ziskom (biele aj čierne)</div>
+        <div id="uloha"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/auth.js"></script>
+<script src="js/player.js"></script>
+<script src="js/vision-core.js"></script>
+<script src="js/rebrik-vymeny.js"></script>
+
+<script>
+// ZNAČKA VERZIE — pri každej úprave tohto súboru prepíš dátum.
+(window.VERZIE = window.VERZIE || {})['laboratorium.html'] = '2026-09-23';
+
+// ─── Pozície z knihy Šachový trh (overené generátorom) ──────────────────────
+const POZICIE_KNIHY = [
+  ['Kapitola 2 — Nekrytá figúrka', [
+    ['2.1 Nekrytý jazdec',            '6k1/8/3n4/8/8/8/8/3R2K1 w - - 0 1'],
+    ['2.2 Krytý pešiak',              '6k1/8/4p3/3p4/8/2N5/8/6K1 w - - 0 1'],
+    ['2.3 Dáma berie vežu',           '7k/8/4r3/8/8/8/Q7/6K1 w - - 0 1'],
+    ['2.4 Aj kráľ berie',             '6k1/8/8/8/2pK4/8/8/8 w - - 0 1'],
+    ['2.5 Nájdi všetky',              '6k1/8/5p2/3np3/8/r7/1B6/3R2K1 w - - 0 1']
+  ]],
+  ['Kapitola 3 — Hľadáme za oboch', [
+    ['3.1 Obaja so ziskom',           '6k1/8/8/8/4n3/6B1/8/4R1K1 w - - 0 1'],
+    ['3.2 Aj pešiak berie',           '6k1/8/5p2/3np3/8/p7/1B6/3R2K1 w - - 0 1'],
+    ['3.3 Zisk má len čierny',        '6k1/8/4pb2/3p2n1/8/2N4P/8/6K1 w - - 0 1'],
+    ['3.4 Tri brania',                '6k1/2r5/8/8/4n3/6B1/8/4R1K1 w - - 0 1']
+  ]],
+  ['Kapitola 4 — Lacnejší berie drahšieho', [
+    ['4.1 Pešiak berie jazdca',       '6k1/8/2p5/3n4/4P3/8/8/6K1 w - - 0 1'],
+    ['4.2 Jazdec berie vežu',         '6k1/8/p7/1r6/8/2N5/8/6K1 w - - 0 1'],
+    ['4.3 Veža berie dámu',           '6k1/2p5/3q4/8/8/8/8/3R2K1 w - - 0 1'],
+    ['4.4 Strelec berie vežu',        '6k1/6p1/5r2/8/8/8/1B6/6K1 w - - 0 1'],
+    ['4.5 Pasca',                     '6k1/8/2p2p2/3nr3/8/5N2/8/3R2K1 w - - 0 1'],
+    ['4.6 Nájdi všetky',              '6k1/8/p1p5/1r1n4/4P3/2N5/8/6K1 w - - 0 1']
+  ]],
+  ['Kapitola 5 — Výmena nie je zisk', [
+    ['5.1 Strelec za jazdca',         '6k1/1p6/2n5/1B6/8/8/8/6K1 w - - 0 1'],
+    ['5.2 Veža za vežu',              '6k1/2p5/3r4/8/8/8/8/2KR4 w - - 0 1'],
+    ['5.3 Dáma za pešiaka',           '6k1/8/4p3/3p4/8/8/8/3Q2K1 w - - 0 1'],
+    ['5.4 Pasca',                     '6k1/8/4p3/1b1n4/8/2N5/8/6K1 w - - 0 1'],
+    ['5.5 Tri výmeny',                '6k1/1pp5/2nr4/PB6/8/8/8/2KR4 w - - 0 1']
+  ]],
+  ['Kapitola 6 — Počet nestačí', [
+    ['6.1 Dvaja útočníci nestačia',   '4k3/8/2p5/3p4/5N2/8/8/3RK3 w - - 0 1'],
+    ['6.2 Súper späť neberie',        '6k1/8/5n2/3n4/8/1B6/8/3R2K1 w - - 0 1'],
+    ['6.3 Dáma späť neberie',         '6k1/4q3/8/4p3/8/5N2/8/4R1K1 w - - 0 1'],
+    ['6.4 Zdvojené veže',             '3r2k1/8/5n2/3p4/8/8/3R4/3R2K1 w - - 0 1'],
+    ['6.5 Nájdi všetky',              '6k1/8/2p2p2/3pn3/5N2/8/1B6/3RR1K1 w - - 0 1']
+  ]],
+  ['Kapitola 7 — Rovnaký terč, iná figúrka', [
+    ['7.1 Jazdec, nie dáma',          '7k/8/2p5/3r4/5N2/8/Q7/6K1 w - - 0 1'],
+    ['7.2 Pešiak, nie veža',          '6k1/8/5p2/4n3/3P4/8/8/4R1K1 w - - 0 1'],
+    ['7.3 Nekrytý terč',              '6k1/8/8/3n4/8/1B6/8/3R2K1 w - - 0 1'],
+    ['7.4 Jediné riešenie',           '6k1/8/2p5/3n4/4P3/8/8/3Q2K1 w - - 0 1']
+  ]],
+  ['Kapitola 8 — Batéria', [
+    ['8.1 Veža a dáma za ňou',        '3rk3/8/8/3p4/8/8/3R4/3QK3 w - - 0 1'],
+    ['8.2 Batéria na oboch stranách', '3r2k1/3r4/8/3p4/8/8/3R4/3R2K1 w - - 0 1'],
+    ['8.3A Dáma za strelcom',         '3q2k1/8/5n2/6B1/7Q/8/8/6K1 w - - 0 1'],
+    ['8.3B Bez dámy',                 '3q2k1/8/5n2/6B1/8/8/8/6K1 w - - 0 1'],
+    ['8.4 Dve batérie',               'r5k1/8/4p3/p4n2/8/8/R1B5/RQ4K1 w - - 0 1']
+  ]],
+  ['Kapitola 9 — Väzba', [
+    ['9.1 Viazaný obranca',           '7k/8/5n2/3p4/8/8/1B6/3RK3 w - - 0 1'],
+    ['9.2 Viazaný jazdec nemôže brať','7k/8/5n2/8/4P3/8/1B6/6K1 w - - 0 1'],
+    ['9.3 Viazaný pešiak',            '3k4/8/5p2/4r3/2N4B/8/8/6K1 w - - 0 1'],
+    ['9.4 Nájdi všetky',              '7k/8/5n2/3p4/4P3/8/1B6/3R2K1 w - - 0 1']
+  ]],
+  ['Bonus — Kde pravidlo končí', [
+    ['B1 Relatívna väzba',            '1k5q/8/5n2/8/3Bp3/8/8/4RK2 w - - 0 1'],
+    ['B2 Otvorená uhlopriečka',       '6k1/8/1b2p3/8/3N4/8/5Q2/7K w - - 0 1']
+  ]]
+];
+const PREDVOLENA = '4k3/8/2p5/3p4/5N2/8/8/3RK3 w - - 0 1';   // 6.1
+
+// ─── Stav stránky ───────────────────────────────────────────────────────────
+const VC = VisionCore;
+const RV = RebrikVymeny;
+const esc = RV.esc;
+
+let pozicia = null;        // { board, state } — pôvodná pozícia (bez prehraných krokov)
+let brania = [];           // VC.vsetkyBrania
+let uloha = null;          // VC.braniaSoZiskom
+let vybranePole = null;    // figúrka vybraná klikom na šachovnici
+let skryt = false;         // tréner: skryť zisky, kým sa deti nevyjadria
+let editor = false;        // úprava pozície
+let paletaFigurka = 'P';   // zvolená figúrka v palete ('' = guma)
+
+let sachovnica = null;
+let prehravac = null;
+
+function goHome() { location.href = 'index.html'; }
+
+// ─── Načítanie pozície ──────────────────────────────────────────────────────
+function nacitajFen(fen, tichy) {
+  const chyba = RV.chybaFen(fen);
+  const el = document.getElementById('fenChyba');
+  if (chyba) {
+    if (!tichy) { el.textContent = chyba; el.hidden = false; }
+    return false;
+  }
+  el.hidden = true;
+  pozicia = VC.parseFen(fen);
+  document.getElementById('fen').value = RV.fenZoSachovnice(pozicia.board, pozicia.state.active);
+  vybranePole = null;
+  _napoveda = null;
+  prehravac.zrus();
+  prepocitaj();
+  return true;
+}
+
+// Po každej zmene pozície: brania, úloha, upozornenia a šachovnica
+function prepocitaj() {
+  brania = VC.vsetkyBrania(pozicia.board, pozicia.state);
+  uloha = VC.braniaSoZiskom(pozicia.board, pozicia.state);
+  sachovnica.nastav(pozicia.board);
+  sachovnica.oznac({});
+  kresliZoznam();
+  kresliUlohu();
+  kresliUpozornenia();
+  kresliRebrik();
+}
+
+// ─── Klik na šachovnicu ─────────────────────────────────────────────────────
+function klikNaPole(pole) {
+  if (editor) { upravPole(pole); return; }
+
+  // Klik počas prehrávania = nový výber na pôvodnej pozícii
+  if (prehravac.rebrik) {
+    prehravac.zrus();
+    sachovnica.nastav(pozicia.board);
+  }
+
+  // Druhý klik: na figúrku, ktorú vybraná figúrka môže zobrať
+  if (vybranePole !== null) {
+    const uci = VC.sqName(vybranePole) + VC.sqName(pole);
+    if (brania.some(b => b.uci === uci)) { spusti(uci); return; }
+  }
+
+  const ciele = brania.filter(b => VC.sqIndex(b.uci.slice(0, 2)) === pole);
+  if (pozicia.board[pole] && ciele.length) {
+    vybranePole = pole;
+    const z = {}; z[pole] = 'selected';
+    ciele.forEach(b => { z[VC.sqIndex(b.uci.slice(2, 4))] = 'ciel'; });
+    sachovnica.oznac(z);
+    napoveda('Teraz klikni na figúrku označenú červeným — tú, ktorú má ' +
+             VC.SK_FIGURKA[pozicia.board[pole].toLowerCase()] + ' z ' + VC.sqName(pole) + ' zobrať.');
+  } else {
+    vybranePole = null;
+    sachovnica.oznac({});
+    napoveda(pozicia.board[pole]
+      ? 'Figúrka na ' + VC.sqName(pole) + ' nemá čo zobrať. Skús inú.'
+      : null);
+  }
+  kresliZoznam();
+}
+
+function spusti(uci) {
+  vybranePole = null;
+  _napoveda = null;
+  prehravac.nacitaj(pozicia.board, uci);
+  prehravac.prehraj();
+  kresliZoznam();
+}
+
+// ─── Rebrík výmeny v paneli ─────────────────────────────────────────────────
+let _napoveda = null;
+function napoveda(text) {
+  _napoveda = text;
+  kresliRebrik();
+}
+
+function kresliPasik() {
+  const pasik = document.getElementById('pasik');
+  const text = document.getElementById('pasikText');
+  const ucetBox = document.getElementById('pasikUcetBox');
+  const p = prehravac;
+  if (editor || !p || (!p.rebrik && !_napoveda)) { pasik.hidden = true; return; }
+  pasik.hidden = false;
+  pasik.className = 'pasik';
+  if (!p.rebrik) {
+    text.textContent = _napoveda;
+    ucetBox.hidden = true;
+    return;
+  }
+  ucetBox.hidden = false;
+  const ucet = p.ucet();
+  const ucetEl = document.getElementById('pasikUcet');
+  ucetEl.textContent = RV.znak(ucet);
+  ucetEl.className = RV.triedaZnamienka(ucet);
+  const n = p.pocetKrokov();
+  if (p.jeNaKonci()) {
+    pasik.className = 'pasik ' + RV.triedaZnamienka(p.rebrik.vysledok);
+    ucetEl.className = '';
+    const v = p.rebrik.vysledok;
+    text.textContent = v > 0 ? 'Branie so ziskom' : (v < 0 ? 'Strata' : 'Výmena — nič nezískaš');
+  } else if (p.k === 0) {
+    text.textContent = 'Skúmame branie ' + (p.rebrik.kroky[0] ? p.rebrik.kroky[0].tah : p.uci);
+  } else {
+    const k = p.rebrik.kroky[p.k - 1];
+    text.textContent = 'Krok ' + p.k + '/' + n + ': ' + k.tah + ' — ' +
+                       (k.strana === p.strana ? 'beriem ' : 'súper berie ') + k.figurka;
+  }
+}
+
+function kresliRebrik() {
+  kresliPasik();
+  const prazdny = document.getElementById('rebrikPrazdny');
+  const obsah = document.getElementById('rebrikObsah');
+  if (!prehravac || !prehravac.rebrik) {
+    obsah.hidden = true;
+    prazdny.hidden = false;
+    prazdny.textContent = editor
+      ? 'Upravuješ pozíciu. Zoznam braní a úloha sa prepočítavajú priebežne.'
+      : (_napoveda || 'Klikni na figúrku, ktorá má brať, a potom na figúrku, ktorú má zobrať. ' +
+                      'Alebo vyber branie zo zoznamu nižšie.');
+    return;
+  }
+  prazdny.hidden = true;
+  obsah.hidden = false;
+
+  const p = prehravac;
+  const prvy = p.rebrik.kroky[0];
+  document.getElementById('rebrikTah').innerHTML = prvy
+    ? '<span class="bodka ' + prvy.strana + '"></span>' + esc(prvy.tah) +
+      ' <span class="slabo" style="font-weight:normal">— ' + (prvy.strana === 'w' ? 'biely' : 'čierny') +
+      ' berie ' + esc(prvy.figurka) + '</span>'
+    : esc(p.uci);
+
+  const ucet = p.ucet();
+  const ucetEl = document.getElementById('ucet');
+  ucetEl.textContent = RV.znak(ucet);
+  ucetEl.className = RV.triedaZnamienka(ucet);
+
+  document.getElementById('rebrikTabulka').innerHTML = RV.htmlRebrika(p);
+
+  const verdikt = document.getElementById('verdikt');
+  const veta = document.getElementById('vetaGeneratora');
+  if (p.jeNaKonci()) {
+    const v = p.rebrik.vysledok;
+    verdikt.hidden = false;
+    verdikt.className = 'verdikt ' + RV.triedaZnamienka(v);
+    verdikt.textContent = RV.textVerdiktu(v);
+    if (v > 0) {
+      veta.hidden = false;
+      veta.textContent = 'V tréningu: „' + VC.vysvetliBranie(pozicia.board, pozicia.state, p.uci, p.strana) + '“';
+    } else {
+      veta.hidden = true;
+    }
+  } else {
+    verdikt.hidden = true;
+    veta.hidden = true;
+  }
+
+  document.getElementById('btnZaciatok').disabled = p.k === 0 && !p.bezi();
+  document.getElementById('btnSpat').disabled = p.k === 0;
+  document.getElementById('btnDalej').disabled = p.jeNaKonci();
+  document.getElementById('btnPrehraj').textContent = p.bezi() ? '⏸ Pauza' : '▶ Prehraj';
+}
+
+// ─── Zoznam všetkých braní ──────────────────────────────────────────────────
+function kresliZoznam() {
+  const el = document.getElementById('zoznamBrani');
+  if (!brania.length) {
+    el.innerHTML = '<div class="napoveda">V tejto pozícii sa nedá nič zobrať.</div>';
+    return;
+  }
+  const aktivne = prehravac && prehravac.rebrik ? prehravac.uci : null;
+  let h = '';
+  ['w', 'b'].forEach(strana => {
+    const moje = brania.filter(b => b.strana === strana);
+    if (!moje.length) return;
+    h += '<div class="skupina">' + (strana === 'w' ? 'Biely' : 'Čierny') + '</div>';
+    moje.forEach(b => {
+      const vybrane = b.uci === aktivne ||
+                      (vybranePole !== null && VC.sqIndex(b.uci.slice(0, 2)) === vybranePole);
+      h += '<button class="branie' + (vybrane ? ' vybrane' : '') + '" data-uci="' + b.uci + '">' +
+           '<span><span class="bodka ' + strana + '"></span>' + esc(b.nazov) + '</span>' +
+           '<span class="zisk ' + (skryt ? 'nula' : RV.triedaZnamienka(b.zisk)) + '">' +
+           (skryt ? '?' : RV.znak(b.zisk)) + '</span></button>';
+    });
+  });
+  el.innerHTML = h;
+  el.querySelectorAll('.branie').forEach(btn => {
+    btn.onclick = () => {
+      if (editor) return;
+      sachovnica.nastav(pozicia.board);
+      spusti(btn.dataset.uci);
+    };
+  });
+}
+
+// ─── Úloha zo zručností (riešenie tak, ako ho vidí generátor) ───────────────
+function kresliUlohu() {
+  const el = document.getElementById('uloha');
+  if (skryt) {
+    el.innerHTML = '<div class="napoveda">Riešenie je skryté. Ukážeš ho tlačidlom <b>Ukáž zisky</b>.</div>';
+    return;
+  }
+  if (uloha.dovod === 'sach') {
+    el.innerHTML = '<div class="napoveda">Táto pozícia by sa v tréningu nepoužila — niektorý kráľ je v šachu.</div>';
+    return;
+  }
+  if (uloha.dovod === 'prilis_vela') {
+    el.innerHTML = '<div class="napoveda">Táto pozícia by sa v tréningu nepoužila — má viac ako ' +
+                   VC.MAX_BRANI_SO_ZISKOM + ' braní so ziskom.</div>';
+    return;
+  }
+  if (!uloha.riesenia.length) {
+    el.innerHTML = '<div class="napoveda">Žiadne branie so ziskom. Generátor by túto pozíciu preskočil.</div>';
+    return;
+  }
+  const nazov = uci => (brania.find(b => b.uci === uci) || {}).nazov || uci;
+  el.innerHTML = '<div class="slabo" style="font-size:13px;margin-bottom:4px;">Riešení: ' + uloha.riesenia.length + '</div>' +
+    uloha.riesenia.map((u, i) =>
+      '<div class="riesenie"><b>' + esc(nazov(u)) + '</b> ' + esc(uloha.vysvetlenia[i]) + '</div>'
+    ).join('');
+}
+
+function kresliUpozornenia() {
+  const el = document.getElementById('upozornenia');
+  const zoznam = RV.upozornenia(pozicia.board);
+  el.hidden = !zoznam.length;
+  el.innerHTML = zoznam.length ? '<ul>' + zoznam.map(t => '<li>' + esc(t) + '</li>').join('') + '</ul>' : '';
+}
+
+// ─── Úprava pozície ─────────────────────────────────────────────────────────
+function prepniEditor(zapnut) {
+  editor = zapnut;
+  document.getElementById('paleta').hidden = !editor;
+  document.getElementById('btnUprav').textContent = editor ? 'Hotovo' : 'Upraviť pozíciu';
+  document.getElementById('btnUprav').className = editor ? 'primary' : 'secondary';
+  vybranePole = null;
+  _napoveda = null;
+  prehravac.zrus();
+  sachovnica.nastav(pozicia.board);
+  sachovnica.oznac({});
+  kresliRebrik();
+  kresliZoznam();
+}
+
+function postavPaletu() {
+  const el = document.getElementById('paletaFigurky');
+  const figurky = ['K', 'Q', 'R', 'B', 'N', 'P', '', 'k', 'q', 'r', 'b', 'n', 'p'];
+  let h = '';
+  figurky.forEach((f, i) => {
+    if (i === 6) {
+      h += '<button class="guma" data-f="" title="Guma — odstráni figúrku">Guma</button>';
+      return;
+    }
+    const farba = f === f.toUpperCase() ? 'w' : 'b';
+    h += '<button data-f="' + f + '" title="' + VC.SK_FIGURKA[f.toLowerCase()] + '">' +
+         '<img src="img/Pieces/' + farba + f.toUpperCase() + '.svg" alt="' + f + '"></button>';
+  });
+  el.innerHTML = h;
+  el.querySelectorAll('button').forEach(b => {
+    b.onclick = () => { paletaFigurka = b.dataset.f; oznacPaletu(); };
+  });
+  oznacPaletu();
+}
+
+function oznacPaletu() {
+  document.querySelectorAll('#paletaFigurky button').forEach(b =>
+    b.classList.toggle('zvolena', b.dataset.f === paletaFigurka));
+}
+
+function upravPole(pole) {
+  const chybaEl = document.getElementById('fenChyba');
+  const f = paletaFigurka;
+  const rad = 8 - Math.floor(pole / 8);
+  if ((f === 'P' || f === 'p') && (rad === 1 || rad === 8)) {
+    chybaEl.textContent = 'Pešiak nemôže stáť na 1. ani na 8. rade.';
+    chybaEl.hidden = false;
+    return;
+  }
+  chybaEl.hidden = true;
+  // Druhý klik tou istou figúrkou ju odstráni
+  pozicia.board[pole] = (pozicia.board[pole] === f) ? '' : f;
+  document.getElementById('fen').value = RV.fenZoSachovnice(pozicia.board, pozicia.state.active);
+  prepocitaj();
+}
+
+// ─── Spustenie ──────────────────────────────────────────────────────────────
+function init() {
+  sachovnica = new RV.Sachovnica(document.getElementById('board'));
+  sachovnica.naKlik = klikNaPole;
+  prehravac = new RV.Prehravac(sachovnica, {
+    onZmena: () => { kresliRebrik(); },
+    rychlost: 1100
+  });
+
+  // Výber pozícií z knihy
+  const sel = document.getElementById('priklady');
+  let h = '<option value="">Pozície z knihy…</option>';
+  POZICIE_KNIHY.forEach(([kapitola, zoznam]) => {
+    h += '<optgroup label="' + esc(kapitola) + '">';
+    zoznam.forEach(([nazov, fen]) => { h += '<option value="' + esc(fen) + '">' + esc(nazov) + '</option>'; });
+    h += '</optgroup>';
+  });
+  sel.innerHTML = h;
+  sel.onchange = () => {
+    if (!sel.value) return;
+    if (editor) prepniEditor(false);
+    nacitajFen(sel.value);
+  };
+
+  document.getElementById('btnFen').onclick = () => {
+    if (editor) prepniEditor(false);
+    sel.value = '';
+    nacitajFen(document.getElementById('fen').value);
+  };
+  document.getElementById('fen').addEventListener('keydown', e => {
+    if (e.key === 'Enter') document.getElementById('btnFen').click();
+  });
+  document.getElementById('btnOtoc').onclick = () => sachovnica.otoc();
+  document.getElementById('btnUprav').onclick = () => prepniEditor(!editor);
+  document.getElementById('btnHotovo').onclick = () => prepniEditor(false);
+  document.getElementById('btnVycisti').onclick = () => {
+    pozicia.board = new Array(64).fill('');
+    sel.value = '';
+    document.getElementById('fen').value = RV.fenZoSachovnice(pozicia.board, pozicia.state.active);
+    prepocitaj();
+  };
+  document.getElementById('btnSkry').onclick = () => {
+    skryt = !skryt;
+    document.getElementById('btnSkry').textContent = skryt ? 'Ukáž zisky' : 'Skryť zisky';
+    kresliZoznam();
+    kresliUlohu();
+  };
+
+  document.getElementById('btnZaciatok').onclick = () => prehravac.naZaciatok();
+  document.getElementById('btnSpat').onclick = () => prehravac.spat();
+  document.getElementById('btnDalej').onclick = () => { prehravac.zastav(); prehravac.dalej(); };
+  document.getElementById('btnPrehraj').onclick = () => {
+    if (prehravac.bezi()) prehravac.zastav(); else prehravac.prehraj();
+  };
+
+  // Klávesy pre tréningy s projektorom: šípky = krok, medzerník = prehraj/pauza
+  document.addEventListener('keydown', e => {
+    const tag = (e.target && e.target.tagName) || '';
+    if (tag === 'INPUT' || tag === 'SELECT' || !prehravac.rebrik) return;
+    if (e.key === 'ArrowRight') { prehravac.zastav(); prehravac.dalej(); e.preventDefault(); }
+    else if (e.key === 'ArrowLeft') { prehravac.spat(); e.preventDefault(); }
+    else if (e.key === ' ') {
+      if (prehravac.bezi()) prehravac.zastav(); else prehravac.prehraj();
+      e.preventDefault();
+    }
+  });
+
+  postavPaletu();
+
+  // Pozícia z adresy (?fen=...) — napr. odkaz, ktorý tréner pošle hráčom
+  const zAdresy = new URLSearchParams(location.search).get('fen');
+  if (!(zAdresy && nacitajFen(zAdresy))) nacitajFen(PREDVOLENA);
+  if (!zAdresy) sel.value = PREDVOLENA;
+}
+
+// ─── Prihlásenie ────────────────────────────────────────────────────────────
+// Laboratórium nič nečíta ani nezapisuje do databázy, prihlásenie len drží
+// stránku vo vnútri platformy. Pri otvorení súboru priamo z disku (dvojklik,
+// adresa file://) sa prihlásenie preskočí, aby sa dalo testovať pred nahratím.
+async function checkAuthAndInit() {
+  if (location.protocol === 'file:') { init(); return; }
+  const ok = await refreshSession();
+  if (!ok) { location.href = 'login.html'; return; }
+  if (!await vyzadujBezUdrzby()) return;
+  if (!await vyzadujPlatnost()) return;
+  hlasPritomnost();
+  init();
+}
+checkAuthAndInit();
+</script>
+<script>
+// Registrácia service workera — rovnako ako na ostatných stránkach.
+if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(e =>
+      console.warn('Service worker sa nezaregistroval:', e));
+  });
+}
+</script>
+</body>
+</html>
