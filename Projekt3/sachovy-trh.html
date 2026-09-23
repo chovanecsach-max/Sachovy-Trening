@@ -412,6 +412,75 @@ table.rebrik tr.koniec td { background: #f8fafc; font-size: 13px; }
 .zapamataj-pozn { font-size: 12px; font-weight: normal; color: #64748b; margin-top: 6px; }
 .koniec-tlacidla { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
 
+/* ── Záverečná skúška, odznak, bonus ────────────────────────────────── */
+.cas {
+  font-weight: bold;
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #1e3a8a;
+  border: 1px solid #bfdbfe;
+}
+.cas.malo { background: #fef2f2; color: #b91c1c; border-color: #fca5a5; }
+.kapitola-karta.skuska .k-cislo { background: #b45309; }
+.kapitola-karta.bonus .k-cislo { background: #7c3aed; }
+.odznak {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px 3px 4px;
+  border-radius: 999px;
+  background: #fef3c7;
+  border: 2px solid #f59e0b;
+  color: #92400e;
+  font-size: 14px;
+  font-weight: bold;
+  vertical-align: middle;
+}
+.odznak-minca {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at 35% 35%, #fef3c7, #f59e0b 60%, #b45309);
+  color: #fff;
+  font-size: 13px;
+}
+.odznak.velky { font-size: 24px; padding: 8px 22px 8px 8px; gap: 12px; }
+.odznak.velky .odznak-minca { width: 48px; height: 48px; font-size: 26px; }
+.koniec-odznak { text-align: center; margin: 4px 0 8px; }
+.skuska-vysledok { text-align: center; margin-bottom: 14px; }
+.skuska-cislo { font-size: 42px; font-weight: bold; }
+.skuska-mriezka { display: flex; justify-content: center; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.skuska-pole {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  color: #fff;
+}
+.skuska-pole.dobre { background: #16a34a; }
+.skuska-pole.zle { background: #dc2626; }
+.odporucania { max-width: 820px; margin: 0 auto 14px; }
+.odporucanie {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid #f1f5f9;
+  font-size: 14px;
+}
+.odporucanie:last-child { border-bottom: none; }
+.odkaz-tlacidlo.velke { padding: 13px 22px; font-size: 16px; font-weight: bold; background: #16a34a; color: #fff; }
+
 /* ── Mobil ──────────────────────────────────────────────────────────── */
 @media (max-width: 900px) {
   .uloha-layout { grid-template-columns: 1fr; }
