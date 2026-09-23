@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Šachový trh</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0f1117">
+<link rel="apple-touch-icon" href="ikona-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Šach tréning">
+
+<style>
+/* Atribút hidden musí platiť aj pre prvky s vlastným display */
+[hidden] { display: none !important; }
+
+body {
+  font-family: Arial, sans-serif;
+  background: #f4f4f6;
+  margin: 0;
+  padding: 10px;
+  color: #111827;
+}
+.app {
+  max-width: 1180px;
+  margin: 0 auto;
+  background: white;
+  border-radius: 14px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+  padding: 12px 14px 18px;
+  min-height: 60vh;
+}
+.slabo { color: #64748b; font-weight: normal; }
+
+/* ── Tlačidlá (ako v training.html) ─────────────────────────────────── */
+button, .odkaz-tlacidlo {
+  padding: 10px 14px;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 15px;
+  font-family: inherit;
+  text-decoration: none;
+  display: inline-block;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+button:disabled { cursor: not-allowed; }
+.primary   { background: #111827; color: white; }
+.secondary { background: #e5e7eb; color: #111827; }
+.accent    { background: #dbeafe; color: #1d4ed8; }
+.odkaz-tlacidlo { background: #fef3c7; color: #92400e; }
+button.velke { padding: 13px 22px; font-size: 16px; font-weight: bold; }
+button.male  { padding: 6px 10px; font-size: 13px; }
+
+/* ── Horná lišta ────────────────────────────────────────────────────── */
+.hra-lista {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-bottom: 10px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid #e5e7eb;
+}
+.hra-nazov { font-size: 22px; font-weight: bold; }
+.hra-podtitul { font-size: 13px; color: #64748b; margin-top: 2px; }
+.hra-lista-tlacidla { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.test-pas {
+  margin: -4px 0 12px;
+  padding: 7px 12px;
+  border-radius: 10px;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  color: #92400e;
+  font-size: 13px;
+}
+
+/* ── Grošík a bublina ───────────────────────────────────────────────── */
+.grosik-riadok { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 14px; }
+.grosik-obal { flex: none; width: 72px; height: 72px; }
+.grosik-riadok.velky .grosik-obal { width: 104px; height: 104px; }
+.grosik { width: 100%; height: 100%; display: block; }
+.bublina {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  background: #fffbeb;
+  border: 2px solid #fcd34d;
+  border-radius: 16px;
+  padding: 12px 16px;
+  font-size: 15px;
+  line-height: 1.5;
+}
+.bublina::before {
+  content: '';
+  position: absolute;
+  left: -11px;
+  top: 22px;
+  border: 10px solid transparent;
+  border-right-color: #fcd34d;
+  border-left: 0;
+}
+.bublina p { margin: 0 0 8px; }
+.bublina p:last-child { margin-bottom: 0; }
+.grosik-riadok.velky .bublina { font-size: 16px; }
+
+.minca {
+  display: inline-block;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #fef3c7, #f59e0b 60%, #b45309);
+  box-shadow: inset 0 0 0 2px rgba(146, 64, 14, 0.55);
+  flex: none;
+  vertical-align: middle;
+}
+.minca.mala { width: 16px; height: 16px; }
+
+/* ── Mapa kapitol ───────────────────────────────────────────────────── */
+.mapa-suhrn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 4px 0 14px;
+}
+.mapa-hviezdy { font-size: 18px; font-weight: bold; color: #b45309; }
+.mapa-tlacidla { display: flex; gap: 8px; flex-wrap: wrap; }
+.kapitoly { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 10px; }
+.kapitola-karta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+  background: #fff;
+  border: 2px solid #e5e7eb;
+  border-radius: 14px;
+  padding: 12px 14px;
+  min-height: 72px;
+}
+.kapitola-karta:hover:not(:disabled) { border-color: #f59e0b; background: #fffbeb; }
+.kapitola-karta.dokoncena { border-color: #86efac; background: #f0fdf4; }
+.kapitola-karta.zamknuta, .kapitola-karta.pripravujeme { opacity: 0.55; background: #f8fafc; }
+.k-cislo {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #111827;
+  color: #fff;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.k-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.k-nazov { font-weight: bold; font-size: 15px; }
+.k-stav { font-size: 12px; color: #64748b; }
+.hviezdy { white-space: nowrap; font-size: 18px; letter-spacing: 1px; }
+.hv { color: #d1d5db; }
+.hv.plna { color: #f59e0b; }
+.test-akcie { margin-top: 16px; text-align: right; }
+
+/* ── Zošit ──────────────────────────────────────────────────────────── */
+.zosit h2 { font-size: 19px; margin: 6px 0 10px; }
+.zosit-riadok {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 10px 0;
+  border-bottom: 1px solid #f1f5f9;
+}
+.zosit-riadok.zamknuty { opacity: 0.5; }
+.zosit-kapitola { font-size: 13px; color: #64748b; }
+.zosit-pravidlo { font-size: 16px; font-weight: bold; margin-top: 2px; }
+.zosit > button { margin-top: 14px; }
+
+/* ── Úvod kapitoly ──────────────────────────────────────────────────── */
+.uvod, .koniec, .zosit, .mapa { max-width: 820px; margin: 0 auto; }
+.uvod-hlava { font-size: 14px; color: #64748b; font-weight: bold; text-transform: uppercase; margin-bottom: 10px; }
+.cennik { margin: 10px 0; display: grid; gap: 4px; }
+.cennik-riadok {
+  display: grid;
+  grid-template-columns: 40px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  background: #fff;
+  border-radius: 10px;
+  padding: 4px 10px;
+}
+.cennik-riadok img { width: 36px; height: 36px; }
+.cennik-meno { font-weight: bold; }
+.cennik-cena { color: #92400e; font-weight: bold; white-space: nowrap; }
+.ramcek {
+  margin: 0 0 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 10px 14px;
+  background: #f8fafc;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.ramcek summary { cursor: pointer; font-weight: bold; color: #1d4ed8; }
+.ramcek.trener summary { color: #7c3aed; }
+.ramcek p { margin: 8px 0 0; }
+.uvod-info { color: #64748b; font-size: 13px; margin: 12px 0; }
+
+/* ── Úloha ──────────────────────────────────────────────────────────── */
+.uloha-hlava {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+  font-size: 14px;
+}
+.uloha-poradie { font-weight: bold; color: #475569; }
+.seria { display: flex; gap: 4px; }
+.bod { width: 12px; height: 12px; border-radius: 50%; background: #e5e7eb; }
+.bod.plny { background: #f59e0b; }
+.skore { font-weight: bold; font-size: 18px; white-space: nowrap; }
+
+.uloha-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 16px;
+  align-items: start;
+}
+.zadanie { text-align: center; font-size: 21px; margin: 0 0 10px; }
+
+.board-area { position: relative; width: fit-content; max-width: 100%; margin: 0 auto; }
+.board {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  grid-template-rows: repeat(8, 1fr);
+  width: min(100%, 62vh);
+  max-width: 600px;
+  aspect-ratio: 1 / 1;
+  margin: auto;
+  border: 8px solid #5b4636;
+  border-radius: 8px;
+  overflow: hidden;
+  position: relative;
+}
+.square {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
+  position: relative;
+  box-sizing: border-box;
+  user-select: none;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+.square img.piece-img {
+  width: 85%;
+  height: 85%;
+  object-fit: contain;
+  pointer-events: none;
+  user-select: none;
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.4));
+}
+.light { background: #f4e7c7; }
+.dark  { background: #7a9b76; }
+.square.selected {
+  outline: 3px solid #2563eb;
+  outline-offset: -3px;
+  box-shadow: inset 0 0 0 9999px rgba(37, 99, 235, 0.18);
+}
+.square.last-from {
+  box-shadow: inset 0 0 0 9999px rgba(250, 204, 21, 0.45);
+  outline: 3px solid rgba(202, 138, 4, 0.85);
+  outline-offset: -3px;
+}
+.square.last-to {
+  box-shadow: inset 0 0 0 9999px rgba(250, 204, 21, 0.65);
+  outline: 4px solid rgba(180, 83, 9, 1);
+  outline-offset: -4px;
+}
+.square.ciel {
+  box-shadow: inset 0 0 0 9999px rgba(220, 38, 38, 0.22);
+  outline: 4px solid rgba(220, 38, 38, 0.9);
+  outline-offset: -4px;
+}
+.square.najdene {
+  box-shadow: inset 0 0 0 9999px rgba(34, 197, 94, 0.28);
+  outline: 4px solid rgba(22, 163, 74, 0.9);
+  outline-offset: -4px;
+}
+.coord-file, .coord-rank { position: absolute; font-size: 10px; font-weight: bold; opacity: 0.75; z-index: 3; }
+.coord-file { right: 4px; bottom: 2px; }
+.coord-rank { left: 4px; top: 2px; }
+
+/* Stôl pre úlohy bez šachovnice */
+.stol { padding: 18px 8px; background: #f8fafc; border-radius: 14px; border: 1px solid #e5e7eb; }
+.stol-rad { display: flex; align-items: center; justify-content: center; gap: 14px; flex-wrap: wrap; }
+.stol-karta {
+  background: #fff;
+  border: 2px solid #e5e7eb;
+  border-radius: 14px;
+  padding: 14px 18px;
+  min-width: 150px;
+  text-align: center;
+}
+.stol-karta.vitaz { border-color: #4ade80; background: #f0fdf4; }
+.stol-popis { font-size: 13px; color: #64748b; font-weight: bold; margin-bottom: 6px; text-transform: uppercase; }
+.stol-figurky { display: flex; justify-content: center; gap: 4px; min-height: 70px; align-items: center; }
+.stol-figurka { width: 66px; height: 66px; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.35)); }
+.stol-meno { font-weight: bold; margin-top: 6px; }
+.stol-cena { margin-top: 6px; font-weight: bold; color: #92400e; font-size: 18px; }
+.stol-cena.plus { color: #15803d; }
+.stol-cena.minus { color: #b91c1c; }
+.stol-vs { font-size: 18px; color: #64748b; font-weight: bold; }
+
+/* Pás pod šachovnicou */
+.pasik {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 10px;
+  padding: 9px 12px;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  font-size: 15px;
+}
+.pasik .ucet { display: flex; align-items: center; gap: 6px; font-size: 20px; font-weight: bold; white-space: nowrap; }
+.pasik.plus  { background: #f0fdf4; border-color: #86efac; color: #166534; font-weight: bold; }
+.pasik.minus { background: #fef2f2; border-color: #fca5a5; color: #b91c1c; font-weight: bold; }
+.pasik.nula  { background: #f1f5f9; border-color: #cbd5e1; color: #334155; font-weight: bold; }
+
+/* Odpovede pod šachovnicou */
+.odpovede { margin-top: 12px; text-align: center; }
+.moznosti { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; }
+.moznosti.dve { grid-template-columns: 1fr 1fr; }
+.moznosti.cisla { grid-template-columns: repeat(6, 1fr); }
+.moznost {
+  background: #fff;
+  border: 2px solid #cbd5e1;
+  font-size: 17px;
+  font-weight: bold;
+  padding: 13px 8px;
+  color: #111827;
+}
+.moznost:hover { border-color: #111827; }
+.moznost.ano { border-color: #86efac; }
+.moznost.nie { border-color: #fca5a5; }
+.moznost.spravna { background: #dcfce7; border-color: #16a34a; color: #166534; }
+.moznost.nespravna { background: #fee2e2; border-color: #dc2626; color: #991b1b; }
+.vysledok { font-size: 17px; font-weight: bold; margin-bottom: 10px; }
+.vysledok.dobre { color: #15803d; }
+.vysledok.zle { color: #b91c1c; }
+
+/* Pravý panel */
+.panel-karta {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+  background: #fff;
+}
+.panel-karta h3 { margin: 0 0 8px; font-size: 15px; }
+.prepinac { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 8px; font-size: 13px; color: #64748b; }
+.prepinac button.vybrane { background: #111827; color: #fff; }
+.rebrik-tlacidla { display: grid; grid-template-columns: 1fr 1.4fr 1fr; gap: 6px; margin-top: 8px; }
+.zaznam { padding: 6px 0; border-bottom: 1px solid #f1f5f9; font-size: 14px; }
+.zaznam:last-child { border-bottom: none; }
+.zaznam b { margin-right: 4px; }
+.zaznam.dobre b { color: #15803d; }
+.zaznam.zle b { color: #b91c1c; }
+.zaznam.prehliadnute b { color: #b45309; }
+
+table.rebrik { width: 100%; border-collapse: collapse; font-size: 14px; }
+table.rebrik th { text-align: left; font-size: 11px; color: #64748b; text-transform: uppercase; padding: 4px 6px; border-bottom: 1px solid #e5e7eb; }
+table.rebrik td { padding: 6px; border-bottom: 1px solid #f1f5f9; vertical-align: top; }
+table.rebrik tr.skryty td { color: #cbd5e1; }
+table.rebrik tr.aktualny td { background: #fefce8; }
+table.rebrik tr.koniec td { background: #f8fafc; font-size: 13px; }
+.cislo { text-align: right !important; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.plus { color: #15803d; } .minus { color: #b91c1c; } .nula { color: #475569; }
+.bodka { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; border: 1.5px solid #111827; }
+.bodka.w { background: #fff; } .bodka.b { background: #111827; }
+
+/* ── Koniec kapitoly ────────────────────────────────────────────────── */
+.koniec-hviezdy { text-align: center; margin: 6px 0 10px; }
+.koniec-hviezdy .hviezdy { font-size: 52px; letter-spacing: 6px; }
+.koniec-cisla { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 14px; }
+.koniec-cisla > div { background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 12px; padding: 10px; text-align: center; }
+.koniec-hodnota { display: block; font-size: 26px; font-weight: bold; }
+.koniec-popis { font-size: 12px; color: #64748b; text-transform: uppercase; }
+.koniec-pozn { text-align: center; font-size: 13px; color: #64748b; margin: -4px 0 14px; }
+.zapamataj {
+  background: #eff6ff;
+  border: 2px solid #93c5fd;
+  border-radius: 14px;
+  padding: 14px 16px;
+  font-size: 19px;
+  font-weight: bold;
+  color: #1e3a8a;
+  text-align: center;
+  margin-bottom: 14px;
+}
+.zapamataj-nadpis { font-size: 12px; text-transform: uppercase; color: #3b82f6; margin-bottom: 4px; }
+.zapamataj-pozn { font-size: 12px; font-weight: normal; color: #64748b; margin-top: 6px; }
+.koniec-tlacidla { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+
+/* ── Mobil ──────────────────────────────────────────────────────────── */
+@media (max-width: 900px) {
+  .uloha-layout { grid-template-columns: 1fr; }
+  .board { width: min(100%, 94vw); }
+}
+@media (max-width: 600px) {
+  body { padding: 6px; }
+  .app { padding: 10px; }
+  .hra-nazov { font-size: 19px; }
+  .hra-lista-tlacidla { flex-wrap: nowrap; }
+  .hra-lista-tlacidla button { padding: 8px 10px; font-size: 14px; min-height: 38px; }
+  .hra-podtitul { font-size: 12px; }
+  .zadanie { font-size: 18px; }
+  .board { border-width: 5px; }
+  .grosik-obal { width: 56px; height: 56px; }
+  .grosik-riadok.velky .grosik-obal { width: 72px; height: 72px; }
+  .bublina { font-size: 14px; padding: 10px 12px; }
+  .moznosti.cisla { grid-template-columns: repeat(3, 1fr); }
+  .stol-figurka { width: 52px; height: 52px; }
+  .stol-karta { min-width: 120px; padding: 10px; }
+  .koniec-hviezdy .hviezdy { font-size: 42px; }
+  button { min-height: 44px; }
+  button.male { min-height: 34px; }
+}
+</style>
+</head>
+
+<body>
+<div class="app" id="hra"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/auth.js"></script>
+<script src="js/player.js"></script>
+<script src="js/sounds.js"></script>
+<script src="js/vision-core.js"></script>
+<script src="js/rebrik-vymeny.js"></script>
+<script src="js/trh-obsah.js"></script>
+<script src="js/hra-engine.js"></script>
+
+<script>
+// ZNAČKA VERZIE — pri každej úprave tohto súboru prepíš dátum.
+(window.VERZIE = window.VERZIE || {})['sachovy-trh.html'] = '2026-09-23';
+
+function spustiHru(testovaci) {
+  HraEngine.spusti({
+    obsah: OBSAH_TRH,
+    koren: document.getElementById('hra'),
+    rola: sessionStorage.getItem('user_role') || '',
+    userId: sessionStorage.getItem('user_id') || '',
+    testovaci: testovaci
+  });
+}
+
+// Pri otvorení súboru priamo z disku (dvojklik, adresa file://) sa prihlásenie
+// preskočí — hra sa dá vyskúšať pred nahratím na web.
+async function checkAuthAndInit() {
+  if (location.protocol === 'file:') { spustiHru(true); return; }
+  const ok = await refreshSession();
+  if (!ok) { location.href = 'login.html'; return; }
+  if (!await vyzadujBezUdrzby()) return;
+  if (!await vyzadujPlatnost()) return;
+  hlasPritomnost();
+  spustiHru(false);
+}
+checkAuthAndInit();
+</script>
+<script>
+if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(e =>
+      console.warn('Service worker sa nezaregistroval:', e));
+  });
+}
+</script>
+</body>
+</html>
