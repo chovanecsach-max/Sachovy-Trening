@@ -3,12 +3,14 @@
 // ----------------------------------------------------------------------------
 //  Rámec nevie nič o konkrétnej hre. Dostane obsah (napr. OBSAH_TRH z
 //  trh-obsah.js) a postará sa o všetko ostatné:
-//    • mapa kapitol, odomykanie, hviezdičky, zošit pravidiel,
+//    • mapa kapitol, odomykanie, hviezdičky, zošit pravidiel, odznak,
 //    • úvod kapitoly so sprievodcom Grošíkom,
 //    • úlohy (typy: vazenie, obchod, anonie, kolko, pasca, najdi),
 //    • body: správne +10, chyba −5, séria 5 správnych +10, úloha Nájdi
 //      všetky bez chyby +10; skóre kapitoly neklesne pod nulu,
-//    • po odpovedi rebrík výmeny na šachovnici (RebrikVymeny).
+//    • po odpovedi rebrík výmeny na šachovnici (RebrikVymeny),
+//    • záverečná skúška: náhodné pozície, časový limit, rozbor chýb
+//      a odporúčanie kapitol na zopakovanie.
 //
 //  Správne odpovede pri úlohách so šachovnicou počíta VŽDY VisionCore —
 //  rovnako ako generátor úloh. Obsah hry ich neurčuje.
@@ -46,6 +48,7 @@ const HraEngine = (function () {
   let nast = {};            // { rola, userId, testovaci, cestaObrazkov }
   let postup = null;        // uložený postup hráča
   let stav = null;          // rozohraná kapitola
+  let casovac = null;       // časový limit úlohy (skúška)
 
   // ════════════════════════════════════════════════════════════════════
   //  Spustenie a postup
@@ -88,13 +91,31 @@ const HraEngine = (function () {
     return postup.kapitoly[k.cislo] || { dokoncene: false, hviezdy: 0, najlepsie: 0 };
   }
 
-  function maObsah(k) { return k.ulohy && k.ulohy.length > 0; }
+  function maObsah(k) { return !!(k.skuska || (k.ulohy && k.ulohy.length > 0)); }
+  function znackaKapitoly(k) { return k.znacka || String(k.cislo); }
+
+  // Kapitola sa odomkne po dokončení predchádzajúcej (alebo tej, ktorú určí odomknePo)
+  function predchodca(k) {
+    if (k.odomknePo) return O.kapitoly.find(x => x.cislo === k.odomknePo) || null;
+    const i = O.kapitoly.indexOf(k);
+    return i > 0 ? O.kapitoly[i - 1] : null;
+  }
 
   function jeOdomknuta(k) {
     if (jeTrener()) return true;
-    const i = O.kapitoly.indexOf(k);
-    if (i <= 0) return true;
-    return postupKapitoly(O.kapitoly[i - 1]).dokoncene;
+    const p = predchodca(k);
+    return !p || postupKapitoly(p).dokoncene;
+  }
+
+  function zlozilSkusku() {
+    return O.kapitoly.some(k => k.skuska && postupKapitoly(k).dokoncene);
+  }
+
+  // Legálny ťah strany, ktorej figúrka stojí na z
+  function jeLegalny(board, uci) {
+    const z = VC.sqIndex(uci.slice(0, 2)), na = VC.sqIndex(uci.slice(2, 4));
+    const strana = VC.pieceColor(board[z]);
+    return !!strana && VC.isLegal(board, { active: strana, castling: '-', ep: '-' }, z, na, '');
   }
 
   // Výpis rozporu medzi scenárom a výpočtom — pre autora obsahu
@@ -104,13 +125,19 @@ const HraEngine = (function () {
       const poz = VC.parseFen(u.fen);
       let vypocet;
       if (u.typ === 'najdi') vypocet = VC.braniaSoZiskom(poz.board, poz.state).riesenia;
-      else if (u.tah) vypocet = VC.seeWithPins(poz.board, VC.sqIndex(u.tah.slice(0, 2)), VC.sqIndex(u.tah.slice(2, 4)),
-                                               VC.pieceColor(poz.board[VC.sqIndex(u.tah.slice(0, 2))]));
+      else if (u.typ === 'pasca') vypocet = u.moznosti.filter(x => ziskNaSachovnici(poz.board, x) > 0);
+      else if (u.tah && !jeLegalny(poz.board, u.tah)) vypocet = 'nelegalny';
+      else if (u.tah) vypocet = ziskNaSachovnici(poz.board, u.tah);
       if (JSON.stringify(vypocet) !== JSON.stringify(u.ocakavane)) {
         console.warn('Úloha ' + u.id + ': scenár čaká ' + JSON.stringify(u.ocakavane) +
                      ', výpočet dáva ' + JSON.stringify(vypocet));
       }
     }));
+  }
+
+  function ziskNaSachovnici(board, uci) {
+    const z = VC.sqIndex(uci.slice(0, 2)), na = VC.sqIndex(uci.slice(2, 4));
+    return VC.seeWithPins(board, z, na, VC.pieceColor(board[z]));
   }
 
   // ════════════════════════════════════════════════════════════════════
@@ -157,6 +184,12 @@ const HraEngine = (function () {
   const POCHVALY = ['Výborne! Dobrý obchod.', 'Presne tak!', 'Máš oko obchodníka.', 'Správne!', 'Tak sa to robí!'];
   function pochvala() { return POCHVALY[Math.floor(Math.random() * POCHVALY.length)]; }
 
+  // Odznak Obchodník (za zloženú záverečnú skúšku)
+  function odznakHtml(velky) {
+    return '<span class="odznak' + (velky ? ' velky' : '') + '"><span class="odznak-minca">★</span>' +
+           '<span class="odznak-text">Obchodník</span></span>';
+  }
+
   // ════════════════════════════════════════════════════════════════════
   //  Spoločné časti obrazovky
   // ════════════════════════════════════════════════════════════════════
@@ -172,8 +205,8 @@ const HraEngine = (function () {
   }
 
   function naviazListu() {
-    koren.querySelectorAll('[data-akcia="mapa"]').forEach(b => b.onclick = () => { zastavPrehravac(); ukazMapu(); });
-    koren.querySelectorAll('[data-akcia="menu"]').forEach(b => b.onclick = () => { location.href = 'index.html'; });
+    koren.querySelectorAll('[data-akcia="mapa"]').forEach(b => b.onclick = () => { zastavVsetko(); ukazMapu(); });
+    koren.querySelectorAll('[data-akcia="menu"]').forEach(b => b.onclick = () => { zastavVsetko(); location.href = 'index.html'; });
   }
 
   function hviezdyHtml(n) {
@@ -213,10 +246,16 @@ const HraEngine = (function () {
     return n + ' mincí';
   }
 
+  function formatCas(s) {
+    s = Math.max(0, Math.ceil(s));
+    return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+  }
+
   // ════════════════════════════════════════════════════════════════════
   //  Mapa kapitol
   // ════════════════════════════════════════════════════════════════════
   function ukazMapu() {
+    zastavVsetko();
     stav = null;
     const sObsahom = O.kapitoly.filter(maObsah);
     const hviezd = sObsahom.reduce((s, k) => s + postupKapitoly(k).hviezdy, 0);
@@ -226,14 +265,20 @@ const HraEngine = (function () {
       const p = postupKapitoly(k);
       const obsah = maObsah(k);
       const odomknuta = obsah && jeOdomknuta(k);
-      let trieda = 'kapitola-karta';
+      let trieda = 'kapitola-karta' + (k.skuska ? ' skuska' : '') + (k.znacka ? ' bonus' : '');
       let stavText;
       if (!obsah) { trieda += ' pripravujeme'; stavText = 'Pripravujeme'; }
-      else if (!odomknuta) { trieda += ' zamknuta'; stavText = 'Najprv dokonči kapitolu ' + (k.cislo - 1); }
-      else if (p.dokoncene) { trieda += ' dokoncena'; stavText = 'Najlepšie: ' + p.najlepsie + ' b.'; }
+      else if (!odomknuta) {
+        trieda += ' zamknuta';
+        stavText = 'Najprv dokonči kapitolu ' + znackaKapitoly(predchodca(k));
+      } else if (k.skuska) {
+        if (p.dokoncene) { trieda += ' dokoncena'; stavText = 'Zložená · najlepšie ' + p.najlepsie + ' / ' + k.skuska.pocet; }
+        else if (p.pokusy) stavText = 'Najlepšie ' + p.najlepsie + ' / ' + k.skuska.pocet + ' · treba ' + k.skuska.hranica;
+        else stavText = 'Skús to';
+      } else if (p.dokoncene) { trieda += ' dokoncena'; stavText = 'Najlepšie: ' + p.najlepsie + ' b.'; }
       else stavText = 'Hraj';
       karty += '<button class="' + trieda + '" data-kapitola="' + k.cislo + '"' + (odomknuta ? '' : ' disabled') + '>' +
-        '<span class="k-cislo">' + k.cislo + '</span>' +
+        '<span class="k-cislo">' + esc(znackaKapitoly(k)) + '</span>' +
         '<span class="k-text"><span class="k-nazov">' + esc(k.nazov) + '</span>' +
         '<span class="k-stav">' + esc(stavText) + '</span></span>' +
         (obsah ? hviezdyHtml(p.hviezdy) : '') + '</button>';
@@ -242,7 +287,8 @@ const HraEngine = (function () {
     koren.innerHTML = lista(false) +
       '<div class="mapa">' +
       grosikRiadok('vesely', esc(O.pozdrav), null, true) +
-      '<div class="mapa-suhrn"><span class="mapa-hviezdy">★ ' + hviezd + ' / ' + (sObsahom.length * 3) + '</span>' +
+      '<div class="mapa-suhrn"><span class="mapa-hviezdy">★ ' + hviezd + ' / ' + (sObsahom.length * 3) +
+      (zlozilSkusku() ? ' ' + odznakHtml(false) : '') + '</span>' +
       '<span class="mapa-tlacidla"><button class="accent" data-akcia="zosit">Zošit pravidiel</button>' +
       '<a class="odkaz-tlacidlo" href="laboratorium.html">Laboratórium výmeny</a></span></div>' +
       '<div class="kapitoly">' + karty + '</div>' +
@@ -268,7 +314,7 @@ const HraEngine = (function () {
     let h = '';
     O.kapitoly.filter(maObsah).forEach(k => {
       const hotova = postupKapitoly(k).dokoncene || jeTrener();
-      h += '<div class="zosit-riadok' + (hotova ? '' : ' zamknuty') + '"><span class="k-cislo">' + k.cislo + '</span>' +
+      h += '<div class="zosit-riadok' + (hotova ? '' : ' zamknuty') + '"><span class="k-cislo">' + esc(znackaKapitoly(k)) + '</span>' +
            '<div><div class="zosit-kapitola">' + esc(k.nazov) + '</div>' +
            '<div class="zosit-pravidlo">' + (hotova ? esc(k.zapamataj) : 'Pravidlo získaš po dokončení kapitoly.') +
            '</div></div></div>';
@@ -304,20 +350,29 @@ const HraEngine = (function () {
   }
 
   function ukazUvod(k) {
+    zastavVsetko();
     const bublina = k.uvod.map(t => '<p>' + t + '</p>').join('') +
                     (k.cennik ? cennikHtml() : '') +
                     (k.uvodKoniec ? '<p>' + k.uvodKoniec + '</p>' : '');
-    const max = k.ulohy.reduce((s, u) => s + maxBodovUlohy(u), 0);
+    let info;
+    if (k.skuska) {
+      const s = k.skuska;
+      info = 'Pozícií: ' + s.pocet + ' · na úspech treba aspoň ' + s.hranica + ' vyriešených úplne a bez chyby · ' +
+             'čas: ' + s.casZaklad + ' s + ' + s.casNaRiesenie + ' s na každé riešenie';
+    } else {
+      const max = k.ulohy.reduce((sum, u) => sum + maxBodovUlohy(u), 0);
+      info = 'Úloh: ' + k.ulohy.length + ' · najviac ' + max + ' bodov · za správnu odpoveď +' +
+             BODY_SPRAVNE + ', za chybu ' + znak(BODY_CHYBA);
+    }
     koren.innerHTML = lista(true) +
       '<div class="uvod">' +
-      '<div class="uvod-hlava">Kapitola ' + k.cislo + ' · ' + esc(k.nazov) + '</div>' +
+      '<div class="uvod-hlava">' + (k.znacka ? '' : 'Kapitola ' + k.cislo + ' · ') + esc(k.nazov) + '</div>' +
       grosikRiadok('vesely', bublina, null, true) +
       (k.prePokrocilych ? '<details class="ramcek"><summary>Pre pokročilých</summary><p>' + esc(k.prePokrocilych) + '</p></details>' : '') +
       (k.preTrenerov && vidiTrenerskeRamceky()
         ? '<details class="ramcek trener"><summary>Pre trénerov</summary><p>' + esc(k.preTrenerov) + '</p></details>' : '') +
-      '<div class="uvod-info">Úloh: ' + k.ulohy.length + ' · najviac ' + max + ' bodov · za správnu odpoveď +' +
-      BODY_SPRAVNE + ', za chybu ' + znak(BODY_CHYBA) + '</div>' +
-      '<button class="primary velke" data-akcia="zacat">Začať úlohy</button></div>';
+      '<div class="uvod-info">' + esc(info) + '</div>' +
+      '<button class="primary velke" data-akcia="zacat">' + (k.skuska ? 'Začať skúšku' : 'Začať úlohy') + '</button></div>';
     naviazListu();
     koren.querySelector('[data-akcia="zacat"]').onclick = () => zacniKapitolu(k);
     window.scrollTo(0, 0);
@@ -326,16 +381,39 @@ const HraEngine = (function () {
   // ════════════════════════════════════════════════════════════════════
   //  Priebeh kapitoly
   // ════════════════════════════════════════════════════════════════════
+  function nahodnyVyber(pole, n) {
+    const kopia = pole.slice();
+    for (let i = kopia.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      const t = kopia[i]; kopia[i] = kopia[j]; kopia[j] = t;
+    }
+    return kopia.slice(0, n);
+  }
+
   function zacniKapitolu(k) {
+    let ulohy = k.ulohy || [];
+    let skuska = null;
+    if (k.skuska) {
+      const s = k.skuska;
+      ulohy = nahodnyVyber(s.pozicie, s.pocet).map((fen, i) => {
+        const poz = VC.parseFen(fen);
+        const n = VC.braniaSoZiskom(poz.board, poz.state).riesenia.length;
+        return { id: k.cislo + '.' + (i + 1), typ: 'najdi', fen: fen, limit: s.casZaklad + s.casNaRiesenie * n,
+                 vysvetlenie: '' };
+      });
+      skuska = { vysledky: [], diagnoza: {} };
+    }
     stav = {
       kapitola: k,
+      ulohy: ulohy,
+      skuska: skuska,
       i: 0,
       skore: 0,
       seria: 0,
       spravnych: 0,
       chyb: 0,
       bonusy: 0,
-      max: k.ulohy.reduce((s, u) => s + maxBodovUlohy(u), 0)
+      max: ulohy.reduce((s, u) => s + maxBodovUlohy(u), 0)
     };
     ukazUlohu();
   }
@@ -378,14 +456,45 @@ const HraEngine = (function () {
     const k = stav.kapitola;
     let seria = '';
     for (let i = 0; i < DLZKA_SERIE; i++) seria += '<span class="' + (i < stav.seria ? 'bod plny' : 'bod') + '"></span>';
-    return '<span class="uloha-poradie">Kapitola ' + k.cislo + ' · Úloha ' + (stav.i + 1) + ' / ' + k.ulohy.length + '</span>' +
-           '<span class="seria" title="Séria správnych odpovedí — každých ' + DLZKA_SERIE + ' = bonus">' + seria + '</span>' +
+    const u = stav.ulohy[stav.i];
+    return '<span class="uloha-poradie">' + (k.skuska ? 'Skúška' : (k.znacka ? 'Bonus' : 'Kapitola ' + k.cislo)) +
+           ' · Úloha ' + (stav.i + 1) + ' / ' + stav.ulohy.length + '</span>' +
+           (u && u.limit ? '<span class="cas" id="hraCas">⏱ ' + formatCas(u.limit) + '</span>'
+                         : '<span class="seria" title="Séria správnych odpovedí — každých ' + DLZKA_SERIE +
+                           ' = bonus">' + seria + '</span>') +
            '<span class="skore"><span class="minca mala"></span> <span id="hraSkore">' + stav.skore + '</span> b.</span>';
   }
 
   function obnovHlavu() {
     const el = document.getElementById('hraHlava');
-    if (el) el.innerHTML = hlavaHtml();
+    if (!el) return;
+    const cas = document.getElementById('hraCas');
+    const textCasu = cas ? cas.textContent : null;
+    const trieda = cas ? cas.className : null;
+    el.innerHTML = hlavaHtml();
+    const novy = document.getElementById('hraCas');
+    if (novy && textCasu !== null) { novy.textContent = textCasu; novy.className = trieda; }
+  }
+
+  // ── Časový limit (skúška) ────────────────────────────────────────────
+  function spustiCasovac(sekund, priVyprsani) {
+    zastavCasovac();
+    const koniec = Date.now() + sekund * 1000;
+    const tik = () => {
+      const zostava = (koniec - Date.now()) / 1000;
+      const el = document.getElementById('hraCas');
+      if (el) {
+        el.textContent = '⏱ ' + formatCas(zostava);
+        el.className = 'cas' + (zostava <= 10 ? ' malo' : '');
+      }
+      if (zostava <= 0) { zastavCasovac(); priVyprsani(); }
+    };
+    casovac = setInterval(tik, 250);
+    tik();
+  }
+
+  function zastavCasovac() {
+    if (casovac) { clearInterval(casovac); casovac = null; }
   }
 
   // ── Obrazovka úlohy ───────────────────────────────────────────────────
@@ -396,11 +505,16 @@ const HraEngine = (function () {
     if (prehravac) prehravac.zastav();
   }
 
-  function ukazUlohu() {
+  function zastavVsetko() {
     zastavPrehravac();
+    zastavCasovac();
+  }
+
+  function ukazUlohu() {
+    zastavVsetko();
     prehravac = null;
     sachovnica = null;
-    const u = stav.kapitola.ulohy[stav.i];
+    const u = stav.ulohy[stav.i];
     const naSachovnici = !!u.fen;
 
     koren.innerHTML = lista(true) +
@@ -446,15 +560,17 @@ const HraEngine = (function () {
 
   // Po vyhodnotení: výsledok a tlačidlo Ďalej / Rozumiem
   function ukazPokracovanie(spravne, textVysledku) {
-    const posledna = stav.i >= stav.kapitola.ulohy.length - 1;
+    zastavCasovac();
+    const posledna = stav.i >= stav.ulohy.length - 1;
+    const dokoncit = stav.skuska ? 'Vyhodnotiť skúšku' : 'Dokončiť kapitolu';
     nastavOdpovede(
       '<div class="vysledok ' + (spravne ? 'dobre' : 'zle') + '">' + textVysledku + '</div>' +
       '<button class="primary velke" id="hraDalej">' +
-      (spravne ? (posledna ? 'Dokončiť kapitolu' : 'Ďalej') : (posledna ? 'Rozumiem, dokončiť' : 'Rozumiem, ďalej')) +
+      (spravne ? (posledna ? dokoncit : 'Ďalej') : (posledna ? 'Rozumiem, ' + dokoncit.toLowerCase() : 'Rozumiem, ďalej')) +
       '</button>',
       el => {
         el.querySelector('#hraDalej').onclick = () => {
-          zastavPrehravac();
+          zastavVsetko();
           if (posledna) ukazKoniec(); else { stav.i++; ukazUlohu(); }
         };
       });
@@ -463,7 +579,7 @@ const HraEngine = (function () {
   // ── Rebrík výmeny po odpovedi ────────────────────────────────────────
   function spustiRebrik(uci) {
     if (!prehravac) return;
-    prehravac.nacitaj(stav.kapitola.ulohy[stav.i]._poz.board, uci);
+    prehravac.nacitaj(stav.ulohy[stav.i]._poz.board, uci);
     prehravac.prehraj();
   }
 
@@ -503,11 +619,11 @@ const HraEngine = (function () {
   // Panel s rebríkom (a voliteľne s prepínačom medzi viacerými braniami)
   function panelRebrika(uci, ineMoznosti) {
     const el = document.getElementById('hraSpatna');
+    const u = stav.ulohy[stav.i];
     const prepinac = (ineMoznosti && ineMoznosti.length > 1)
       ? '<div class="prepinac">Rebrík pre: ' + ineMoznosti.map(x =>
           '<button class="secondary male' + (x === uci ? ' vybrane' : '') + '" data-uci="' + x + '">' +
-          esc(VC.nazovTahu(stav.kapitola.ulohy[stav.i]._poz.board, VC.sqIndex(x.slice(0, 2)), VC.sqIndex(x.slice(2, 4)))) +
-          '</button>').join('') + '</div>'
+          esc(nazov(u, x)) + '</button>').join('') + '</div>'
       : '';
     el.innerHTML = '<div class="panel-karta"><h3>Rebrík výmeny</h3>' + prepinac +
       '<div id="hraRebrikTabulka"></div>' +
@@ -539,8 +655,7 @@ const HraEngine = (function () {
   }
 
   function ziskTahu(u, uci) {
-    const z = VC.sqIndex(uci.slice(0, 2)), na = VC.sqIndex(uci.slice(2, 4));
-    return VC.seeWithPins(u._poz.board, z, na, VC.pieceColor(u._poz.board[z]));
+    return ziskNaSachovnici(u._poz.board, uci);
   }
 
   // Možnosti pre otázku „Koľko?" — správna a 5 blízkych, zoradené od najväčšej
@@ -560,6 +675,76 @@ const HraEngine = (function () {
   function vyznacVolbu(tlacidlo, spravne) {
     if (!tlacidlo) return;
     tlacidlo.classList.add(spravne ? 'spravna' : 'nespravna');
+  }
+
+  // ════════════════════════════════════════════════════════════════════
+  //  Rozbor chýb v skúške — ktorú kapitolu zopakovať
+  // ════════════════════════════════════════════════════════════════════
+  const DOVODY = {
+    2: 'Prehliadnutá nekrytá figúrka',
+    3: 'Prehliadnuté branie za druhú stranu',
+    4: 'Prehliadnuté branie lacnejšou figúrkou',
+    5: 'Rovná výmena označená ako zisk',
+    6: 'Stratové branie krytej figúrky',
+    7: 'Prehliadnuté druhé branie toho istého terča',
+    8: 'Prehliadnutý zisk vďaka batérii',
+    9: 'Prehliadnutý zisk vďaka väzbe'
+  };
+
+  function dovodChyby(zisk) {
+    return zisk === 0 ? 5 : 6;
+  }
+
+  // Stojí za figúrkou z na línii k poľu na figúrka rovnakej farby, ktorá sa pridá? (batéria)
+  function maBateriu(board, na) {
+    const tr = Math.floor(na / 8), tc = na % 8;
+    for (let i = 0; i < 64; i++) {
+      const p = board[i];
+      if (!p || !VC.attacksSq(board, i, na)) continue;
+      const pl = p.toLowerCase();
+      if (pl === 'n' || pl === 'k') continue;
+      const r = Math.floor(i / 8), c = i % 8;
+      const dr = Math.sign(r - tr), dc = Math.sign(c - tc);
+      const diag = dr !== 0 && dc !== 0;
+      let rr = r + dr, cc = c + dc;
+      while (rr >= 0 && rr < 8 && cc >= 0 && cc < 8) {
+        const q = board[rr * 8 + cc];
+        if (q) {
+          if (VC.pieceColor(q) === VC.pieceColor(p)) {
+            const ql = q.toLowerCase();
+            if (ql === 'q' || (diag && ql === 'b') || (!diag && ql === 'r')) return true;
+          }
+          break;
+        }
+        rr += dr; cc += dc;
+      }
+    }
+    return false;
+  }
+
+  function dovodPrehliadnutia(board, uci, najdene) {
+    const z = VC.sqIndex(uci.slice(0, 2)), na = VC.sqIndex(uci.slice(2, 4));
+    const strana = VC.pieceColor(board[z]);
+    const superStrana = strana === 'w' ? 'b' : 'w';
+    if (najdene.some(x => x.slice(2, 4) === uci.slice(2, 4))) return 7;
+    // väzba: súperova figúrka na pole útočí, ale je viazaná na kráľa a brať späť nesmie
+    // (kráľ, ktorý nesmie vstúpiť na kryté pole, sa za väzbu nepovažuje)
+    for (let i = 0; i < 64; i++) {
+      const p = board[i];
+      if (p && p.toLowerCase() !== 'k' && VC.pieceColor(p) === superStrana && VC.attacksSq(board, i, na) &&
+          VC.pinAxis(board, i) !== null &&
+          !VC.isLegal(board, { active: superStrana, castling: '-', ep: '-' }, i, na, '')) return 9;
+    }
+    if (maBateriu(board, na)) return 8;
+    // za druhú stranu: hráč našiel brania súpera, ale za túto stranu ani jedno
+    const farba = x => VC.pieceColor(board[VC.sqIndex(x.slice(0, 2))]);
+    if (!najdene.some(x => farba(x) === strana) && najdene.some(x => farba(x) !== strana)) return 3;
+    return VC.countAttackers(board, na, superStrana) === 0 ? 2 : 4;
+  }
+
+  function zapisDiagnozu(kapitola) {
+    if (!stav.skuska) return;
+    stav.skuska.diagnoza[kapitola] = (stav.skuska.diagnoza[kapitola] || 0) + 1;
   }
 
   // ════════════════════════════════════════════════════════════════════
@@ -668,14 +853,32 @@ const HraEngine = (function () {
   // ── Áno / Nie ─────────────────────────────────────────────────────────
   TYPY.anonie = {
     priprav(u) {
-      const zisk = ziskTahu(u, u.tah);
-      document.getElementById('hraZadanie').innerHTML = 'Je <b>' + esc(nazov(u, u.tah)) + '</b> branie so ziskom?';
+      const legalny = jeLegalny(u._poz.board, u.tah);
+      const zisk = legalny ? ziskTahu(u, u.tah) : null;
+      const otazka = u.otazka || 'Je <b>{tah}</b> branie so ziskom?';
+      document.getElementById('hraZadanie').innerHTML = otazka.replace('{tah}', esc(nazov(u, u.tah)));
       sachovnica.oznac(oznacTah(u.tah));
       nastavOdpovede('<div class="moznosti dve">' +
         '<button class="moznost ano" data-h="ano">Áno</button>' +
         '<button class="moznost nie" data-h="nie">Nie</button></div>',
         el => el.querySelectorAll('.moznost').forEach(b => b.onclick = () => {
           const odpoved = b.dataset.h === 'ano';
+          if (!legalny) {
+            // Ťah viazanou figúrkou: nie je to ani legálny ťah, rebrík sa neprehráva
+            const dobre = !odpoved;
+            vyznacVolbu(b, dobre);
+            sachovnica.naKlik = null;
+            if (dobre) {
+              const bonus = zapisSpravne();
+              grosikHovori('nadseny', pochvala() + ' ' + esc(u.vysvetlenie) + bonus);
+              ukazPokracovanie(true, '+' + BODY_SPRAVNE + ' bodov · nelegálny ťah');
+            } else {
+              zapisChybu();
+              grosikHovori('smutny', 'Pozor, tento ťah nie je ani legálny! ' + esc(u.vysvetlenie));
+              ukazPokracovanie(false, znak(BODY_CHYBA) + ' bodov · nelegálny ťah');
+            }
+            return;
+          }
           const dobre = odpoved === (zisk > 0);
           vyhodnotJednoBranie(u, dobre, b, zisk > 0
             ? 'Je to zisk ' + znak(zisk) + '!'
@@ -743,11 +946,12 @@ const HraEngine = (function () {
       const riesenia = vysl.riesenia;
       const vysvetlenieRiesenia = {};
       riesenia.forEach((x, i) => { vysvetlenieRiesenia[x] = vysl.vysvetlenia[i]; });
-      const ul = { najdene: [], chybne: [], vybrane: null, hotovo: false, chybVUlohe: 0 };
+      const ul = { najdene: [], chybne: [], vybrane: null, hotovo: false, chybVUlohe: 0, casVyprsal: false };
 
       document.getElementById('hraZadanie').innerHTML = 'Nájdi všetky brania so ziskom <span class="slabo">(biele aj čierne)</span>';
-      grosikHovori('rozmysla', 'Klikni na figúrku, ktorá má brať, a potom na figúrku, ktorú má zobrať. ' +
-                   'Hľadaj za bieleho aj za čierneho.');
+      grosikHovori('rozmysla', stav.skuska
+        ? 'Skúška! Nájdi všetky brania so ziskom za oboch skôr, ako vyprší čas.'
+        : 'Klikni na figúrku, ktorá má brať, a potom na figúrku, ktorú má zobrať. Hľadaj za bieleho aj za čierneho.');
 
       const strana = x => VC.pieceColor(u._poz.board[VC.sqIndex(x.slice(0, 2))]);
       const pocitadlo = () => {
@@ -774,7 +978,7 @@ const HraEngine = (function () {
       const zoznam = () => {
         const el = document.getElementById('hraSpatna');
         let h = '<div class="panel-karta"><h3>Tvoje brania</h3>';
-        if (!ul.najdene.length && !ul.chybne.length) h += '<div class="slabo">Zatiaľ nič.</div>';
+        if (!ul.najdene.length && !ul.chybne.length && !ul.hotovo) h += '<div class="slabo">Zatiaľ nič.</div>';
         ul.najdene.forEach(x => {
           h += '<div class="zaznam dobre"><b>' + esc(nazov(u, x)) + '</b> ' + esc(vysvetlenieRiesenia[x]) + '</div>';
         });
@@ -796,13 +1000,17 @@ const HraEngine = (function () {
       };
 
       const dokonci = (vzdal) => {
+        if (ul.hotovo) return;
         ul.hotovo = true;
         ul.vybrane = null;
+        zastavCasovac();
         sachovnica.naKlik = null;
         znacky();
         const vsetkyNajdene = ul.najdene.length === riesenia.length;
+        const bezChyby = vsetkyNajdene && ul.chybVUlohe === 0 && !ul.casVyprsal;
+        const prehliadnute = riesenia.filter(x => !ul.najdene.includes(x));
         let text;
-        if (vsetkyNajdene && ul.chybVUlohe === 0) {
+        if (bezChyby) {
           pripocitaj(BONUS_BEZ_CHYBY);
           stav.bonusy += BONUS_BEZ_CHYBY;
           obnovHlavu();
@@ -814,11 +1022,17 @@ const HraEngine = (function () {
         } else {
           stav.seria = 0;
           obnovHlavu();
-          text = 'Prehliadnuté: ' + (riesenia.length - ul.najdene.length);
-          grosikHovori('smutny', (vzdal ? 'Niečo ti ešte chýbalo. ' : '') + esc(u.vysvetlenie));
+          text = (ul.casVyprsal ? 'Čas vypršal · ' : '') + 'Prehliadnuté: ' + prehliadnute.length;
+          grosikHovori('smutny', (ul.casVyprsal ? 'Čas vypršal. ' : (vzdal ? 'Niečo ti ešte chýbalo. ' : '')) +
+                       (u.vysvetlenie ? esc(u.vysvetlenie) : 'Pozri sa vpravo, čo si prehliadol.'));
+        }
+        // Skúška: zápis výsledku a rozbor chýb
+        if (stav.skuska) {
+          prehliadnute.forEach(x => zapisDiagnozu(dovodPrehliadnutia(u._poz.board, x, ul.najdene)));
+          stav.skuska.vysledky.push({ fen: u.fen, bezChyby: bezChyby });
         }
         zoznam();
-        ukazPokracovanie(vsetkyNajdene, text);
+        ukazPokracovanie(bezChyby || (vsetkyNajdene && !stav.skuska), text);
       };
 
       sachovnica.naKlik = pole => {
@@ -840,6 +1054,7 @@ const HraEngine = (function () {
               ul.chybVUlohe++;
               ul.poslednyRebrik = uci;
               zapisChybu();
+              zapisDiagnozu(dovodChyby(branie.zisk));
               grosikHovori('smutny', esc(branie.nazov) + ' nie je branie so ziskom: ' +
                            RV.textVerdiktu(branie.zisk).toLowerCase() + '. Pozri rebrík vpravo. ' + znak(BODY_CHYBA) + ' bodov.');
             } else {
@@ -868,6 +1083,15 @@ const HraEngine = (function () {
       nastavOdpovede('<button class="secondary velke" id="hraHotovo">Hotovo — viac ich nevidím</button>',
         el => el.querySelector('#hraHotovo').onclick = () => { if (!ul.hotovo) dokonci(true); });
       znacky(); pocitadlo(); zoznam();
+
+      if (u.limit) {
+        spustiCasovac(u.limit, () => {
+          if (ul.hotovo) return;
+          ul.casVyprsal = true;
+          zvuk('loss');
+          dokonci(true);
+        });
+      }
     }
   };
 
@@ -882,6 +1106,8 @@ const HraEngine = (function () {
   }
 
   function ukazKoniec() {
+    zastavVsetko();
+    if (stav.skuska) { ukazKoniecSkusky(); return; }
     const k = stav.kapitola;
     const hviezdy = hviezdyZaSkore(stav.skore, stav.max);
     const pred = postupKapitoly(k);
@@ -895,8 +1121,7 @@ const HraEngine = (function () {
     ulozPostup();
 
     const i = O.kapitoly.indexOf(k);
-    const dalsia = O.kapitoly[i + 1];
-    const dalsiaHratelna = dalsia && maObsah(dalsia);
+    const dalsia = O.kapitoly.slice(i + 1).find(x => maObsah(x) && jeOdomknuta(x));
     const nalada = hviezdy === 3 ? 'nadseny' : (hviezdy === 2 ? 'vesely' : 'rozmysla');
     const pozdrav = hviezdy === 3 ? 'Skvelý obchod! Tri hviezdičky.' :
                     (hviezdy === 2 ? 'Dobrá práca! Na tri hviezdičky ti chýba len kúsok.' :
@@ -904,7 +1129,7 @@ const HraEngine = (function () {
 
     koren.innerHTML = lista(true) +
       '<div class="koniec">' +
-      '<div class="uvod-hlava">Kapitola ' + k.cislo + ' · ' + esc(k.nazov) + '</div>' +
+      '<div class="uvod-hlava">' + (k.znacka ? '' : 'Kapitola ' + k.cislo + ' · ') + esc(k.nazov) + '</div>' +
       grosikRiadok(nalada, esc(pozdrav) + (noveMaximum && pred.dokoncene ? ' <b>Nový rekord!</b>' : ''), null, true) +
       '<div class="koniec-hviezdy">' + hviezdyHtml(hviezdy) + '</div>' +
       '<div class="koniec-cisla">' +
@@ -916,7 +1141,8 @@ const HraEngine = (function () {
       '<div class="zapamataj"><div class="zapamataj-nadpis">Zapamätaj si</div>' + esc(k.zapamataj) +
       '<div class="zapamataj-pozn">Pravidlo je teraz v tvojom zošite.</div></div>' +
       '<div class="koniec-tlacidla">' +
-      (dalsiaHratelna ? '<button class="primary velke" data-akcia="dalsia">Ďalšia kapitola →</button>' : '') +
+      (dalsia ? '<button class="primary velke" data-akcia="dalsia">' +
+                (dalsia.skuska ? 'Na záverečnú skúšku →' : 'Ďalšia kapitola →') + '</button>' : '') +
       '<button class="secondary" data-akcia="znova">Skúsiť znova</button>' +
       '<button class="secondary" data-akcia="mapa">Kapitoly</button></div></div>';
     naviazListu();
@@ -926,11 +1152,79 @@ const HraEngine = (function () {
     window.scrollTo(0, 0);
   }
 
+  // ── Koniec záverečnej skúšky ─────────────────────────────────────────
+  function ukazKoniecSkusky() {
+    const k = stav.kapitola;
+    const s = k.skuska;
+    const vysl = stav.skuska.vysledky;
+    const vyriesene = vysl.filter(x => x.bezChyby).length;
+    const zlozena = vyriesene >= s.hranica;
+    const hviezdy = zlozena ? Math.min(3, 1 + vyriesene - s.hranica) : 0;
+    const pred = postupKapitoly(k);
+    postup.kapitoly[k.cislo] = {
+      dokoncene: pred.dokoncene || zlozena,
+      hviezdy: Math.max(pred.hviezdy, hviezdy),
+      najlepsie: Math.max(pred.najlepsie, vyriesene),
+      pokusy: (pred.pokusy || 0) + 1,
+      naposledy: new Date().toISOString()
+    };
+    ulozPostup();
+
+    const mriezka = vysl.map((x, i) => '<span class="skuska-pole ' + (x.bezChyby ? 'dobre' : 'zle') + '">' +
+                                       (i + 1) + '</span>').join('');
+
+    // Odporúčania: kapitoly zoradené podľa počtu chýb
+    const diag = stav.skuska.diagnoza;
+    // najviac tri — dlhší zoznam by dieťa skôr odradil
+    const kapitolyNaZopakovanie = Object.keys(diag).map(Number).sort((a, b) => diag[b] - diag[a]).slice(0, 3);
+    let odporucania = '';
+    if (kapitolyNaZopakovanie.length) {
+      odporucania = '<div class="panel-karta odporucania"><h3>Čo zopakovať</h3>' +
+        kapitolyNaZopakovanie.map(c => {
+          const kap = O.kapitoly.find(x => x.cislo === c);
+          return '<div class="odporucanie"><div><b>Kapitola ' + c + ' — ' + esc(kap ? kap.nazov : '') + '</b>' +
+                 '<div class="slabo">' + esc(DOVODY[c] || '') + ' (' + diag[c] + '×)</div></div>' +
+                 '<button class="secondary male" data-kapitola="' + c + '">Zopakovať</button></div>';
+        }).join('') + '</div>';
+    }
+
+    const text = zlozena
+      ? 'Skúška je zložená! Vyriešil si ' + vyriesene + ' z ' + vysl.length + ' pozícií bez chyby. ' +
+        'Teraz si naozajstný obchodník a môžeš trénovať Brania so ziskom v menu Zručnosti.'
+      : 'Vyriešil si ' + vyriesene + ' z ' + vysl.length + ' pozícií bez chyby. Na zloženie treba ' + s.hranica +
+        '. Zopakuj si kapitoly nižšie a skús to znova — pozície budú zakaždým iné.';
+
+    koren.innerHTML = lista(true) +
+      '<div class="koniec">' +
+      '<div class="uvod-hlava">' + esc(k.nazov) + '</div>' +
+      grosikRiadok(zlozena ? 'nadseny' : 'rozmysla', esc(text), null, true) +
+      (zlozena ? '<div class="koniec-odznak">' + odznakHtml(true) + '</div>' +
+                 '<div class="koniec-hviezdy">' + hviezdyHtml(hviezdy) + '</div>' : '') +
+      '<div class="skuska-vysledok"><div class="skuska-cislo ' + (zlozena ? 'plus' : 'minus') + '">' + vyriesene +
+      ' / ' + vysl.length + '</div><div class="slabo">pozícií vyriešených úplne a bez chyby (treba ' + s.hranica + ')</div>' +
+      '<div class="skuska-mriezka">' + mriezka + '</div></div>' +
+      odporucania +
+      (zlozena ? '<div class="zapamataj"><div class="zapamataj-nadpis">Zapamätaj si</div>' + esc(k.zapamataj) + '</div>' : '') +
+      '<div class="koniec-tlacidla">' +
+      (zlozena ? '<a class="odkaz-tlacidlo velke" href="skills.html?type=direct_attack">Trénovať Brania so ziskom →</a>' : '') +
+      '<button class="' + (zlozena ? 'secondary' : 'primary velke') + '" data-akcia="znova">Skúsiť skúšku znova</button>' +
+      '<button class="secondary" data-akcia="mapa">Kapitoly</button></div></div>';
+    naviazListu();
+    koren.querySelector('[data-akcia="znova"]').onclick = () => ukazUvod(k);
+    koren.querySelectorAll('.odporucanie button').forEach(b => b.onclick = () => {
+      const kap = O.kapitoly.find(x => x.cislo === Number(b.dataset.kapitola));
+      if (kap) ukazUvod(kap);
+    });
+    zvuk(zlozena ? 'win' : 'loss');
+    window.scrollTo(0, 0);
+  }
+
   return {
     spusti: spusti,
     // pre testy
     _hviezdyZaSkore: hviezdyZaSkore,
     _moznostiCisel: moznostiCisel,
+    _dovodPrehliadnutia: dovodPrehliadnutia,
     _stav: () => stav
   };
 })();
