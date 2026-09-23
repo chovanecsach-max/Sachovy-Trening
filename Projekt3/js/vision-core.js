@@ -621,8 +621,10 @@ const VisionCore = (function () {
   // ── Rebrík výmeny ──────────────────────────────────────────────────────
   //  Priebeh výmeny po braní uci, ako ho počíta see_with_pins.
   //  Výsledok: {
-  //    kroky:  [{ tah:'Jf4×d5', strana:'w', figurka:'pešiaka', zmena:+1, ucet:+1 }, ...],
-  //    koniec: { typ:'nikto' | 'neoplati_sa' | 'nie_je_branie', strana:'b', tah:'Vd8×d5' | null },
+  //    kroky:  [{ tah:'Jf4×d5', strana:'w', z:37, na:27, figurka:'pešiaka', zmena:+1, ucet:+1 }, ...],
+  //    koniec: { typ:'nikto' | 'neoplati_sa' | 'nie_je_branie', strana:'b', tah:'Vd8×d5' | null,
+  //              z, na  (len pri 'neoplati_sa': ťah, ktorý by sa neoplatil) },
+  //  z / na sú indexy polí (0 = a8 … 63 = h1) — podľa nich šachovnica krok prehrá.
   //    vysledok: číslo (vždy rovné seeWithPins)
   //  }
   //  „zmena" a „ucet" sú z pohľadu strany, ktorá začala brať.
@@ -649,7 +651,7 @@ const VisionCore = (function () {
     const obet1 = b[obetIdx];
     const c1 = obet1 ? HODNOTA[obet1.toLowerCase()] : 0;
     ucet += c1;
-    kroky.push({ tah: nazovTahu(b, fr, to), strana: side,
+    kroky.push({ tah: nazovTahu(b, fr, to), strana: side, z: fr, na: to,
                  figurka: obet1 ? SK_FIGURY[obet1.toLowerCase()] : '', zmena: c1, ucet: ucet });
     b[to] = b[fr]; b[fr] = '';
     if (obetIdx !== to) b[obetIdx] = '';
@@ -662,14 +664,14 @@ const VisionCore = (function () {
       const u = najlacnejsiUtocnik(b, to, turn);
       if (u === null) { koniec = { typ: 'nikto', strana: turn, tah: null }; break; }
       if (seeInner(b, to, turn, null) <= 0) {
-        koniec = { typ: 'neoplati_sa', strana: turn, tah: nazovTahu(b, u, to) };
+        koniec = { typ: 'neoplati_sa', strana: turn, tah: nazovTahu(b, u, to), z: u, na: to };
         break;
       }
       const obet = b[to];
       const c = HODNOTA[obet.toLowerCase()];
       const zmena = turn === side ? c : -c;
       ucet += zmena;
-      kroky.push({ tah: nazovTahu(b, u, to), strana: turn,
+      kroky.push({ tah: nazovTahu(b, u, to), strana: turn, z: u, na: to,
                    figurka: SK_FIGURY[obet.toLowerCase()], zmena: zmena, ucet: ucet });
       b = b.slice();
       b[to] = b[u]; b[u] = '';
@@ -696,6 +698,7 @@ const VisionCore = (function () {
     isCapture: isCapture,
     pinAxis: pinAxis,
     countAttackers: countAttackers,
+    attacksSq: attacksSq,
     seeWithPins: seeWithPins,
     vysvetliBranie: vysvetliBranie,
     braniaSoZiskomStrany: braniaSoZiskomStrany,
