@@ -654,7 +654,8 @@ function kresliPasik() {
   } else {
     const k = p.rebrik.kroky[p.k - 1];
     text.textContent = 'Krok ' + p.k + '/' + n + ': ' + k.tah + ' — ' +
-                       (k.strana === p.strana ? 'beriem ' : 'súper berie ') + k.figurka;
+                       (k.strana === p.strana ? 'beriem ' : 'súper berie ') + k.figurka +
+                     (k.premena ? ' a mení sa na dámu' : '');
   }
 }
 
