@@ -15,12 +15,15 @@
 //  Správne odpovede pri úlohách so šachovnicou počíta VŽDY VisionCore —
 //  rovnako ako generátor úloh. Obsah hry ich neurčuje.
 //
-//  POSTUP HRÁČA sa zatiaľ ukladá do prehliadača (localStorage). V kroku 5
-//  pribudne tabuľka v databáze, aby postup videl aj tréner.
+//  POSTUP HRÁČA ukladá „úložisko", ktoré dodá stránka (js/hra-postup.js):
+//  na webe tabuľka hra_postup v databáze, pri teste zo súboru len prehliadač.
+//  Bez úložiska sa postup drží len v prehliadači (ako pred krokom 5).
 //
 //  Potrebuje: js/vision-core.js, js/rebrik-vymeny.js (a voliteľne sounds.js).
-//  Spustenie: HraEngine.spusti({ obsah, koren, rola, userId, testovaci })
+//  Spustenie: HraEngine.spusti({ obsah, koren, rola, userId, testovaci, uloziste })
 // ============================================================================
+
+(window.VERZIE = window.VERZIE || {})['hra-engine.js'] = '2026-09-24';
 
 const HraEngine = (function () {
   'use strict';
@@ -47,6 +50,7 @@ const HraEngine = (function () {
   let koren = null;         // DOM prvok, do ktorého sa hra kreslí
   let nast = {};            // { rola, userId, testovaci, cestaObrazkov }
   let postup = null;        // uložený postup hráča
+  let uloziste = null;      // kam sa postup ukladá (hra-postup.js)
   let stav = null;          // rozohraná kapitola
   let casovac = null;       // časový limit úlohy (skúška)
 
@@ -62,29 +66,44 @@ const HraEngine = (function () {
       testovaci: !!moznosti.testovaci,
       cestaObrazkov: moznosti.cestaObrazkov || 'img/Pieces/'
     };
-    postup = nacitajPostup();
+    uloziste = moznosti.uloziste || lokalneUloziste();
     skontrolujObsah();
-    ukazMapu();
+    koren.innerHTML = '<div class="nacitavam-postup" style="text-align:center;padding:40px 10px;color:#64748b;">' +
+                      'Načítavam tvoj postup…</div>';
+    Promise.resolve()
+      .then(() => uloziste.nacitaj())
+      .catch(e => { console.warn('Postup sa nenačítal:', e); return null; })
+      .then(p => {
+        postup = (p && p.kapitoly) ? p : { verzia: 1, kapitoly: {} };
+        ukazMapu();
+      });
   }
 
   function jeTrener() { return ROLY_TRENEROV.includes(nast.rola); }
   function vidiTrenerskeRamceky() { return jeTrener() || nast.testovaci; }
 
-  function klucPostupu() { return 'hra_' + O.kluc + '_' + (nast.userId || 'lokalne'); }
-
-  function nacitajPostup() {
-    try {
-      const raw = localStorage.getItem(klucPostupu());
-      if (raw) {
-        const p = JSON.parse(raw);
-        if (p && p.kapitoly) return p;
-      }
-    } catch (e) { /* prehliadač bez úložiska — hrá sa bez ukladania */ }
-    return { verzia: 1, kapitoly: {} };
+  // Náhradné úložisko, keď stránka žiadne nedodá: len prehliadač
+  function lokalneUloziste() {
+    const kluc = 'hra_' + O.kluc + '_' + (nast.userId || 'lokalne');
+    return {
+      nacitaj: () => {
+        try {
+          const p = JSON.parse(localStorage.getItem(kluc) || 'null');
+          if (p && p.kapitoly) return p;
+        } catch (e) { /* prehliadač bez úložiska — hrá sa bez ukladania */ }
+        return null;
+      },
+      uloz: (p) => { try { localStorage.setItem(kluc, JSON.stringify(p)); } catch (e) {} }
+    };
   }
 
-  function ulozPostup() {
-    try { localStorage.setItem(klucPostupu(), JSON.stringify(postup)); } catch (e) {}
+  // cislo = práve dohraná kapitola (pre databázu), udalost = { pokusy, posledne }.
+  // Chyba zápisu hru nezastaví — kópia ostáva v prehliadači a odošle sa
+  // pri ďalšom otvorení hry.
+  function ulozPostup(cislo, udalost) {
+    Promise.resolve()
+      .then(() => uloziste.uloz(postup, cislo, udalost))
+      .catch(e => console.warn('Postup sa neuložil do databázy (odošle sa neskôr):', e));
   }
 
   function postupKapitoly(k) {
@@ -1117,9 +1136,10 @@ const HraEngine = (function () {
       dokoncene: true,
       hviezdy: Math.max(pred.hviezdy, hviezdy),
       najlepsie: Math.max(pred.najlepsie, stav.skore),
+      pokusy: (pred.pokusy || 0) + 1,
       naposledy: new Date().toISOString()
     };
-    ulozPostup();
+    ulozPostup(k.cislo, { pokusy: 1, posledne: stav.skore });
 
     const i = O.kapitoly.indexOf(k);
     const dalsia = O.kapitoly.slice(i + 1).find(x => maObsah(x) && jeOdomknuta(x));
@@ -1169,7 +1189,7 @@ const HraEngine = (function () {
       pokusy: (pred.pokusy || 0) + 1,
       naposledy: new Date().toISOString()
     };
-    ulozPostup();
+    ulozPostup(k.cislo, { pokusy: 1, posledne: vyriesene });
 
     const mriezka = vysl.map((x, i) => '<span class="skuska-pole ' + (x.bezChyby ? 'dobre' : 'zle') + '">' +
                                        (i + 1) + '</span>').join('');
