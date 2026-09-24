@@ -16,6 +16,9 @@
 //  Branie mimochodom je vylúčené (rovnako ako v generate_vision.py):
 //  parseFen pole mimochodom z FEN-u ignoruje.
 //
+//  Premena pešiaka pri braní na poslednom rade sa počíta (+8, ďalej sa berie
+//  dáma) — oprava 23. 9. 2026, rovnaká ako v see_with_pins v generátore.
+//
 //  POUŽITIE (všetko je v objekte VisionCore):
 //    const poz = VisionCore.parseFen(fen);
 //    const vysledok = VisionCore.braniaSoZiskom(poz.board, poz.state);
@@ -499,6 +502,15 @@ const VisionCore = (function () {
     return bestI;
   }
 
+  // Premena: pešiak, ktorý prišiel na posledný rad, sa mení na dámu.
+  // Vráti novú figúrku ('Q' / 'q') alebo null.
+  function premena(figurka, naPole) {
+    if (figurka === 'P' && rowOf(naPole) === 0) return 'Q';
+    if (figurka === 'p' && rowOf(naPole) === 7) return 'q';
+    return null;
+  }
+  const BONUS_PREMENY = HODNOTA.q - HODNOTA.p;   // +8
+
   // ── see_with_pins (vnútorná _see) ──────────────────────────────────────
   function seeInner(board, sq, side, forcedI) {
     if (!board[sq]) return 0;
@@ -507,7 +519,12 @@ const VisionCore = (function () {
     const captured = HODNOTA[board[sq].toLowerCase()];
     const b = board.slice();
     b[sq] = b[bestI]; b[bestI] = '';
-    return captured - Math.max(0, seeInner(b, sq, super_(side), null));
+    // PREMENA (ako v generate_vision.py): pešiak, ktorý berie na poslednom rade,
+    // sa zmení na dámu — strana získa aj +8 a súper ďalej berie dámu.
+    const nova = premena(board[bestI], sq);
+    let bonus = 0;
+    if (nova) { b[sq] = nova; bonus = BONUS_PREMENY; }
+    return captured + bonus - Math.max(0, seeInner(b, sq, super_(side), null));
   }
 
   // ── see_with_pins ──────────────────────────────────────────────────────
@@ -597,7 +614,7 @@ const VisionCore = (function () {
     const p = board[fi];
     const pismeno = p ? SK_PISMENO[p.toLowerCase()] : '';
     const branie = board[ti] || (p && p.toLowerCase() === 'p' && colOf(fi) !== colOf(ti));
-    return pismeno + sqName(fi) + (branie ? '×' : '–') + sqName(ti);
+    return pismeno + sqName(fi) + (branie ? '×' : '–') + sqName(ti) + (p && premena(p, ti) ? 'D' : '');
   }
 
   // ── Všetky legálne brania oboch strán so ziskom (aj nulovým a záporným) ─
@@ -621,7 +638,7 @@ const VisionCore = (function () {
   // ── Rebrík výmeny ──────────────────────────────────────────────────────
   //  Priebeh výmeny po braní uci, ako ho počíta see_with_pins.
   //  Výsledok: {
-  //    kroky:  [{ tah:'Jf4×d5', strana:'w', z:37, na:27, figurka:'pešiaka', zmena:+1, ucet:+1 }, ...],
+  //    kroky:  [{ tah:'Jf4×d5', strana:'w', z:37, na:27, premena:false, figurka:'pešiaka', zmena:+1, ucet:+1 }, ...],
   //    koniec: { typ:'nikto' | 'neoplati_sa' | 'nie_je_branie', strana:'b', tah:'Vd8×d5' | null,
   //              z, na  (len pri 'neoplati_sa': ťah, ktorý by sa neoplatil) },
   //  z / na sú indexy polí (0 = a8 … 63 = h1) — podľa nich šachovnica krok prehrá.
@@ -649,11 +666,12 @@ const VisionCore = (function () {
       return { kroky: [], koniec: { typ: 'nie_je_branie', strana: side, tah: nazovTahu(board, fr, to) }, vysledok: 0 };
     }
     const obet1 = b[obetIdx];
-    const c1 = obet1 ? HODNOTA[obet1.toLowerCase()] : 0;
+    const nova1 = premena(b[fr], to);
+    const c1 = (obet1 ? HODNOTA[obet1.toLowerCase()] : 0) + (nova1 ? BONUS_PREMENY : 0);
     ucet += c1;
-    kroky.push({ tah: nazovTahu(b, fr, to), strana: side, z: fr, na: to,
+    kroky.push({ tah: nazovTahu(b, fr, to), strana: side, z: fr, na: to, premena: !!nova1,
                  figurka: obet1 ? SK_FIGURY[obet1.toLowerCase()] : '', zmena: c1, ucet: ucet });
-    b[to] = b[fr]; b[fr] = '';
+    b[to] = nova1 || b[fr]; b[fr] = '';
     if (obetIdx !== to) b[obetIdx] = '';
 
     // 2. ďalšie kroky — strany sa striedajú, berú najlacnejšou figúrkou
@@ -668,13 +686,14 @@ const VisionCore = (function () {
         break;
       }
       const obet = b[to];
-      const c = HODNOTA[obet.toLowerCase()];
+      const nova = premena(b[u], to);
+      const c = HODNOTA[obet.toLowerCase()] + (nova ? BONUS_PREMENY : 0);
       const zmena = turn === side ? c : -c;
       ucet += zmena;
-      kroky.push({ tah: nazovTahu(b, u, to), strana: turn, z: u, na: to,
+      kroky.push({ tah: nazovTahu(b, u, to), strana: turn, z: u, na: to, premena: !!nova,
                    figurka: SK_FIGURY[obet.toLowerCase()], zmena: zmena, ucet: ucet });
       b = b.slice();
-      b[to] = b[u]; b[u] = '';
+      b[to] = nova || b[u]; b[u] = '';
       turn = super_(turn);
     }
     return { kroky: kroky, koniec: koniec, vysledok: ucet };
