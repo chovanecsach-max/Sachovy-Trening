@@ -158,7 +158,9 @@ const RebrikVymeny = (function () {
     let b = board.slice();
     for (const krok of this.rebrik.kroky) {
       b = b.slice();
-      b[krok.na] = b[krok.z];
+      const f = b[krok.z];
+      // pešiak, ktorý berie na poslednom rade, sa mení na dámu
+      b[krok.na] = krok.premena ? (f === f.toUpperCase() ? 'Q' : 'q') : f;
       b[krok.z] = '';
       this.pozicie.push(b);
     }
@@ -287,7 +289,7 @@ const RebrikVymeny = (function () {
              ? '<td class="slabo">…</td>'
              : '<td><span class="bodka ' + k.strana + '"></span>' + esc(k.tah) +
                ' <span class="slabo">— ' + (k.strana === p.strana ? 'beriem' : 'súper berie') +
-               ' ' + esc(k.figurka) + '</span></td>') +
+               ' ' + esc(k.figurka) + (k.premena ? ' a mení sa na dámu (+8)' : '') + '</span></td>') +
            '<td class="cislo ' + triedaZnamienka(k.zmena) + '">' + (skryty ? '' : znak(k.zmena)) + '</td>' +
            '<td class="cislo ' + triedaZnamienka(k.ucet) + '">' + (skryty ? '' : znak(k.ucet)) + '</td></tr>';
     });
