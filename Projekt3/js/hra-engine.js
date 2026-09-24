@@ -607,7 +607,8 @@ const HraEngine = (function () {
     } else {
       const k = p.rebrik.kroky[p.k - 1];
       text.textContent = 'Krok ' + p.k + '/' + p.pocetKrokov() + ': ' + k.tah + ' — ' +
-                         (k.strana === p.strana ? 'beriem ' : 'súper berie ') + k.figurka;
+                         (k.strana === p.strana ? 'beriem ' : 'súper berie ') + k.figurka +
+                       (k.premena ? ' a mení sa na dámu' : '');
     }
     // tabuľka v paneli
     const tab = document.getElementById('hraRebrikTabulka');
