@@ -123,7 +123,7 @@ body {
 /* ── Nav mriežka ── */
 .nav-row {
   display: grid;
-  grid-template-columns: repeat(8, 1fr);
+  grid-template-columns: repeat(9, 1fr);
   gap: 10px;
   margin-bottom: 12px;
 }
@@ -163,6 +163,7 @@ body {
 .i-mix       { background: #f0fdf4; color: #16a34a; }
 .i-stat      { background: #eff6ff; color: #2563eb; }
 .i-admin     { background: rgba(212,168,67,0.15); color: #a07828; }
+.i-hry       { background: #fef3c7; color: #b45309; }
 
 .nav-btn.nav-admin {
   background: #0f1117; color: #d4a843; border-color: #0f1117;
@@ -186,6 +187,8 @@ body {
 /* Podmenu trénera má len 3 položky — nech sa netiahnu cez celú šírku */
 .submenu-trener { grid-template-columns: repeat(4, 1fr); }
 .submenu-koncovky { grid-template-columns: repeat(4, 1fr); }
+.submenu-hry { grid-template-columns: repeat(4, 1fr); }
+.sub-pozn { display: block; font-size: 10.5px; color: #94a3b8; font-weight: 400; margin-top: 3px; }
 .sub-count { font-size: 11px; color: #94a3b8; margin-left: 4px; }
 
 @keyframes fadeIn {
@@ -300,6 +303,7 @@ body {
   .submenu { grid-template-columns: repeat(5, 1fr); gap: 8px; padding: 10px; }
   .submenu-trener { grid-template-columns: repeat(3, 1fr); }
   .submenu-koncovky { grid-template-columns: repeat(2, 1fr); }
+  .submenu-hry { grid-template-columns: repeat(2, 1fr); }
   .sub-btn { padding: 12px 4px; font-size: 11px; gap: 6px; min-height: 74px;
              touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
   .sub-icon { width: 32px; height: 32px; font-size: 15px; }
@@ -313,6 +317,7 @@ body {
   .submenu { grid-template-columns: repeat(4, 1fr); }
   .submenu-trener { grid-template-columns: repeat(3, 1fr); }
   .submenu-koncovky { grid-template-columns: repeat(2, 1fr); }
+  .submenu-hry { grid-template-columns: repeat(2, 1fr); }
   .leaderboards { grid-template-columns: 1fr; }
 }
 </style>
@@ -378,11 +383,15 @@ body {
 <!-- Hlavný obsah -->
 <div class="main">
 
-  <!-- 7 tlačidiel v jednom rade -->
+  <!-- Hlavné menu — 9 stĺpcov (hráč: Zručnosti … Dokumentácia; tréner namiesto Zadaní Tréner) -->
   <div class="nav-row">
     <button class="nav-btn" id="btnSkills" onclick="toggleSkillsMenu()">
       <div class="nav-icon i-skills">♞</div>
       Zručnosti
+    </button>
+    <button class="nav-btn" id="btnHry" onclick="toggleHryMenu()">
+      <div class="nav-icon i-hry">🎲</div>
+      Hry
     </button>
     <button class="nav-btn" onclick="goTraining('taktika')">
       <div class="nav-icon i-taktika">⚔</div>
@@ -444,6 +453,9 @@ body {
     <button class="sub-btn" onclick="goReport()">
       <div class="sub-icon i-koncovka">📄</div>Mesačný report
     </button>
+    <button class="sub-btn" onclick="goHryPrehlad()">
+      <div class="sub-icon i-hry">🎲</div>Prehľad hier
+    </button>
     <button class="sub-btn" id="koncovkySubBtn" onclick="goKoncovky()" style="display:none;">
       <div class="sub-icon i-strategia">🔍</div>Analýza koncoviek
     </button>
@@ -493,6 +505,14 @@ body {
     </button>
   </div>
 
+  <!-- Podmenu hier — hry, ktoré vysvetľujú zručnosti (pred tréningom v Zručnostiach) -->
+  <div id="hrySubmenu" class="submenu submenu-hry">
+    <button class="sub-btn" onclick="goHra('sachovy-trh')">
+      <div class="sub-icon i-hry">💰</div>Šachový trh
+      <span class="sub-pozn">vysvetľuje Branie so ziskom</span>
+    </button>
+  </div>
+
   <!-- 5 rebríčkov vedľa seba -->
   <div class="leaderboards">
     <div class="lb-card">
@@ -523,6 +543,9 @@ body {
 <script src="js/auth.js"></script>
 <script src="js/player.js"></script>
 <script>
+// ZNAČKA VERZIE — pri každej úprave tohto súboru prepíš dátum.
+(window.VERZIE = window.VERZIE || {})['index.html'] = '2026-09-24';
+
 async function initPage() {
   const ok = await refreshSession();
   if (!ok) { location.href = 'login.html'; return; }
@@ -729,6 +752,8 @@ function goKoncovkyMapa()  { location.href = "koncovky-mapa.html"; }
 function goCasovaMapa()   { location.href = 'casova-mapa.html'; }
 function goSutaze()       { location.href = 'sutaze.html'; }
 function goMojeSutaze()   { location.href = 'moje-sutaze.html'; }
+function goHra(kluc)      { location.href = kluc + '.html'; }
+function goHryPrehlad()   { location.href = 'hry-prehlad.html'; }
 
 // Odznak s počtom nesplnených zadaní. Splnenie sa vyhodnocuje rovnako ako na
 // stránke zadania.html: pri cieli na ELO podľa aktuálneho elo_<zručnosť>,
@@ -790,8 +815,7 @@ async function loadAssignmentBadge() {
     const open = rows.filter(a => {
       if (a.completed_at) return false;                 // ručne uzavreté trénerom
       if (a.target_type === 'elo' && !a.endgame_type) {
-        // 1000 = predvolená hodnota ELO stĺpcov v databáze (do resetu 1200)
-        return Number(player['elo_' + a.skill] ?? 1000) < a.target_value;
+        return Number(player['elo_' + a.skill] ?? 1200) < a.target_value;
       }
       return countFirstAttemptWins(logRows, a, meta) < a.target_value;
     }).length;
@@ -843,7 +867,7 @@ function toggleKoncovkyMenu() {
   const menu = document.getElementById('koncovkySubmenu');
   const btn  = document.getElementById('btnKoncovky');
   const isOpen = menu.classList.contains('open');
-  closeSkillsMenu(); closeTrenerMenu();
+  closeSkillsMenu(); closeTrenerMenu(); closeHryMenu();
   menu.classList.toggle('open');
   btn.classList.toggle('active', !isOpen);
   if (!isOpen) loadKoncovkyTypes();
@@ -860,7 +884,7 @@ function toggleSkillsMenu() {
   const menu = document.getElementById('skillsSubmenu');
   const btn  = document.getElementById('btnSkills');
   const isOpen = menu.classList.contains('open');
-  closeTrenerMenu(); closeKoncovkyMenu();
+  closeTrenerMenu(); closeKoncovkyMenu(); closeHryMenu();
   menu.classList.toggle('open');
   btn.classList.toggle('active', !isOpen);
 }
@@ -869,7 +893,7 @@ function toggleTrenerMenu() {
   const menu = document.getElementById('trenerSubmenu');
   const btn  = document.getElementById('trenerBtn');
   const isOpen = menu.classList.contains('open');
-  closeSkillsMenu(); closeKoncovkyMenu();
+  closeSkillsMenu(); closeKoncovkyMenu(); closeHryMenu();
   menu.classList.toggle('open');
   btn.classList.toggle('active', !isOpen);
 }
@@ -877,6 +901,22 @@ function toggleTrenerMenu() {
 function closeSkillsMenu() {
   document.getElementById('skillsSubmenu').classList.remove('open');
   document.getElementById('btnSkills').classList.remove('active');
+}
+
+function toggleHryMenu() {
+  const menu = document.getElementById('hrySubmenu');
+  const btn  = document.getElementById('btnHry');
+  const isOpen = menu.classList.contains('open');
+  closeSkillsMenu(); closeKoncovkyMenu(); closeTrenerMenu();
+  menu.classList.toggle('open');
+  btn.classList.toggle('active', !isOpen);
+}
+
+function closeHryMenu() {
+  const m = document.getElementById('hrySubmenu');
+  const b = document.getElementById('btnHry');
+  if (m) m.classList.remove('open');
+  if (b) b.classList.remove('active');
 }
 
 function closeTrenerMenu() {
