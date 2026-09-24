@@ -8,9 +8,11 @@
 //                                        udalost = { pokusy, posledne })
 //
 //  Úložiská:
-//    HraPostup.lokalne(hra, userId)   — len prehliadač (testovanie zo súboru)
-//    HraPostup.databaza(hra, userId)  — tabuľka hra_postup v Supabase
-//                                       + kópia v prehliadači pre prípad výpadku
+//    HraPostup.lokalne(hra, userId, verzia)   — len prehliadač (testovanie zo súboru)
+//    HraPostup.databaza(hra, userId, verzia)  — tabuľka hra_postup v Supabase
+//                                               + kópia v prehliadači pre prípad výpadku
+//  verzia = verzia číslovania kapitol z obsahu hry (napr. OBSAH_TRH.verzia). Kópia
+//  v prehliadači zo starého číslovania sa nepoužije, lebo by kapitoly pomiešala.
 //
 //  DATABÁZA sa zapisuje LEN cez funkciu hra_zapis_postup (pozri hry-postup.sql).
 //  Tá lepší výsledok nikdy neprepíše horším. Do training_log sa NEZAPISUJE —
@@ -32,14 +34,16 @@
 //  Potrebuje: js/player.js (sbFetch) — pre úložisko databaza a pre prístup.
 // ============================================================================
 
-(window.VERZIE = window.VERZIE || {})['hra-postup.js'] = '2026-09-24b';
+(window.VERZIE = window.VERZIE || {})['hra-postup.js'] = '2026-09-24c';
 
 const HraPostup = (function () {
   'use strict';
 
   function prazdny() { return { verzia: 1, kapitoly: {} }; }
 
-  function klucLokalne(hra, userId) { return 'hra_' + hra + '_' + (userId || 'lokalne'); }
+  function klucLokalne(hra, userId, verzia) {
+    return 'hra_' + hra + (verzia ? '_v' + verzia : '') + '_' + (userId || 'lokalne');
+  }
 
   function citajLokalne(kluc) {
     try {
@@ -80,8 +84,8 @@ const HraPostup = (function () {
   }
 
   // ── Len prehliadač ──────────────────────────────────────────────────────
-  function lokalne(hra, userId) {
-    const kluc = klucLokalne(hra, userId);
+  function lokalne(hra, userId, verzia) {
+    const kluc = klucLokalne(hra, userId, verzia);
     return {
       nacitaj: () => Promise.resolve(citajLokalne(kluc)),
       uloz: (postup) => { pisLokalne(kluc, postup); return Promise.resolve(); }
@@ -89,8 +93,8 @@ const HraPostup = (function () {
   }
 
   // ── Databáza ────────────────────────────────────────────────────────────
-  function databaza(hra, userId) {
-    const kluc = klucLokalne(hra, userId);
+  function databaza(hra, userId, verzia) {
+    const kluc = klucLokalne(hra, userId, verzia);
 
     function zapis(cislo, z, pokusy, posledne, kedy) {
       return sbFetch('rpc/hra_zapis_postup', {
