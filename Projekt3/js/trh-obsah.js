@@ -14,6 +14,7 @@
 //    kolko    — aký je zisk ťahu `tah`? (fen, tah)
 //    pasca    — ktoré z braní `moznosti` je so ziskom? (fen, moznosti)
 //    najdi    — nájdi všetky brania so ziskom za oboch (fen, pomocka)
+//    stanok   — na ktorom poli (stánku) sa počíta zisk ťahu `tah`? (fen, tah, moznosti = polia)
 //
 //  KAPITOLA môže mať aj:
 //    skuska     — záverečná skúška (náhodný výber pozícií, časový limit)
@@ -25,8 +26,14 @@
 //  anglicky ako vo FEN (K Q R B N P).
 // ============================================================================
 
+(window.VERZIE = window.VERZIE || {})['trh-obsah.js'] = '2026-09-24c';
+
 const OBSAH_TRH = {
   kluc: 'sachovy-trh',
+  // Verzia číslovania kapitol. Pri zmene poradia kapitol sa zvýši — kópia postupu
+  // v prehliadači zo starého číslovania sa potom nepoužije (databázu prečísluje SQL).
+  //   2 = 24. 9. 2026: nová kapitola 10 Zručnosť a šachová hra, skúška 10 → 11, bonus zrušený
+  verzia: 2,
   nazov: 'Šachový trh',
   podtitul: 'Hra, ktorá vysvetľuje zručnosť Branie so ziskom',
   sprievodca: 'Grošík',
@@ -65,6 +72,7 @@ const OBSAH_TRH = {
       cislo: 2,
       nazov: 'Nekrytá figúrka',
       uvod: [
+        'Každé pole šachovnice je jeden <b>stánok</b> nášho trhu. Obchod sa počíta vždy na stánku, kde sa berie.',
         'Figúrka je <b>krytá</b>, keď ju chráni iná figúrka jej farby. Keby si ju zobral, strážca zoberie tvoju figúrku späť.',
         'Figúrka je <b>nekrytá</b>, keď ju nechráni nikto. Je ako peňaženka zabudnutá na lavičke: kto ju vezme, má všetky mince a nič neplatí.',
         'Pozor, aj kráľ môže brať! Ale len nekrytú figúrku, lebo kráľ nesmie vstúpiť na napadnuté pole.'
@@ -284,7 +292,7 @@ const OBSAH_TRH = {
                       'Viazaný môže byť aj pešiak (9.3).',
       preTrenerov: 'see_with_pins vyradí z výmeny každú figúrku, ktorej branie by nechalo vlastného kráľa v šachu. ' +
                    'Rovnako to robí count_attackers. Preto generátor pri 9.1 napíše „Nikto ho nebráni", hoci jazdec f6 ' +
-                   'na pole d5 vidí. Relatívna väzba (na dámu alebo vežu) sa NEráta, pozri bonusovú kapitolu.',
+                   'na pole d5 vidí. Relatívna väzba (na dámu alebo vežu) sa NEráta, pozri kapitolu 10.',
       ulohy: [
         { id: '9.1', typ: 'anonie', fen: '7k/8/5n2/3p4/8/8/1B6/3RK3 w - - 0 1', tah: 'd1d5',
           ocakavane: 1, vysvetlenie: 'Jazdec f6 je viazaný strelcom b2 na kráľa h8. Pešiaka d5 preto nikto nebráni.' },
@@ -299,9 +307,52 @@ const OBSAH_TRH = {
       ]
     },
 
-    // ── Kapitola 10 — záverečná skúška ─────────────────────────────────────
+    // ── Kapitola 10 — zručnosť a šachová hra ───────────────────────────────
     {
       cislo: 10,
+      nazov: 'Zručnosť a šachová hra',
+      uvod: [
+        'Náš trh má <b>64 stánkov</b> — každé pole šachovnice je jeden stánok. Keď začneš brať, vyberieš si stánok: ' +
+        'je to pole, na ktorom berieš. Tam sa uzatvára celý obchod: berieš ty, berie súper, berieš ty…',
+        'Zisk počítame <b>len na tomto stánku</b>. Čo sa potom môže stať na inom stánku, je iný obchod. ' +
+        'Nezaujíma nás, aj keby tam bol veľký zisk alebo veľká strata.'
+      ],
+      uvodKoniec: 'V skutočnej partii sa pozeráš na celú šachovnicu. Tu sa učíš jednu vec: rýchlo a presne vidieť zisk na jednom stánku.',
+      zapamataj: 'Počítam len na stánku, kde som začal brať. Ostatné stánky sú iný obchod.',
+      prePokrocilych: 'Na našom stánku platia pravidlá šachu: viazaná figúrka na kráľa nesmie brať (kapitola 9), ' +
+                      'kráľ nesmie zobrať krytú figúrku a pešiak na poslednom rade sa mení na dámu. Nepočítame však, ' +
+                      'čo sa potom stane na inom stánku: väzbu na dámu, odkrytý útok, preťaženého obrancu, medziťah ani mat.',
+      preTrenerov: 'Zručnosť Branie so ziskom trénuje len videnie možnosti zisku materiálu na určitom poli. Netrénuje ' +
+                   'hľadanie najlepšieho ťahu. see_with_pins počíta výmenu len na cieľovom poli; relatívnu väzbu, odkrytý ' +
+                   'útok, preťaženého obrancu, medziťah ani mat po braní zámerne nevidí. Rešpektuje však legálnosť ' +
+                   '(absolútna väzba, kráľ nevstúpi do šachu) a premenu pešiaka.',
+      ulohy: [
+        { id: '10.1', typ: 'stanok', fen: '1k5q/8/5n2/8/3Bp3/8/8/4RK2 w - - 0 1', tah: 'e1e4',
+          moznosti: ['e4', 'f6', 'h8'], ocakavane: -4,
+          vysvetlenie: 'Stánok je pole, na ktorom sa berie: e4. Tam sa uzatvára celý obchod.' },
+        { id: '10.2', typ: 'anonie', fen: '1k5q/8/5n2/8/3Bp3/8/8/4RK2 w - - 0 1', tah: 'e1e4',
+          ocakavane: -4,
+          vysvetlenie: 'Na stánku e4 stratíš 4 mince: jazdec f6 zoberie vežu. Že potom Sd4×h8 zoberie dámu, ' +
+                       'je iný stánok — iný obchod.' },
+        { id: '10.3', typ: 'anonie', fen: 'r5k1/pp1q2pp/2p1r3/3pP3/6Q1/2N5/PPP2PPK/R4R2 b - - 0 1', tah: 'e6e5',
+          otazka: 'Na ťahu je čierny. Je <b>{tah}</b> branie so ziskom?',
+          ocakavane: 1,
+          vysvetlenie: 'Na stánku e5 čierny zarobí pešiaka, nikto ho nebráni. Že potom Dg4×d7 zoberie dámu, ' +
+                       'je iný stánok — iný obchod.' },
+        { id: '10.4', typ: 'anonie', fen: '6k1/8/1b2p3/8/3N4/8/5Q2/7K w - - 0 1', tah: 'd4e6',
+          ocakavane: 1,
+          vysvetlenie: 'Na stánku e6 zarobíš pešiaka, nikto ho nebráni. Že jazdec odkryl uhlopriečku a Sb6×f2 ' +
+                       'zoberie dámu, je iný stánok — iný obchod.' },
+        { id: '10.5', typ: 'najdi', fen: '6k1/8/5p2/3np3/8/p7/1B6/3R2K1 w - - 0 1', pomocka: 'strany',
+          ocakavane: ['b2a3', 'd1d5', 'a3b2'],
+          vysvetlenie: 'Tri stánky, tri obchody: d5 a a3 pre bieleho, b2 pre čierneho. Pri Vd1×d5 nás b2 nezaujíma — ' +
+                       'ale je to ďalší stánok, a aj ten treba nájsť.' }
+      ]
+    },
+
+    // ── Kapitola 11 — záverečná skúška ─────────────────────────────────────
+    {
+      cislo: 11,
       nazov: 'Záverečná skúška',
       uvod: [
         'Teraz si naozajstný obchodník! Čaká ťa <b>10 pozícií z ozajstných partií</b>.',
@@ -309,7 +360,7 @@ const OBSAH_TRH = {
         'Keď vyriešiš aspoň 8 pozícií úplne a bez chyby, získaš odznak <b>Obchodník</b>.'
       ],
       uvodKoniec: 'Ak sa nepodarí, poviem ti, ktoré kapitoly si zopakovať. Pozície budú zakaždým iné.',
-      zapamataj: 'Obchodník vidí za oboch, počíta celú výmenu a berie len so ziskom.',
+      zapamataj: 'Obchodník vidí za oboch, počíta celú výmenu na stánku a berie len so ziskom.',
       preTrenerov: 'Pozície sú skutočné pozície zo Skills.pgn, z ktorých generátor robí úlohy direct_attack (60 pozícií ' +
                    's 1 až 4 riešeniami, náhodne sa vyberie 10). Čas ako v tréningu na úrovni 1: 15 s + 10 s na riešenie. ' +
                    'Skúška sa nezapisuje do training_log a neovplyvní ELO zručnosti. ' +
@@ -382,35 +433,6 @@ const OBSAH_TRH = {
           '1r2k2r/p5bp/4p1p1/q2pn3/1p2N1P1/6QP/PPP5/1KBR3R w k - 0 1'
         ]
       }
-    },
-
-    // ── Bonus ──────────────────────────────────────────────────────────────
-    {
-      cislo: 11,
-      znacka: 'B',
-      nazov: 'Bonus: Kde pravidlo končí',
-      odomknePo: 9,
-      uvod: [
-        'Šachovnica má 64 polí, ale naše počítanie sleduje len jedno.',
-        'Niekedy preto povie „nie", hoci by si v partii vyhral. Inokedy povie „áno", hoci by si prehral.',
-        'Branie so ziskom je <b>prvý krok</b>, nie posledný.'
-      ],
-      uvodKoniec: 'Pravidlo nevidí ani preťaženého obrancu, medziťah či mat po braní. V týchto úlohách odpovedaj podľa pravidla — a potom sa pozri, čo by sa stalo v partii.',
-      zapamataj: 'Branie so ziskom je prvý krok, nie posledný.',
-      preTrenerov: 'Tento rozdiel je zámerný. Úloha trénuje rýchle a presné počítanie výmeny na jednom poli. Hodnotenie ' +
-                   'celej pozície patrí do iných zručností (priame hrozby, vidličky) a do riešenia kombinácií.',
-      ulohy: [
-        { id: 'B1', typ: 'anonie', fen: '1k5q/8/5n2/8/3Bp3/8/8/4RK2 w - - 0 1', tah: 'e1e4',
-          otazka: 'Je <b>{tah}</b> branie so ziskom podľa pravidla?',
-          ocakavane: -4,
-          vysvetlenie: 'Podľa pravidla nie: jazdec f6 zoberie vežu. V partii však po Jf6×e4 príde Sd4×h8 — jazdec ' +
-                       'bol viazaný na dámu. Takú väzbu pravidlo nevidí.' },
-        { id: 'B2', typ: 'anonie', fen: '6k1/8/1b2p3/8/3N4/8/5Q2/7K w - - 0 1', tah: 'd4e6',
-          otazka: 'Je <b>{tah}</b> branie so ziskom podľa pravidla?',
-          ocakavane: 1,
-          vysvetlenie: 'Podľa pravidla áno: pešiaka nikto nebráni. V partii by to však bola chyba — jazdec odišiel z d4, ' +
-                       'otvoril uhlopriečku a strelec b6 zoberie dámu f2.' }
-      ]
     }
   ]
 };
