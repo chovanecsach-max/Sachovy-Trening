@@ -132,9 +132,10 @@ tr.nezacal td.meno { color: #64748b; font-weight: normal; }
 <script src="js/auth.js"></script>
 <script src="js/player.js"></script>
 <script src="js/trh-obsah.js"></script>
+<script src="js/hra-postup.js"></script>
 <script>
 // ZNAČKA VERZIE — pri každej úprave tohto súboru prepíš dátum.
-(window.VERZIE = window.VERZIE || {})['hry-prehlad.html'] = '2026-09-24';
+(window.VERZIE = window.VERZIE || {})['hry-prehlad.html'] = '2026-09-24b';
 
 // ─── Hry ─────────────────────────────────────────────────────────────────────
 // Každá hra má svoj obsah (kapitoly, názvy) v samostatnom súbore. Nová hra =
@@ -369,6 +370,7 @@ async function init() {
     goHome();
     return;
   }
+  if (!await HraPostup.vyzadujPristup()) return;   // kým sa hry pripravujú, len admin
 
   const b = document.getElementById('roleBanner');
   if (IS_TRENER) {
