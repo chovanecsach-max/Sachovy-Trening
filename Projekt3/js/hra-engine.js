@@ -5,7 +5,7 @@
 //  trh-obsah.js) a postará sa o všetko ostatné:
 //    • mapa kapitol, odomykanie, hviezdičky, zošit pravidiel, odznak,
 //    • úvod kapitoly so sprievodcom Grošíkom,
-//    • úlohy (typy: vazenie, obchod, anonie, kolko, pasca, najdi),
+//    • úlohy (typy: vazenie, obchod, anonie, kolko, pasca, najdi, stanok),
 //    • body: správne +10, chyba −5, séria 5 správnych +10, úloha Nájdi
 //      všetky bez chyby +10; skóre kapitoly neklesne pod nulu,
 //    • po odpovedi rebrík výmeny na šachovnici (RebrikVymeny),
@@ -23,7 +23,7 @@
 //  Spustenie: HraEngine.spusti({ obsah, koren, rola, userId, testovaci, uloziste })
 // ============================================================================
 
-(window.VERZIE = window.VERZIE || {})['hra-engine.js'] = '2026-09-24';
+(window.VERZIE = window.VERZIE || {})['hra-engine.js'] = '2026-09-24c';
 
 const HraEngine = (function () {
   'use strict';
@@ -84,7 +84,7 @@ const HraEngine = (function () {
 
   // Náhradné úložisko, keď stránka žiadne nedodá: len prehliadač
   function lokalneUloziste() {
-    const kluc = 'hra_' + O.kluc + '_' + (nast.userId || 'lokalne');
+    const kluc = 'hra_' + O.kluc + (O.verzia ? '_v' + O.verzia : '') + '_' + (nast.userId || 'lokalne');
     return {
       nacitaj: () => {
         try {
@@ -147,6 +147,9 @@ const HraEngine = (function () {
       else if (u.typ === 'pasca') vypocet = u.moznosti.filter(x => ziskNaSachovnici(poz.board, x) > 0);
       else if (u.tah && !jeLegalny(poz.board, u.tah)) vypocet = 'nelegalny';
       else if (u.tah) vypocet = ziskNaSachovnici(poz.board, u.tah);
+      if (u.typ === 'stanok' && !(u.moznosti || []).includes(u.tah.slice(2, 4))) {
+        console.warn('Úloha ' + u.id + ': medzi možnosťami chýba stánok ' + u.tah.slice(2, 4));
+      }
       if (JSON.stringify(vypocet) !== JSON.stringify(u.ocakavane)) {
         console.warn('Úloha ' + u.id + ': scenár čaká ' + JSON.stringify(u.ocakavane) +
                      ', výpočet dáva ' + JSON.stringify(vypocet));
@@ -905,6 +908,39 @@ const HraEngine = (function () {
             : (zisk === 0 ? 'Nie je to zisk, je to len výmena.' : 'Nie je to zisk — stratil by si ' + mince(-zisk) + '.'));
         }));
       grosikHovori('rozmysla', 'Pozri sa, či figúrku niekto kryje, a spočítaj, čo dostaneš a čo zaplatíš.');
+    }
+  };
+
+  // ── Ktorý stánok? — na ktorom poli sa počíta zisk brania ─────────────
+  // Správny stánok je vždy cieľové pole ťahu: tam sa začína a končí výmena.
+  TYPY.stanok = {
+    priprav(u) {
+      const spravne = u.tah.slice(2, 4);
+      const zisk = ziskTahu(u, u.tah);
+      document.getElementById('hraZadanie').innerHTML =
+        'Na ktorom stánku sa počíta zisk ťahu <b>' + esc(nazov(u, u.tah)) + '</b>?';
+      sachovnica.oznac(oznacTah(u.tah));
+      nastavOdpovede('<div class="moznosti">' + u.moznosti.map(pole =>
+        '<button class="moznost" data-h="' + pole + '">' + esc(pole) + '</button>').join('') + '</div>',
+        el => el.querySelectorAll('.moznost').forEach(b => b.onclick = () => {
+          const dobre = b.dataset.h === spravne;
+          vyznacVolbu(b, dobre);
+          el.querySelectorAll('.moznost').forEach(x => { if (x.dataset.h === spravne) x.classList.add('spravna'); });
+          sachovnica.naKlik = null;
+          panelRebrika(u.tah);
+          spustiRebrik(u.tah);
+          const naStanku = ' Na stánku ' + spravne + ': ' + RV.textVerdiktu(zisk).toLowerCase() + '.';
+          if (dobre) {
+            const bonus = zapisSpravne();
+            grosikHovori('nadseny', pochvala() + ' ' + esc(u.vysvetlenie) + naStanku + bonus);
+            ukazPokracovanie(true, '+' + BODY_SPRAVNE + ' bodov · stánok ' + spravne);
+          } else {
+            zapisChybu();
+            grosikHovori('smutny', 'Správne je ' + spravne + '. ' + esc(u.vysvetlenie) + naStanku);
+            ukazPokracovanie(false, znak(BODY_CHYBA) + ' bodov · stánok ' + spravne);
+          }
+        }));
+      grosikHovori('rozmysla', 'Stánok je pole, na ktorom sa berie. Tam sa uzatvára celý obchod.');
     }
   };
 
