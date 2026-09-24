@@ -523,7 +523,7 @@ table.rebrik tr.koniec td { background: #f8fafc; font-size: 13px; }
 
 <script>
 // ZNAČKA VERZIE — pri každej úprave tohto súboru prepíš dátum.
-(window.VERZIE = window.VERZIE || {})['sachovy-trh.html'] = '2026-09-24b';
+(window.VERZIE = window.VERZIE || {})['sachovy-trh.html'] = '2026-09-24c';
 
 // Postup sa na webe ukladá do databázy (tabuľka hra_postup), aby ho hráč mal
 // na každom zariadení a videl ho aj tréner. Pri teste zo súboru len do prehliadača.
@@ -536,8 +536,8 @@ function spustiHru(testovaci) {
     userId: userId,
     testovaci: testovaci,
     uloziste: (testovaci || !userId)
-      ? HraPostup.lokalne(OBSAH_TRH.kluc, userId)
-      : HraPostup.databaza(OBSAH_TRH.kluc, userId)
+      ? HraPostup.lokalne(OBSAH_TRH.kluc, userId, OBSAH_TRH.verzia)
+      : HraPostup.databaza(OBSAH_TRH.kluc, userId, OBSAH_TRH.verzia)
   });
 }
 
