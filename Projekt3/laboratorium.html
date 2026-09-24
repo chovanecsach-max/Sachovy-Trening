@@ -460,10 +460,11 @@ table.rebrik tr.koniec td { background: #f8fafc; font-size: 13px; }
 <script src="js/player.js"></script>
 <script src="js/vision-core.js"></script>
 <script src="js/rebrik-vymeny.js"></script>
+<script src="js/hra-postup.js"></script>
 
 <script>
 // ZNAČKA VERZIE — pri každej úprave tohto súboru prepíš dátum.
-(window.VERZIE = window.VERZIE || {})['laboratorium.html'] = '2026-09-23';
+(window.VERZIE = window.VERZIE || {})['laboratorium.html'] = '2026-09-24b';
 
 // ─── Pozície z knihy Šachový trh (overené generátorom) ──────────────────────
 const POZICIE_KNIHY = [
@@ -921,6 +922,7 @@ async function checkAuthAndInit() {
   if (!ok) { location.href = 'login.html'; return; }
   if (!await vyzadujBezUdrzby()) return;
   if (!await vyzadujPlatnost()) return;
+  if (!await HraPostup.vyzadujPristup()) return;   // kým sa hry pripravujú, len admin
   hlasPritomnost();
   init();
 }
