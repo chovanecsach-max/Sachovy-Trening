@@ -312,7 +312,8 @@ const OBSAH_TRH = {
       zapamataj: 'Obchodník vidí za oboch, počíta celú výmenu a berie len so ziskom.',
       preTrenerov: 'Pozície sú skutočné pozície zo Skills.pgn, z ktorých generátor robí úlohy direct_attack (60 pozícií ' +
                    's 1 až 4 riešeniami, náhodne sa vyberie 10). Čas ako v tréningu na úrovni 1: 15 s + 10 s na riešenie. ' +
-                   'Skúška sa nezapisuje do training_log a neovplyvní ELO zručnosti.',
+                   'Skúška sa nezapisuje do training_log a neovplyvní ELO zručnosti. ' +
+                   'Kto skúšku zložil a ako idú kapitoly, uvidíš v menu Tréner → Prehľad hier.',
       skuska: {
         pocet: 10,
         hranica: 8,
