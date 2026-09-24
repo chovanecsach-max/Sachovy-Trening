@@ -123,7 +123,8 @@ body {
 /* ── Nav mriežka ── */
 .nav-row {
   display: grid;
-  grid-template-columns: repeat(9, 1fr);
+  /* počet stĺpcov nastaví prisposobMenu() podľa viditeľných tlačidiel */
+  grid-template-columns: repeat(var(--stlpce, 8), 1fr);
   gap: 10px;
   margin-bottom: 12px;
 }
@@ -383,13 +384,13 @@ body {
 <!-- Hlavný obsah -->
 <div class="main">
 
-  <!-- Hlavné menu — 9 stĺpcov (hráč: Zručnosti … Dokumentácia; tréner namiesto Zadaní Tréner) -->
-  <div class="nav-row">
+  <!-- Hlavné menu — všetky tlačidlá v jednom rade, pri viac než 9 v dvoch rovnakých -->
+  <div class="nav-row" id="navRow">
     <button class="nav-btn" id="btnSkills" onclick="toggleSkillsMenu()">
       <div class="nav-icon i-skills">♞</div>
       Zručnosti
     </button>
-    <button class="nav-btn" id="btnHry" onclick="toggleHryMenu()">
+    <button class="nav-btn" id="btnHry" onclick="toggleHryMenu()" style="display:none;">
       <div class="nav-icon i-hry">🎲</div>
       Hry
     </button>
@@ -453,7 +454,7 @@ body {
     <button class="sub-btn" onclick="goReport()">
       <div class="sub-icon i-koncovka">📄</div>Mesačný report
     </button>
-    <button class="sub-btn" onclick="goHryPrehlad()">
+    <button class="sub-btn" id="hryPrehladSubBtn" onclick="goHryPrehlad()" style="display:none;">
       <div class="sub-icon i-hry">🎲</div>Prehľad hier
     </button>
     <button class="sub-btn" id="koncovkySubBtn" onclick="goKoncovky()" style="display:none;">
@@ -542,9 +543,25 @@ body {
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/auth.js"></script>
 <script src="js/player.js"></script>
+<script src="js/hra-postup.js"></script>
 <script>
 // ZNAČKA VERZIE — pri každej úprave tohto súboru prepíš dátum.
-(window.VERZIE = window.VERZIE || {})['index.html'] = '2026-09-24';
+(window.VERZIE = window.VERZIE || {})['index.html'] = '2026-09-24b';
+
+// Hlavné menu: všetky tlačidlá v jednom rade; keď ich je viac než 9, v dvoch
+// rovnakých radoch. Tlačidlá sa zobrazujú postupne (Zadania, Súťaže, Hry sa
+// dozvedia až z databázy), preto sa počet prepočíta pri každej zmene.
+// Na mobile platí pevné pravidlo 4 stĺpcov z CSS.
+function prisposobMenu() {
+  const row = document.getElementById('navRow');
+  const n = [...row.children].filter(b => b.style.display !== 'none').length;
+  const stlpce = String(n <= 9 ? n : Math.ceil(n / 2));
+  // len pri zmene — inak by zápis do style znova spustil pozorovateľa
+  if (row.style.getPropertyValue('--stlpce') !== stlpce) row.style.setProperty('--stlpce', stlpce);
+}
+new MutationObserver(prisposobMenu).observe(document.getElementById('navRow'),
+  { attributes: true, subtree: true, attributeFilter: ['style'] });
+prisposobMenu();
 
 async function initPage() {
   const ok = await refreshSession();
@@ -565,6 +582,14 @@ async function initPage() {
   if (role === 'hrac') {
     document.getElementById('asgBtn').style.display = 'flex';
   }
+  // Hry — kým sa pripravujú, vidí ich len admin (nastavenie 'hry', pozri hra-postup.js)
+  HraPostup.pristup(role).then(ok => {
+    if (!ok) return;
+    document.getElementById('btnHry').style.display = 'flex';
+    if (role === 'trener' || role === 'hlavny_trener' || role === 'admin') {
+      document.getElementById('hryPrehladSubBtn').style.display = 'flex';
+    }
+  });
   if (role === 'admin') {
     document.getElementById('adminSubBtn').style.display = 'flex';
     document.getElementById('koncovkySubBtn').style.display = 'flex';
