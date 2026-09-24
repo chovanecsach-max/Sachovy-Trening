@@ -20,10 +20,19 @@
 //  sa pre výpadok siete neodoslal), zostal v prehliadači. Pri načítaní sa
 //  porovná s databázou a čo je v prehliadači lepšie, pošle sa hore.
 //
-//  Potrebuje: js/player.js (sbFetch) — len pre úložisko databaza.
+//  PRÍSTUP K HRÁM: kým sa hry pripravujú, vidí ich len admin. Kto ich vidí,
+//  určuje riadok 'hry' v tabuľke nastavenia (rovnako ako režim údržby):
+//      'admin'    — len admin (platí aj vtedy, keď riadok chýba)
+//      'personal' — admin, hlavný tréner a tréneri (na vyskúšanie pred spustením)
+//      'vsetci'   — všetci vrátane hráčov
+//  Zmena v SQL editore (netreba nič nahrávať na GitHub):
+//      insert into nastavenia (kluc, hodnota) values ('hry', 'vsetci')
+//      on conflict (kluc) do update set hodnota = excluded.hodnota, zmenene = now();
+//
+//  Potrebuje: js/player.js (sbFetch) — pre úložisko databaza a pre prístup.
 // ============================================================================
 
-(window.VERZIE = window.VERZIE || {})['hra-postup.js'] = '2026-09-24';
+(window.VERZIE = window.VERZIE || {})['hra-postup.js'] = '2026-09-24b';
 
 const HraPostup = (function () {
   'use strict';
@@ -145,10 +154,50 @@ const HraPostup = (function () {
     return { nacitaj: nacitaj, uloz: uloz };
   }
 
+  // ── Prístup k hrám ──────────────────────────────────────────────────────
+  const PERSONAL = ['admin', 'hlavny_trener', 'trener'];
+  let _pristupCache = null;
+
+  // Smie prihlásený používateľ hry vidieť? Admin vždy.
+  async function pristup(rola) {
+    rola = rola || sessionStorage.getItem('user_role') || '';
+    if (rola === 'admin') return true;
+    if (_pristupCache === null) {
+      try {
+        const rows = await sbFetch('nastavenia?kluc=eq.hry&select=hodnota&limit=1');
+        _pristupCache = (rows && rows[0] && rows[0].hodnota) || 'admin';
+      } catch (e) {
+        _pristupCache = 'admin';      // pri chybe radšej zatvorené
+      }
+    }
+    if (_pristupCache === 'vsetci') return true;
+    if (_pristupCache === 'personal') return PERSONAL.includes(rola);
+    return false;
+  }
+
+  // Na stránke hry: ak hry ešte nie sú sprístupnené, ukáže oznam a vráti false
+  async function vyzadujPristup() {
+    if (await pristup()) return true;
+    document.body.innerHTML =
+      '<div style="max-width:520px;margin:60px auto;padding:26px;background:#fff;' +
+      'border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,.08);' +
+      'font-family:Arial,sans-serif;text-align:center;color:#111827;">' +
+      '<div style="font-size:40px;margin-bottom:10px;">🎲</div>' +
+      '<h2 style="margin:0 0 10px;color:#b45309;">Hry sa pripravujú</h2>' +
+      '<p style="color:#475569;font-size:15px;line-height:1.5;">' +
+      'Na hrách ešte pracujeme. Čoskoro ich nájdeš v menu Hry.</p>' +
+      '<button onclick="location.href=\'index.html\'" style="margin-top:14px;padding:11px 20px;' +
+      'border:none;border-radius:10px;background:#1e3a5f;color:#fff;font-size:14px;' +
+      'font-weight:bold;cursor:pointer;">Späť na úvod</button></div>';
+    return false;
+  }
+
   return {
     lokalne: lokalne,
     databaza: databaza,
     klucLokalne: klucLokalne,
+    pristup: pristup,
+    vyzadujPristup: vyzadujPristup,
     // pre testy
     _lepsi: lepsi,
     _zluc: zluc
