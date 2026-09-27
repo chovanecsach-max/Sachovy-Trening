@@ -28,9 +28,16 @@
 //    VisionCore.rebrikVymeny(board, 'f4d5')                 → priebeh výmeny krok po kroku
 //    VisionCore.nazovTahu(board, zPola, naPola)             → 'Jf4×d5'
 //
+//  Slabo pokryté figúrky (hra Stráž na trhu, úloha underdefended):
+//    VisionCore.slaboPokryte(board, state)   → { riesenia: ['e4', ...], vysvetlenia, dovod }
+//    VisionCore.strazFigurky(board, pole)    → { utocnici: [...], obrancovia: [...], slaba }
+//    VisionCore.strazPola(board, pole, farba) → kto z farby útočí / bráni (aj batérie)
+//
 //  Šachovnica je pole 64 reťazcov: index 0 = a8, 7 = h8, 56 = a1, 63 = h1.
 //  Prázdne pole = '', figúrky ako vo FEN (P N B R Q K biele, p n b r q k čierne).
 // ============================================================================
+
+if (typeof window !== 'undefined') (window.VERZIE = window.VERZIE || {})['vision-core.js'] = '2026-09-27';
 
 const VisionCore = (function () {
   'use strict';
@@ -700,6 +707,184 @@ const VisionCore = (function () {
   }
 
   // ── Verejné rozhranie ──────────────────────────────────────────────────
+
+  // ════════════════════════════════════════════════════════════════════
+  //  SLABO POKRYTÉ FIGÚRKY (hra Stráž na trhu, úloha underdefended)
+  // ════════════════════════════════════════════════════════════════════
+  const MAX_SLABO_POKRYTYCH = 10;                              // MAX_UNDERDEFENDED
+  const SK_KRYTY = { p: ['krytý', 'napadnutý'], n: ['krytý', 'napadnutý'], b: ['krytý', 'napadnutý'],
+                     r: ['krytá', 'napadnutá'], q: ['krytá', 'napadnutá'], k: ['krytý', 'napadnutý'] };
+
+  // ── Kto útočí na pole / kto ho bráni — ZOZNAM figúrok ─────────────────
+  //  Presne tá istá logika ako countAttackers (count_attackers v generátore),
+  //  len namiesto počtu vracia figúrky: [{ i, pole, figurka, cez }]
+  //    cez = null          — figúrka mieri na pole priamo
+  //          'bateria'     — stojí v línii za vlastnou figúrkou (batéria)
+  //          'za_superom'  — stojí za súperovou strelou, ktorá na pole mieri
+  //  Počet prvkov sa MUSÍ rovnať countAttackers — overuje testy/test-jadro.html.
+  function strazPola(board, sq, color) {
+    const zoznam = [];
+    const row = rowOf(sq), col = colOf(sq);
+    const pridaj = (i, cez) => zoznam.push({ i: i, pole: sqName(i), figurka: board[i], cez: cez });
+
+    function canReach(ai, needR, needC) {
+      const ax = pinAxis(board, ai);
+      if (ax === null) return true;
+      return (needR === ax[0] && needC === ax[1]) || (needR === -ax[0] && needC === -ax[1]);
+    }
+
+    const pawn = color === 'w' ? 'P' : 'p';
+    const pdirs = color === 'w' ? [[1,-1],[1,1]] : [[-1,-1],[-1,1]];
+    for (const [dr, dc] of pdirs) {
+      const r = row + dr, c = col + dc;
+      if (inside(r, c) && board[toIdx(r, c)] === pawn && canReach(toIdx(r, c), -dr, -dc)) pridaj(toIdx(r, c), null);
+    }
+    const knight = color === 'w' ? 'N' : 'n';
+    for (const [dr, dc] of SMERY_JAZDCA) {
+      const r = row + dr, c = col + dc;
+      if (inside(r, c) && board[toIdx(r, c)] === knight && pinAxis(board, toIdx(r, c)) === null) pridaj(toIdx(r, c), null);
+    }
+    const king = color === 'w' ? 'K' : 'k';
+    for (let dr = -1; dr <= 1; dr++) {
+      for (let dc = -1; dc <= 1; dc++) {
+        if (dr === 0 && dc === 0) continue;
+        const r = row + dr, c = col + dc;
+        if (inside(r, c) && board[toIdx(r, c)] === king) pridaj(toIdx(r, c), null);
+      }
+    }
+    const bishop = color === 'w' ? 'B' : 'b';
+    const queen  = color === 'w' ? 'Q' : 'q';
+    const oppBishop = color === 'w' ? 'b' : 'B';
+    const oppQueen  = color === 'w' ? 'q' : 'Q';
+    const pawnFrom = color === 'w' ? [[1,-1],[1,1]] : [[-1,-1],[-1,1]];
+    for (const [dr, dc] of SMERY_DIAG) {
+      let r = row + dr, c = col + dc;
+      let passedEnemy = false, first = true, cez = null;
+      while (inside(r, c)) {
+        const p = board[toIdx(r, c)];
+        if (p) {
+          if (p === bishop || p === queen) {
+            if (canReach(toIdx(r, c), -dr, -dc)) pridaj(toIdx(r, c), cez);
+            if (!cez) cez = 'bateria';
+            r += dr; c += dc; first = false;
+            continue;
+          }
+          if (first && p === pawn && pawnFrom.some(([a, b]) => a === dr && b === dc)) {
+            first = false; cez = 'bateria';
+            r += dr; c += dc;
+            continue;
+          }
+          if (!passedEnemy && (p === oppBishop || p === oppQueen)) {
+            passedEnemy = true; first = false; cez = 'za_superom';
+            r += dr; c += dc;
+            continue;
+          }
+          break;
+        }
+        r += dr; c += dc; first = false;
+      }
+    }
+    const rook = color === 'w' ? 'R' : 'r';
+    const oppRook = color === 'w' ? 'r' : 'R';
+    for (const [dr, dc] of SMERY_ROVNE) {
+      let r = row + dr, c = col + dc;
+      let passedEnemy = false, cez = null;
+      while (inside(r, c)) {
+        const p = board[toIdx(r, c)];
+        if (p) {
+          if (p === rook || p === queen) {
+            if (canReach(toIdx(r, c), -dr, -dc)) pridaj(toIdx(r, c), cez);
+            if (!cez) cez = 'bateria';
+            r += dr; c += dc;
+            continue;
+          }
+          if (!passedEnemy && (p === oppRook || p === oppQueen)) {
+            passedEnemy = true; cez = 'za_superom';
+            r += dr; c += dc;
+            continue;
+          }
+          break;
+        }
+        r += dr; c += dc;
+      }
+    }
+    return zoznam;
+  }
+
+  // ── Stráž jednej figúrky: útočníci, obrancovia, je slabo pokrytá? ────
+  function strazFigurky(board, sq) {
+    const p = board[sq];
+    if (!p) return null;
+    const farba = pieceColor(p);
+    const utocnici = strazPola(board, sq, super_(farba));
+    const obrancovia = strazPola(board, sq, farba);
+    return {
+      pole: sqName(sq), figurka: p, farba: farba,
+      utocnici: utocnici, obrancovia: obrancovia,
+      // kráľ sa medzi slabo pokryté nepočíta nikdy
+      slaba: p.toLowerCase() !== 'k' && obrancovia.length <= utocnici.length
+    };
+  }
+
+  // ── underdefended_for_color ────────────────────────────────────────────
+  //  Polia slabo pokrytých figúrok jednej farby, v poradí a8 … h1.
+  //  Slabo pokrytá = obrancov ≤ útočníkov (aj 0 : 0), kráľ sa vynecháva.
+  function slaboPokryteFarby(board, color) {
+    const e = super_(color);
+    const out = [];
+    for (let sq = 0; sq < 64; sq++) {
+      const p = board[sq];
+      if (!p || pieceColor(p) !== color || p.toLowerCase() === 'k') continue;
+      if (countAttackers(board, sq, color) <= countAttackers(board, sq, e)) out.push(sqName(sq));
+    }
+    return out;
+  }
+
+  // ── vysvetli_slabo_pokrytu ─────────────────────────────────────────────
+  function vysvetliSlaboPokrytu(board, sqStr) {
+    const sq = sqIndex(sqStr);
+    const fig = board[sq];
+    const color = pieceColor(fig);
+    const enemy = super_(color);
+    const ut = countAttackers(board, sq, enemy);
+    const ob = countAttackers(board, sq, color);
+    const kluc = fig.toLowerCase();
+    const nazov = SK_FIGURKA[kluc] || 'figúrka';
+    const zaklad = nazov[0].toUpperCase() + nazov.slice(1) + ' na ' + sqStr;
+    if (ut === 0 && ob === 0) {
+      const [kryty, napadnuty] = SK_KRYTY[kluc] || ['krytá', 'napadnutá'];
+      const zam = SK_ROD[kluc] || 'ju';
+      return zaklad + ' nie je ' + kryty + ' ani ' + napadnuty + ' — nikto ' + zam + ' nebráni.';
+    }
+    // Odkiaľ útok prichádza (ťahy s premenou sú v zozname 4×, rovnako ako v generátore)
+    const st = { active: enemy, castling: '-', ep: '-' };
+    const odkial = [];
+    for (const [fi, ti] of legalMoves(board, st)) {
+      if (ti === sq && isCapture(board, st, fi, ti)) odkial.push(sqName(fi));
+    }
+    let veta = zaklad + ': útočníkov ' + ut + ', obrancov ' + ob;
+    if (odkial.length) {
+      veta += ' (útok z ' + odkial.slice().sort().slice(0, 3).join(', ');
+      if (odkial.length < ut) veta += ', ďalší v línii za ním';
+      veta += ')';
+    }
+    return veta + '.';
+  }
+
+  // ── find_underdefended_both_sides ──────────────────────────────────────
+  //  Úloha „Nájdi všetky slabo pokryté figúrky" za oboch (biele, potom čierne).
+  //  dovod: null | 'sach' (niektorý kráľ je v šachu) | 'prilis_vela' (viac ako 10)
+  function slaboPokryte(board, state) {
+    if (isKingInCheck(board, 'w') || isKingInCheck(board, 'b')) {
+      return { riesenia: [], vysvetlenia: [], dovod: 'sach' };
+    }
+    const riesenia = slaboPokryteFarby(board, 'w').concat(slaboPokryteFarby(board, 'b'));
+    if (riesenia.length > MAX_SLABO_POKRYTYCH) {
+      return { riesenia: [], vysvetlenia: [], dovod: 'prilis_vela' };
+    }
+    return { riesenia: riesenia, vysvetlenia: riesenia.map(x => vysvetliSlaboPokrytu(board, x)), dovod: null };
+  }
+
   return {
     HODNOTA: HODNOTA,
     MAX_BRANI_SO_ZISKOM: MAX_BRANI_SO_ZISKOM,
@@ -724,7 +909,14 @@ const VisionCore = (function () {
     braniaSoZiskom: braniaSoZiskom,
     vsetkyBrania: vsetkyBrania,
     nazovTahu: nazovTahu,
-    rebrikVymeny: rebrikVymeny
+    rebrikVymeny: rebrikVymeny,
+    // slabo pokryté figúrky
+    MAX_SLABO_POKRYTYCH: MAX_SLABO_POKRYTYCH,
+    strazPola: strazPola,
+    strazFigurky: strazFigurky,
+    slaboPokryteFarby: slaboPokryteFarby,
+    slaboPokryte: slaboPokryte,
+    vysvetliSlaboPokrytu: vysvetliSlaboPokrytu
   };
 })();
 
