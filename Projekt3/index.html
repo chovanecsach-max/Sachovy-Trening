@@ -190,6 +190,8 @@ body {
 .submenu-koncovky { grid-template-columns: repeat(4, 1fr); }
 .submenu-hry { grid-template-columns: repeat(4, 1fr); }
 .sub-pozn { display: block; font-size: 10.5px; color: #94a3b8; font-weight: 400; margin-top: 3px; }
+/* Hra, ktorú hráč ešte nemá odomknutú (klik ukáže, čo treba splniť) */
+.sub-btn.zamknuta { opacity: 0.6; }
 .sub-count { font-size: 11px; color: #94a3b8; margin-left: 4px; }
 
 @keyframes fadeIn {
@@ -512,6 +514,10 @@ body {
       <div class="sub-icon i-hry">💰</div>Šachový trh
       <span class="sub-pozn">vysvetľuje Branie so ziskom</span>
     </button>
+    <button class="sub-btn" id="hraStrazBtn" onclick="goHra('straz-na-trhu')">
+      <div class="sub-icon i-hry">🛡️</div>Stráž na trhu
+      <span class="sub-pozn" id="hraStrazPozn">vysvetľuje Slabo pokryté figúrky</span>
+    </button>
   </div>
 
   <!-- 5 rebríčkov vedľa seba -->
@@ -546,7 +552,7 @@ body {
 <script src="js/hra-postup.js"></script>
 <script>
 // ZNAČKA VERZIE — pri každej úprave tohto súboru prepíš dátum.
-(window.VERZIE = window.VERZIE || {})['index.html'] = '2026-09-24b';
+(window.VERZIE = window.VERZIE || {})['index.html'] = '2026-09-27';
 
 // Hlavné menu: všetky tlačidlá v jednom rade; keď ich je viac než 9, v dvoch
 // rovnakých radoch. Tlačidlá sa zobrazujú postupne (Zadania, Súťaže, Hry sa
@@ -589,6 +595,12 @@ async function initPage() {
     if (role === 'trener' || role === 'hlavny_trener' || role === 'admin') {
       document.getElementById('hryPrehladSubBtn').style.display = 'flex';
     }
+    // Stráž na trhu sa hráčovi odomkne až po zložení skúšky Šachového trhu (tréneri ju majú hneď)
+    HraPostup.odomknuta('straz-na-trhu', role).then(o => {
+      if (o.ok) return;
+      document.getElementById('hraStrazBtn').classList.add('zamknuta');
+      document.getElementById('hraStrazPozn').textContent = '🔒 odomkne sa po skúške Šachového trhu';
+    });
   });
   if (role === 'admin') {
     document.getElementById('adminSubBtn').style.display = 'flex';
