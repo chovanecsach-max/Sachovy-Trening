@@ -30,7 +30,7 @@
 //  Spustenie: HraEngine.spusti({ obsah, koren, rola, userId, testovaci, uloziste })
 // ============================================================================
 
-(window.VERZIE = window.VERZIE || {})['hra-engine.js'] = '2026-09-27';
+(window.VERZIE = window.VERZIE || {})['hra-engine.js'] = '2026-09-27b';
 
 const HraEngine = (function () {
   'use strict';
@@ -188,6 +188,13 @@ const HraEngine = (function () {
                      ', výpočet dáva ' + JSON.stringify(vypocet));
       }
     }));
+    // Pozície skúšky: každá musí mať aspoň jedno riešenie
+    O.kapitoly.filter(k => k.skuska).forEach(k => {
+      const typ = k.skuska.typ || 'najdi';
+      k.skuska.pozicie.forEach(fen => {
+        if (!pocetRieseni(typ, fen)) console.warn('Skúška ' + k.cislo + ': pozícia bez riešenia ' + fen);
+      });
+    });
   }
 
   function ziskNaSachovnici(board, uci) {
@@ -449,15 +456,22 @@ const HraEngine = (function () {
     return kopia.slice(0, n);
   }
 
+  // Počet riešení pozície v úlohe typu Nájdi všetky (pre časový limit skúšky)
+  function pocetRieseni(typ, fen) {
+    const poz = VC.parseFen(fen);
+    if (typ === 'najdiSlabe') return VC.slaboPokryte(poz.board, poz.state).riesenia.length;
+    return VC.braniaSoZiskom(poz.board, poz.state).riesenia.length;
+  }
+
   function zacniKapitolu(k) {
     let ulohy = k.ulohy || [];
     let skuska = null;
     if (k.skuska) {
       const s = k.skuska;
+      const typ = s.typ || 'najdi';    // Šachový trh: brania so ziskom, Stráž na trhu: najdiSlabe
       ulohy = nahodnyVyber(s.pozicie, s.pocet).map((fen, i) => {
-        const poz = VC.parseFen(fen);
-        const n = VC.braniaSoZiskom(poz.board, poz.state).riesenia.length;
-        return { id: k.cislo + '.' + (i + 1), typ: 'najdi', fen: fen, limit: s.casZaklad + s.casNaRiesenie * n,
+        const n = pocetRieseni(typ, fen);
+        return { id: k.cislo + '.' + (i + 1), typ: typ, fen: fen, limit: s.casZaklad + s.casNaRiesenie * n,
                  vysvetlenie: '' };
       });
       skuska = { vysledky: [], diagnoza: {} };
@@ -1325,6 +1339,56 @@ const HraEngine = (function () {
     sachovnica.naKlik = pole => { if (board[pole]) ukazStraz(pole, moznosti ? moznosti() : {}); };
   }
 
+  // ── Rozbor chýb v skúške Stráže na trhu — ktorú kapitolu zopakovať ───
+  //  2 Nikto ju nestráži · 3 Rovnako nestačí · 4 Počítajú sa kusy, nie ceny
+  //  5 Za oboch, aj pešiaky · 6 Batéria · 7 Väzba
+  //
+  // Rozhodla o figúrke batéria alebo väzba? Porovná skutočný výsledok
+  // s tým, čo by vyšlo bez figúrok v rade za inou (batéria) a keby sa
+  // viazané figúrky počítali (väzba).
+  function coRozhoduje(board, sq) {
+    const info = VC.strazFigurky(board, sq);
+    const ut = info.utocnici.length, ob = info.obrancovia.length;
+    const slaba = ob <= ut;
+    const priami = zoznam => zoznam.filter(x => !x.cez).length;
+    const bateria = (priami(info.obrancovia) <= priami(info.utocnici)) !== slaba;
+    let utV = ut, obV = ob;
+    const zapocitane = new Set(info.utocnici.concat(info.obrancovia).map(x => x.i));
+    for (let j = 0; j < 64; j++) {
+      const p = board[j];
+      if (!p || j === sq || zapocitane.has(j) || jeKral(p)) continue;
+      if (!VC.attacksSq(board, j, sq) || VC.pinAxis(board, j) === null) continue;
+      if (VC.pieceColor(p) === info.farba) obV++; else utV++;
+    }
+    const vazba = (obV <= utV) !== slaba;
+    return { ut: ut, ob: ob, bateria: bateria, vazba: vazba };
+  }
+
+  // Hráč klikol na figúrku, ktorá slabo pokrytá nie je (alebo na kráľa)
+  function dovodOmyluSlabej(board, sq) {
+    if (jeKral(board[sq])) return 5;
+    const r = coRozhoduje(board, sq);
+    if (r.vazba) return 7;
+    if (r.bateria) return 6;
+    return 4;                       // dobre pokrytá figúrka — napr. veža napadnutá pešiakom
+  }
+
+  // Hráč prehliadol slabo pokrytú figúrku
+  function dovodPrehliadnutejSlabej(board, pole, najdene, riesenia) {
+    const sq = VC.sqIndex(pole);
+    const r = coRozhoduje(board, sq);
+    if (r.vazba) return 7;
+    if (r.bateria) return 6;
+    const farba = x => VC.pieceColor(board[VC.sqIndex(x)]);
+    const moja = VC.pieceColor(board[sq]);
+    // hľadal len za jednu stranu: za túto (aspoň 2 riešenia) nenašiel nič, za druhú áno
+    if ((riesenia || []).filter(x => farba(x) === moja).length >= 2 &&
+        !najdene.some(x => farba(x) === moja) && najdene.some(x => farba(x) !== moja)) return 5;
+    if (r.ut === 0 && r.ob === 0) return 2;
+    if (r.ut === r.ob) return 3;
+    return board[sq].toLowerCase() === 'p' ? 5 : 2;
+  }
+
   // ── Koľko? — koľko útočníkov (obrancov) má označená figúrka ──────────
   TYPY.pocet = {
     priprav(u) {
@@ -1494,8 +1558,8 @@ const HraEngine = (function () {
 
       // Veta z tréningu so zvýraznenou figúrkou: „<b>Pešiak na a2</b>: útočníkov 1, obrancov 0…"
       const vetaHtml = x => {
-        const m = /^(\S+ na [a-h][1-8])([\s\S]*)$/.exec(veta[x]);
-        return m ? '<b>' + esc(m[1]) + '</b>' + esc(m[2]) : esc(veta[x]);
+        const m = /^(\S+ na [a-h][1-8]:?)\s*([\s\S]*)$/.exec(veta[x]);
+        return m ? '<b>' + esc(m[1]) + '</b> ' + esc(m[2]) : esc(veta[x]);
       };
 
       const zoznamHtml = () => {
@@ -1563,7 +1627,11 @@ const HraEngine = (function () {
                        'Prehliadnuté figúrky sú naoranžovo. ' + (u.vysvetlenie ? esc(u.vysvetlenie) + ' ' : '') +
                        'Klikni na figúrku a uvidíš jej stráž.');
         }
-        if (stav.skuska) stav.skuska.vysledky.push({ fen: u.fen, bezChyby: bezChyby });
+        // Skúška: zápis výsledku a rozbor chýb
+        if (stav.skuska) {
+          prehliadnute.forEach(x => zapisDiagnozu(dovodPrehliadnutejSlabej(board, x, ul.najdene, riesenia)));
+          stav.skuska.vysledky.push({ fen: u.fen, bezChyby: bezChyby });
+        }
         obnov(null);
         ukazPokracovanie(bezChyby || (vsetkyNajdene && !stav.skuska), text);
       };
@@ -1585,6 +1653,7 @@ const HraEngine = (function () {
           ul.chybne.push(meno);
           ul.chybVUlohe++;
           zapisChybu();
+          zapisDiagnozu(dovodOmyluSlabej(board, pole));
           if (jeKral(p)) {
             grosikHovori('smutny', 'Kráľa nehľadáme — nikto ho nesmie zobrať, takže strážnikov nepotrebuje. ' +
                          znak(BODY_CHYBA) + ' bodov.');
@@ -1691,6 +1760,12 @@ const HraEngine = (function () {
     const mriezka = vysl.map((x, i) => '<span class="skuska-pole ' + (x.bezChyby ? 'dobre' : 'zle') + '">' +
                                        (i + 1) + '</span>').join('');
 
+    // Texty, ktoré si skúška môže určiť v obsahu (inak platia texty Šachového trhu)
+    const dovody = s.dovody || DOVODY;
+    const textZlozena = s.textZlozena ||
+      'Teraz si naozajstný obchodník a môžeš trénovať Brania so ziskom v menu Zručnosti.';
+    const odkaz = s.odkaz || { text: 'Trénovať Brania so ziskom →', href: 'skills.html?type=direct_attack' };
+
     // Odporúčania: kapitoly zoradené podľa počtu chýb
     const diag = stav.skuska.diagnoza;
     // najviac tri — dlhší zoznam by dieťa skôr odradil
@@ -1701,14 +1776,13 @@ const HraEngine = (function () {
         kapitolyNaZopakovanie.map(c => {
           const kap = O.kapitoly.find(x => x.cislo === c);
           return '<div class="odporucanie"><div><b>Kapitola ' + c + ' — ' + esc(kap ? kap.nazov : '') + '</b>' +
-                 '<div class="slabo">' + esc(DOVODY[c] || '') + ' (' + diag[c] + '×)</div></div>' +
+                 '<div class="slabo">' + esc(dovody[c] || '') + ' (' + diag[c] + '×)</div></div>' +
                  '<button class="secondary male" data-kapitola="' + c + '">Zopakovať</button></div>';
         }).join('') + '</div>';
     }
 
     const text = zlozena
-      ? 'Skúška je zložená! Vyriešil si ' + vyriesene + ' z ' + vysl.length + ' pozícií bez chyby. ' +
-        'Teraz si naozajstný obchodník a môžeš trénovať Brania so ziskom v menu Zručnosti.'
+      ? 'Skúška je zložená! Vyriešil si ' + vyriesene + ' z ' + vysl.length + ' pozícií bez chyby. ' + textZlozena
       : 'Vyriešil si ' + vyriesene + ' z ' + vysl.length + ' pozícií bez chyby. Na zloženie treba ' + s.hranica +
         '. Zopakuj si kapitoly nižšie a skús to znova — pozície budú zakaždým iné.';
 
@@ -1724,7 +1798,7 @@ const HraEngine = (function () {
       odporucania +
       (zlozena ? '<div class="zapamataj"><div class="zapamataj-nadpis">Zapamätaj si</div>' + esc(k.zapamataj) + '</div>' : '') +
       '<div class="koniec-tlacidla">' +
-      (zlozena ? '<a class="odkaz-tlacidlo velke" href="skills.html?type=direct_attack">Trénovať Brania so ziskom →</a>' : '') +
+      (zlozena ? '<a class="odkaz-tlacidlo velke" href="' + esc(odkaz.href) + '">' + esc(odkaz.text) + '</a>' : '') +
       '<button class="' + (zlozena ? 'secondary' : 'primary velke') + '" data-akcia="znova">Skúsiť skúšku znova</button>' +
       '<button class="secondary" data-akcia="mapa">Kapitoly</button></div></div>';
     naviazListu();
@@ -1743,6 +1817,8 @@ const HraEngine = (function () {
     _hviezdyZaSkore: hviezdyZaSkore,
     _moznostiCisel: moznostiCisel,
     _dovodPrehliadnutia: dovodPrehliadnutia,
+    _dovodOmyluSlabej: dovodOmyluSlabej,
+    _dovodPrehliadnutejSlabej: dovodPrehliadnutejSlabej,
     _stav: () => stav
   };
 })();
