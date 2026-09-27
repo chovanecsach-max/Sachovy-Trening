@@ -33,11 +33,19 @@
 //    VisionCore.strazFigurky(board, pole)    → { utocnici: [...], obrancovia: [...], slaba }
 //    VisionCore.strazPola(board, pole, farba) → kto z farby útočí / bráni (aj batérie)
 //
+//  Vidličky (hra Vidlička na trhu, úloha fork) — stav generátora 27. 9. 2026:
+//    VisionCore.vidlicky(board, state)       → { riesenia: ['c5e4', ...], vysvetlenia, rozbory, dovod }
+//    VisionCore.rozoberVidlicku(board, 'c5e4') → je to vidlička a prečo (nie): terče,
+//        bezpečné pole, kráľ, mat, odkrytý útok (popis polí je pri funkcii)
+//    VisionCore.rebrikVidlicky(rozbor.poTahu, rozbor.na, farbaSupera) → výmena na poli vidličkára
+//  Poradie riešení sa môže od generátora líšiť (generátor prechádza polia
+//  v neurčenom poradí); zoznam ťahov aj vysvetlenia k nim sú rovnaké.
+//
 //  Šachovnica je pole 64 reťazcov: index 0 = a8, 7 = h8, 56 = a1, 63 = h1.
 //  Prázdne pole = '', figúrky ako vo FEN (P N B R Q K biele, p n b r q k čierne).
 // ============================================================================
 
-if (typeof window !== 'undefined') (window.VERZIE = window.VERZIE || {})['vision-core.js'] = '2026-09-27';
+if (typeof window !== 'undefined') (window.VERZIE = window.VERZIE || {})['vision-core.js'] = '2026-09-27b';
 
 const VisionCore = (function () {
   'use strict';
@@ -885,6 +893,472 @@ const VisionCore = (function () {
     return { riesenia: riesenia, vysvetlenia: riesenia.map(x => vysvetliSlaboPokrytu(board, x)), dovod: null };
   }
 
+  // ════════════════════════════════════════════════════════════════════
+  //  VIDLIČKY (hra Vidlička na trhu, úloha fork)
+  //  Verný prepis fork_moves_for_side a jej pomocných funkcií, stav 27. 9. 2026:
+  //  hrozbe matu stačí jeden terč, mat musí byť nový, pešiak na poslednom rade
+  //  sa skúša ako jazdec aj dáma.
+  // ════════════════════════════════════════════════════════════════════
+  const MAX_VIDLICIEK = 12;                                    // MAX_FORKS
+
+  // ── _quiet_targets ─────────────────────────────────────────────────────
+  //  Prázdne polia, kam sa figúrka zo sq vie posunúť bez brania.
+  function tichePolia(board, sq) {
+    const p = board[sq], pl = p.toLowerCase(), color = pieceColor(p);
+    const r = rowOf(sq), c = colOf(sq);
+    const out = [];
+    if (pl === 'n') {
+      for (const [dr, dc] of SMERY_JAZDCA) {
+        const rr = r + dr, cc = c + dc;
+        if (inside(rr, cc) && !board[toIdx(rr, cc)]) out.push(toIdx(rr, cc));
+      }
+    } else if (pl === 'k') {
+      for (let dr = -1; dr <= 1; dr++) {
+        for (let dc = -1; dc <= 1; dc++) {
+          if (dr === 0 && dc === 0) continue;
+          const rr = r + dr, cc = c + dc;
+          if (inside(rr, cc) && !board[toIdx(rr, cc)]) out.push(toIdx(rr, cc));
+        }
+      }
+    } else if (pl === 'p') {
+      const step = color === 'w' ? -1 : 1;
+      const start = color === 'w' ? 6 : 1;
+      const rr = r + step;
+      if (inside(rr, c) && !board[toIdx(rr, c)]) {
+        out.push(toIdx(rr, c));
+        const rr2 = r + 2 * step;
+        if (r === start && inside(rr2, c) && !board[toIdx(rr2, c)]) out.push(toIdx(rr2, c));
+      }
+    } else {
+      const dirs = pl === 'b' ? SMERY_DIAG : (pl === 'r' ? SMERY_ROVNE : SMERY_DAMA);
+      for (const [dr, dc] of dirs) {
+        let rr = r + dr, cc = c + dc;
+        while (inside(rr, cc) && !board[toIdx(rr, cc)]) {
+          out.push(toIdx(rr, cc));
+          rr += dr; cc += dc;
+        }
+      }
+    }
+    return out;
+  }
+
+  // ── _capture_targets ───────────────────────────────────────────────────
+  //  Polia súpera (victim), kam vie figúrka zo sq brať. Kráľa nebrať.
+  function braniePolia(board, sq, victim) {
+    const p = board[sq], pl = p.toLowerCase(), color = pieceColor(p);
+    const r = rowOf(sq), c = colOf(sq);
+    const out = [];
+    const jeObet = i => { const t = board[i]; return !!t && pieceColor(t) === victim && t.toLowerCase() !== 'k'; };
+    if (pl === 'n') {
+      for (const [dr, dc] of SMERY_JAZDCA) {
+        const rr = r + dr, cc = c + dc;
+        if (inside(rr, cc) && jeObet(toIdx(rr, cc))) out.push(toIdx(rr, cc));
+      }
+    } else if (pl === 'k') {
+      for (let dr = -1; dr <= 1; dr++) {
+        for (let dc = -1; dc <= 1; dc++) {
+          if (dr === 0 && dc === 0) continue;
+          const rr = r + dr, cc = c + dc;
+          if (inside(rr, cc) && jeObet(toIdx(rr, cc))) out.push(toIdx(rr, cc));
+        }
+      }
+    } else if (pl === 'p') {
+      const step = color === 'w' ? -1 : 1;
+      for (const dc of [-1, 1]) {
+        const rr = r + step, cc = c + dc;
+        if (inside(rr, cc) && jeObet(toIdx(rr, cc))) out.push(toIdx(rr, cc));
+      }
+    } else {
+      const dirs = pl === 'b' ? SMERY_DIAG : (pl === 'r' ? SMERY_ROVNE : SMERY_DAMA);
+      for (const [dr, dc] of dirs) {
+        let rr = r + dr, cc = c + dc;
+        while (inside(rr, cc)) {
+          const idx = toIdx(rr, cc);
+          if (board[idx]) { if (jeObet(idx)) out.push(idx); break; }
+          rr += dr; cc += dc;
+        }
+      }
+    }
+    return out;
+  }
+
+  // ── _reachable_squares ─────────────────────────────────────────────────
+  //  Polia, kam figúrka zo sq smie legálne ísť jedným ťahom (tichým alebo braním).
+  //  Bez rošády a brania mimochodom. Vracia vzostupne zoradené indexy.
+  function dosiahnutelnePolia(board, fromSq, victim) {
+    const attacker = pieceColor(board[fromSq]);
+    const legalny = ti => {
+      const tmp = board.slice();
+      tmp[ti] = tmp[fromSq]; tmp[fromSq] = '';
+      const k = findKing(tmp, attacker);
+      return k === -1 || !isSquareAttacked(tmp, k, victim);
+    };
+    const reach = new Set();
+    for (const t of tichePolia(board, fromSq)) if (legalny(t)) reach.add(t);
+    for (const t of braniePolia(board, fromSq, victim)) if (legalny(t)) reach.add(t);
+    return Array.from(reach).sort((a, b) => a - b);
+  }
+
+  // ── _least_valuable_attacker ───────────────────────────────────────────
+  //  Najlacnejšia figúrka farby color, ktorá napáda pole sq (pri rovnakej cene
+  //  skoršie pole). Viazaná figúrka berie len po osi väzby.
+  //  POZOR, zámerne ako v Pythone: smer útoku sa počíta celočíselným delením
+  //  zaokrúhleným NADOL (dr // adiv). Pri skoku jazdca tak vznikne „smer",
+  //  ktorý sa môže náhodou zhodovať s osou väzby — generátor vtedy viazaného
+  //  jazdca do výmeny započíta. Kvôli zhode s úlohami v databáze to tu platí tiež.
+  function najlacnejsiVidlicka(board, sq, color) {
+    let bestI = null, bestV = null;
+    for (let i = 0; i < 64; i++) {
+      const p = board[i];
+      if (!p || pieceColor(p) !== color) continue;
+      if (!attacksSq(board, i, sq)) continue;
+      const ax = pinAxis(board, i);
+      if (ax !== null) {
+        const dr = rowOf(sq) - rowOf(i), dc = colOf(sq) - colOf(i);
+        const adiv = Math.max(Math.abs(dr), Math.abs(dc));
+        if (adiv === 0) continue;
+        const a0 = Math.floor(dr / adiv), a1 = Math.floor(dc / adiv);
+        if (!((a0 === ax[0] && a1 === ax[1]) || (-a0 === ax[0] && -a1 === ax[1]))) continue;
+      }
+      const v = HODNOTA[p.toLowerCase()];
+      if (bestI === null || v < bestV) { bestI = i; bestV = v; }
+    }
+    return bestI;
+  }
+
+  // ── _capture_value ─────────────────────────────────────────────────────
+  //  Čistý zisk strany side, keď začne brať na poli sq najlacnejšou figúrkou
+  //  a súper berie späť, len keď sa mu to oplatí. null = strana nemá čím brať.
+  function hodnotaBrania(board, sq, side) {
+    const ai = najlacnejsiVidlicka(board, sq, side);
+    if (ai === null) return null;
+    const captured = HODNOTA[board[sq].toLowerCase()];
+    const b = board.slice();
+    b[sq] = b[ai]; b[ai] = '';
+    let bonus = 0;
+    const nova = premena(board[ai], sq);
+    if (nova) { b[sq] = nova; bonus = BONUS_PREMENY; }
+    const resp = hodnotaBrania(b, sq, super_(side));
+    if (resp === null) return captured + bonus;
+    return captured + bonus - Math.max(0, resp);
+  }
+
+  // ── _king_retreats ─────────────────────────────────────────────────────
+  //  Ústupy kráľa zo šachu (aj branie): [[pole, šachovnica po ústupe], ...]
+  function ustupyKrala(board, kingSq, victim, attackerSide) {
+    const kr = rowOf(kingSq), kc = colOf(kingSq), king = board[kingSq];
+    const out = [];
+    for (let dr = -1; dr <= 1; dr++) {
+      for (let dc = -1; dc <= 1; dc++) {
+        if (dr === 0 && dc === 0) continue;
+        const r = kr + dr, c = kc + dc;
+        if (!inside(r, c)) continue;
+        const s = toIdx(r, c);
+        if (board[s] && pieceColor(board[s]) === victim) continue;
+        const b2 = board.slice();
+        b2[kingSq] = ''; b2[s] = king;
+        if (countAttackers(b2, s, attackerSide) === 0) out.push([s, b2]);
+      }
+    }
+    return out;
+  }
+
+  // ── _mate_in_one_squares ───────────────────────────────────────────────
+  //  Cieľové polia ťahov, ktorými strana side dáva mat (bez rošády a mimochodom).
+  function matovePolia(board, side) {
+    const st = { active: side, castling: '', ep: '-' };
+    const opp = super_(side);
+    const polia = new Set();
+    for (const [fi, ti, promo] of legalMoves(board, st)) {
+      const po = applyMoveEp(board, st, fi, ti, promo);
+      if (!isKingInCheck(po.board, opp)) continue;
+      if (!legalMoves(po.board, { active: opp, castling: po.state.castling, ep: po.state.ep }).length) polia.add(ti);
+    }
+    return polia;
+  }
+
+  // ── _maty_pred: maty, ktoré strana vie dať už pred ťahom (raz na pozíciu) ─
+  function matyPred(board, kontext) {
+    if (kontext.matPred === null) kontext.matPred = matovePolia(board, kontext.side);
+    return kontext.matPred;
+  }
+
+  // ── vysvetli_vidlicku ──────────────────────────────────────────────────
+  function vysvetliVidlicku(tmp, counted, matPolia) {
+    const popis = counted.map(t => (SK_FIGURY[String(tmp[t]).toLowerCase()] || 'figúrku') + ' na ' + sqName(t));
+    const matova = (matPolia && matPolia.length) ? 'hrozí matom na ' + sqName(Math.min.apply(null, matPolia)) : '';
+    if (popis.length >= 2) {
+      const vyber = popis.slice(0, 3);
+      const spojene = vyber.length === 2 ? vyber[0] + ' a ' + vyber[1]
+                    : vyber.slice(0, -1).join(', ') + ' a ' + vyber[vyber.length - 1];
+      let ciele = 'Napáda naraz ' + spojene;
+      if (popis.length > 3) ciele += ' a ďalšie ' + (popis.length - 3);
+      return matova ? ciele + ', a navyše ' + matova + '.' : ciele + '.';
+    }
+    if (popis.length && matova) return 'Napáda ' + popis[0] + ' a zároveň ' + matova + '.';
+    if (matova) return matova[0].toUpperCase() + matova.slice(1) + '.';
+    return 'Vytvára dvojitý útok.';
+  }
+
+  // Názov ťahu pre hru: 'Jc5–e4', 'Dd1×d5', pri premene 'd7–d8J'
+  function nazovVidlicky(board, z, na, kus) {
+    const p = board[z];
+    const zaklad = SK_PISMENO[p.toLowerCase()] + sqName(z) + (board[na] ? '×' : '–') + sqName(na);
+    return kus !== p ? zaklad + SK_PISMENO[kus.toLowerCase()] : zaklad;
+  }
+
+  // ── _vidlicka_kusom + úplný rozbor pre hru ─────────────────────────────
+  //  Rozhodnutie (vidlicka) je presne podľa generátora. Popri ňom sa zbiera
+  //  všetko, čo hra ukazuje: šípky k terčom, bezpečné pole, kráľ, mat, odkrytý útok.
+  function rozborKusom(board, z, na, kus, kontext, uz) {
+    const side = kontext.side, victim = kontext.victim;
+    const p = board[z];
+    const ptype = kus.toLowerCase();
+    const tval = HODNOTA[ptype];
+
+    // pozícia po presune figúrky na vidličkové pole
+    const tmp = board.slice();
+    tmp[z] = ''; tmp[na] = kus;
+
+    // _fork_square_safe: súper nesmie vidličkára zobrať bez straty
+    const ziskSupera = hodnotaBrania(tmp, na, victim);
+    const bezpecne = ziskSupera === null || ziskSupera < 0;
+
+    // Všetky súperove figúrky, ktoré figúrka po ťahu napáda (šípky).
+    // Nové terče = tie, ktoré z pôvodného poľa nenapádala.
+    const napadnute = [], terce = [];
+    for (const t of hypotheticalAttacks(tmp, na, ptype, side)) {
+      if (pieceColor(tmp[t]) !== victim) continue;
+      const x = { i: t, pole: sqName(t), figurka: tmp[t], novy: !uz.has(t),
+                  pocita: false, dovod: null, cennejsi: false, zisk: null };
+      if (!x.novy) x.dovod = 'stary';
+      napadnute.push(x);
+      if (x.novy) terce.push(x);
+    }
+
+    // Cena terča: cennejší ako vidličkár, alebo sa dá zobrať so ziskom
+    const nonking = [];
+    let hasStrong = false, kralT = null;
+    for (const x of terce) {
+      const tp = x.figurka.toLowerCase();
+      if (tp === 'k') { kralT = x; x.dovod = 'kral'; continue; }
+      const strong = HODNOTA[tp] > tval;
+      const cv = hodnotaBrania(tmp, x.i, side);
+      x.cennejsi = strong; x.zisk = cv;
+      if (strong || (cv !== null && cv > 0)) {
+        nonking.push(x.i); x.pocita = true; x.dovod = strong ? 'cennejsi' : 'zisk';
+        if (strong) hasStrong = true;
+      } else {
+        x.dovod = 'nestoji';
+      }
+    }
+
+    // Kráľ ako terč (šach)
+    const counted = nonking.slice();
+    let kral = null;
+    if (kralT) {
+      const ustupy = ustupyKrala(tmp, kralT.i, victim, side);
+      kral = { i: kralT.i, pole: kralT.pole, pocita: false, dovod: null,
+               ustupy: ustupy.map(u => sqName(u[0])), zachrani: null };
+      if (hasStrong) {
+        kral.pocita = true; kral.dovod = 'cennejsi_terc';
+      } else if (nonking.length) {
+        // Po KAŽDOM ústupe kráľa musí zostať aspoň jeden terč vyhrateľný
+        let ok = true;
+        for (const [s, b2] of ustupy) {
+          let vyhra = false;
+          for (const t of nonking) {
+            if (!b2[t] || pieceColor(b2[t]) !== victim) continue;
+            const cv = hodnotaBrania(b2, t, side);
+            if (cv !== null && cv > 0) { vyhra = true; break; }
+          }
+          if (!vyhra) { ok = false; kral.zachrani = sqName(s); break; }
+        }
+        kral.pocita = ok;
+        kral.dovod = ok ? 'ustupy_nezachrania' : 'ustup_zachrani';
+      } else {
+        kral.dovod = 'bez_terca';
+      }
+      if (kral.pocita) counted.push(kralT.i);
+      kralT.pocita = kral.pocita;
+    }
+
+    // Hrozba matu — generátor ju hľadá len pri bezpečnom poli, bez šachu
+    // a keď už je aspoň jeden započítaný terč. Mat musí byť nový a smerovať
+    // inam než na započítaný terč.
+    let mat = null, matStary = null;
+    if (bezpecne && !kralT && counted.length >= 1) {
+      const pred = matyPred(board, kontext);
+      mat = []; matStary = [];
+      for (const s of Array.from(matovePolia(tmp, side)).sort((a, b) => a - b)) {
+        if (counted.includes(s)) continue;
+        if (pred.has(s)) matStary.push(s); else mat.push(s);
+      }
+    }
+
+    // Rozhodnutie v poradí generátora
+    let vidlicka = false, druh = null;
+    if (bezpecne && terce.length) {
+      if (counted.length >= 2) {
+        vidlicka = true;
+        druh = (kral && kral.pocita) ? (kral.dovod === 'cennejsi_terc' ? 'sach_cennejsi_terc' : 'sach_kral_neubrani')
+                                     : 'dva_terce';
+      } else if (counted.length === 1 && !kralT && mat.length) {
+        vidlicka = true; druh = 'mat_a_terc';
+      }
+    }
+    let dovod = null;
+    if (!vidlicka) {
+      if (!bezpecne) dovod = 'vidlickara_zoberu';
+      else if (!terce.length) dovod = 'ziadny_novy_terc';
+      else if (kral && kral.dovod === 'ustup_zachrani') dovod = 'kral_ubrani';
+      else if (terce.length === 1) dovod = 'jeden_novy_terc';
+      else dovod = 'terc_nestoji_za_to';
+    }
+
+    // Odkrytý útok: iná vlastná figúrka, ktorej ťah otvoril líniu na súperovu figúrku
+    const odkryte = [];
+    for (let i = 0; i < 64; i++) {
+      const q = tmp[i];
+      if (!q || i === na || pieceColor(q) !== side) continue;
+      const lq = q.toLowerCase();
+      if (lq !== 'b' && lq !== 'r' && lq !== 'q') continue;
+      const predtym = new Set(hypotheticalAttacks(board, i, lq, side));
+      for (const t of hypotheticalAttacks(tmp, i, lq, side)) {
+        if (pieceColor(tmp[t]) === victim && !predtym.has(t)) {
+          odkryte.push({ z: i, pole: sqName(i), figurka: q, i: t, terc: sqName(t), tercFigurka: tmp[t] });
+        }
+      }
+    }
+
+    const jePremena = kus !== p;
+    let vysvetlenie = null;
+    if (vidlicka) {
+      vysvetlenie = vysvetliVidlicku(tmp, counted, mat);
+      if (jePremena) {
+        vysvetlenie = 'Po premene na ' + (SK_FIGURY[ptype] || 'figúrku') + ' ' +
+                      vysvetlenie[0].toLowerCase() + vysvetlenie.slice(1);
+      }
+    }
+
+    return {
+      tah: sqName(z) + sqName(na), z: z, na: na, strana: side,
+      figurka: p, kus: kus, premena: jePremena, nazov: nazovVidlicky(board, z, na, kus),
+      dosiahne: true, viazany: pinAxis(board, z) !== null,
+      vidlicka: vidlicka, druh: druh, dovod: dovod, vysvetlenie: vysvetlenie,
+      bezpecne: bezpecne, ziskSupera: ziskSupera,
+      napadnute: napadnute, noveTerce: terce.length,
+      zapocitane: counted.map(sqName),
+      sach: !!kralT, kral: kral,
+      mat: mat ? mat.map(sqName) : null, matStary: matStary ? matStary.map(sqName) : null,
+      odkryte: odkryte,
+      poTahu: tmp
+    };
+  }
+
+  // ── Rozbor jedného ťahu: je to vidlička a prečo (nie) ──────────────────
+  //  uci 'c5e4' (pri premene voliteľne s písmenom: 'd7d8n').
+  //  kus: voliteľne figúrka po premene ('n' / 'q'); bez nej sa skúša jazdec
+  //  a potom dáma presne ako v generátore.
+  //  Ťah hodnotí za figúrku, ktorá na poli stojí — nezáleží na tom, kto je na ťahu.
+  //  dovod (keď nie je vidlička):
+  //    'nelegalny'          figúrka tam nemôže ísť (napr. je viazaná)
+  //    'vidlickara_zoberu'  súper vidličkára zoberie bez straty
+  //    'ziadny_novy_terc'   nenapadne nič nové
+  //    'jeden_novy_terc'    napadne len jeden nový terč (a nehrozí nový mat)
+  //    'kral_ubrani'        šach + nekrytý terč, ale kráľ ho ústupom ubráni
+  //    'terc_nestoji_za_to' terčov je viac, ale nestoja za to
+  function rozoberVidlicku(board, uci, kus, kontext) {
+    const z = sqIndex(uci.slice(0, 2)), na = sqIndex(uci.slice(2, 4));
+    const p = board[z];
+    if (!p) return null;
+    const side = pieceColor(p);
+    if (!kontext || kontext.side !== side) kontext = { side: side, victim: super_(side), matPred: null };
+    if (!dosiahnutelnePolia(board, z, kontext.victim).includes(na)) {
+      return { tah: sqName(z) + sqName(na), z: z, na: na, strana: side, figurka: p, kus: p, premena: false,
+               nazov: nazovVidlicky(board, z, na, p), dosiahne: false, viazany: pinAxis(board, z) !== null,
+               vidlicka: false, druh: null, dovod: 'nelegalny', vysvetlenie: null,
+               bezpecne: null, ziskSupera: null, napadnute: [], noveTerce: 0, zapocitane: [],
+               sach: false, kral: null, mat: null, matStary: null, odkryte: [], poTahu: null };
+    }
+    const uz = new Set(hypotheticalAttacks(board, z, p.toLowerCase(), side));
+    let kusy = [p];
+    if (p.toLowerCase() === 'p' && rowOf(na) === (side === 'w' ? 0 : 7)) {
+      const pis = kus || uci.charAt(4);
+      if (pis) kusy = [side === 'w' ? pis.toUpperCase() : pis.toLowerCase()];
+      else kusy = side === 'w' ? ['N', 'Q'] : ['n', 'q'];
+    }
+    let prvy = null;
+    for (const k of kusy) {
+      const r = rozborKusom(board, z, na, k, kontext, uz);
+      if (r.vidlicka) return r;
+      if (!prvy) prvy = r;
+    }
+    return prvy;
+  }
+
+  // ── fork_moves_for_side ────────────────────────────────────────────────
+  //  Všetky vidličky jednej strany ako zoznam rozborov (poradie: podľa poľa
+  //  figúrky a cieľa; generátor ich má niekedy v inom poradí — na poradí nezáleží).
+  function vidlickyStrany(board, side) {
+    const kontext = { side: side, victim: super_(side), matPred: null };
+    const out = [];
+    for (let z = 0; z < 64; z++) {
+      const p = board[z];
+      if (!p || pieceColor(p) !== side) continue;
+      for (const na of dosiahnutelnePolia(board, z, kontext.victim)) {
+        const r = rozoberVidlicku(board, sqName(z) + sqName(na), null, kontext);
+        if (r.vidlicka) out.push(r);
+      }
+    }
+    return out;
+  }
+
+  // ── find_forks_both_sides ──────────────────────────────────────────────
+  //  Úloha „Nájdi všetky vidličky" za oboch (biele, potom čierne).
+  //  dovod: null | 'sach' (niektorý kráľ je v šachu) | 'prilis_vela' (viac ako 12)
+  function vidlicky(board, state) {
+    if (isKingInCheck(board, 'w') || isKingInCheck(board, 'b')) {
+      return { riesenia: [], vysvetlenia: [], rozbory: [], dovod: 'sach' };
+    }
+    const vsetky = vidlickyStrany(board, 'w').concat(vidlickyStrany(board, 'b'));
+    if (vsetky.length > MAX_VIDLICIEK) {
+      return { riesenia: [], vysvetlenia: [], rozbory: [], dovod: 'prilis_vela' };
+    }
+    return { riesenia: vsetky.map(r => r.tah), vysvetlenia: vsetky.map(r => r.vysvetlenie),
+             rozbory: vsetky, dovod: null };
+  }
+
+  // ── Rebrík výmeny na poli vidličkára ───────────────────────────────────
+  //  Priebeh výmeny, keď strana side začne brať na poli sq, presne ako
+  //  _capture_value (najlacnejšou figúrkou, späť len keď sa oplatí).
+  //  Tvar ako rebrikVymeny; vysledok === hodnotaBrania(board, sq, side),
+  //  null keď strana nemá čím brať.
+  //  Pre vidličku: VisionCore.rebrikVidlicky(rozbor.poTahu, rozbor.na, super strany)
+  function rebrikVidlicky(board, sq, side) {
+    const kroky = [];
+    let b = board.slice(), ucet = 0, turn = side, koniec = null;
+    for (let n = 0; n < 40; n++) {
+      const u = najlacnejsiVidlicka(b, sq, turn);
+      if (u === null) { koniec = { typ: 'nikto', strana: turn, tah: null }; break; }
+      if (n > 0 && hodnotaBrania(b, sq, turn) <= 0) {
+        koniec = { typ: 'neoplati_sa', strana: turn, tah: nazovTahu(b, u, sq), z: u, na: sq };
+        break;
+      }
+      const obet = b[sq];
+      const nova = premena(b[u], sq);
+      const c = HODNOTA[obet.toLowerCase()] + (nova ? BONUS_PREMENY : 0);
+      const zmena = turn === side ? c : -c;
+      ucet += zmena;
+      kroky.push({ tah: nazovTahu(b, u, sq), strana: turn, z: u, na: sq, premena: !!nova,
+                   figurka: SK_FIGURY[obet.toLowerCase()], zmena: zmena, ucet: ucet });
+      b = b.slice();
+      b[sq] = nova || b[u]; b[u] = '';
+      turn = super_(turn);
+    }
+    return { kroky: kroky, koniec: koniec, vysledok: kroky.length ? ucet : null };
+  }
+
   return {
     HODNOTA: HODNOTA,
     MAX_BRANI_SO_ZISKOM: MAX_BRANI_SO_ZISKOM,
@@ -916,7 +1390,16 @@ const VisionCore = (function () {
     strazFigurky: strazFigurky,
     slaboPokryteFarby: slaboPokryteFarby,
     slaboPokryte: slaboPokryte,
-    vysvetliSlaboPokrytu: vysvetliSlaboPokrytu
+    vysvetliSlaboPokrytu: vysvetliSlaboPokrytu,
+    // vidličky
+    MAX_VIDLICIEK: MAX_VIDLICIEK,
+    vidlicky: vidlicky,
+    vidlickyStrany: vidlickyStrany,
+    rozoberVidlicku: rozoberVidlicku,
+    rebrikVidlicky: rebrikVidlicky,
+    hodnotaBrania: hodnotaBrania,
+    dosiahnutelnePolia: dosiahnutelnePolia,
+    matovePolia: matovePolia
   };
 })();
 
