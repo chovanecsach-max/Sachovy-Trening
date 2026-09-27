@@ -27,7 +27,7 @@
 //  Figúrky v textoch: K D V S J (slovensky), vo FEN anglicky (K Q R B N P).
 // ============================================================================
 
-(window.VERZIE = window.VERZIE || {})['straz-obsah.js'] = '2026-09-27';
+(window.VERZIE = window.VERZIE || {})['straz-obsah.js'] = '2026-09-27b';
 
 const OBSAH_STRAZ = {
   kluc: 'straz-na-trhu',
@@ -97,7 +97,7 @@ const OBSAH_STRAZ = {
       zapamataj: 'Bez strážnika je každá figúrka slabo pokrytá — aj keď ju nikto nenapáda.',
       prePokrocilych: 'Slabo pokrytá figúrka nemusí byť v nebezpečenstve hneď. Je to slabé miesto, na ktoré sa ' +
                       'oplatí zaútočiť.',
-      preTrenerov: 'Figúrka bez útočníka aj bez obrancu (0 : 0) sa ráta. V úlohách tréningu je to takmer polovica ' +
+      preTrenerov: 'Figúrka bez útočníka aj bez obrancu (0 : 0) sa ráta. V úlohách tréningu je to viac ako polovica ' +
                    'riešení, preto je to prvé pravidlo hry. Tréning hľadá nechránené figúrky, nie len napadnuté.',
       ulohy: [
         { id: '2.1', typ: 'slaba', fen: '6k1/8/8/8/8/8/8/R5K1 w - - 0 1', pole: 'a1',
@@ -311,10 +311,104 @@ const OBSAH_STRAZ = {
       ]
     },
 
-    // ── Kapitola 9 — záverečná skúška (pripravujeme, krok 3) ───────────────
+    // ── Kapitola 9 — záverečná skúška ──────────────────────────────────────
     {
       cislo: 9,
-      nazov: 'Záverečná skúška'
+      nazov: 'Záverečná skúška',
+      uvod: [
+        'Grošík ti zverí celý trh! Čaká ťa <b>10 pozícií zo skutočných partií</b>.',
+        'V každej nájdi všetky slabo pokryté figúrky za oboch hráčov. Máš na to čas, takže buď rýchly aj presný.',
+        'Keď vyriešiš aspoň 8 pozícií úplne a bez chyby, získaš odznak <b>Strážca trhu</b>.'
+      ],
+      uvodKoniec: 'Ak sa nepodarí, poviem ti, ktoré kapitoly si zopakovať. Pozície budú zakaždým iné.',
+      zapamataj: 'Strážca trhu spočíta pri každej figúrke zlodejov aj strážnikov — za oboch, aj pešiakov.',
+      preTrenerov: 'Pozície sú zo skutočných partií, z tých istých ako úlohy v tréningu Slabo pokryté figúrky ' +
+                   '(60 pozícií s 3 až 5 riešeniami, náhodne sa vyberie 10). Vynechané sú pozície, kde o slabosti ' +
+                   'rozhoduje kráľ ako útočník na krytú figúrku. Čas ako v tréningu na úrovni 1: 20 s + 10 s na ' +
+                   'každé riešenie. Skúška sa nezapisuje do štatistík tréningu a nemení ELO. Skúšku možno opakovať, ' +
+                   'zakaždým s inými pozíciami. Kto ju zložil a ako idú kapitoly, uvidíš v menu Tréner → Prehľad hier.',
+      skuska: {
+        typ: 'najdiSlabe',
+        pocet: 10,
+        hranica: 8,              // vyriešených úplne a bez chyby
+        casZaklad: 20,           // sekúnd (ako tréning, úroveň 1)
+        casNaRiesenie: 10,       // sekúnd za každé riešenie
+        textZlozena: 'Teraz si naozajstný strážca trhu a môžeš trénovať Slabo pokryté figúrky v menu Zručnosti.',
+        odkaz: { text: 'Trénovať Slabo pokryté figúrky →', href: 'skills.html?type=underdefended' },
+        // Rozbor chýb: ktorá kapitola pomôže
+        dovody: {
+          2: 'Prehliadnutá figúrka bez strážnika',
+          3: 'Prehliadnutá figúrka s rovnakým počtom zlodejov a strážnikov',
+          4: 'Označená dobre pokrytá figúrka',
+          5: 'Prehliadnutý pešiak alebo celá strana, klik na kráľa',
+          6: 'Chyba pri figúrke v batérii',
+          7: 'Chyba pri viazanej figúrke'
+        },
+        // 60 pozícií z úloh tréningu Slabo pokryté figúrky (tabuľka skill_puzzles),
+        // 3 až 5 riešení, 10 až 22 figúrok, po 12 z každej úrovne ELO
+        pozicie: [
+          '5rk1/2p2pp1/1q5p/8/3QbP2/2P5/1P4PP/2BR2K1 b - - 0 1',
+          '8/8/p1p4p/1p2k1p1/1P4P1/P2KP2P/8/8 w - - 0 1',
+          '8/ppq5/2pp4/2k5/1nP1Q3/1B5P/P5PK/8 w - - 0 1',
+          '1Qn5/p2q2pp/2N1ppk1/1P1p4/8/7P/5PP1/6K1 w - - 0 1',
+          '4r3/1p1n1pkp/2q3p1/3pr3/p2Q4/P1P4P/1P2BPP1/R3R1K1 w - - 0 1',
+          'r2qnrk1/5ppp/2p5/1p6/1P1bPN2/6P1/1Q1P2BP/R4R1K w - - 0 1',
+          'r1r4k/p5pp/1p2R3/6q1/8/2Q5/5PPP/4R1K1 w - - 0 1',
+          '1RN3k1/5pp1/8/2b1P3/3r1P2/6P1/7P/6K1 b - - 0 1',
+          '5rk1/5pp1/1p6/4P2Q/3R1P2/6P1/1q5P/2rR3K b - - 0 1',
+          '2kr3r/ppp1n2p/8/8/4q2N/2Pp1RP1/PP1Q2KP/R7 w - - 0 1',
+          'r4r2/4q1k1/p3pp2/3b3P/2pN4/P3Q3/1PP5/2KR4 w - - 0 1',
+          '3R2Q1/p5p1/4p1k1/5n1p/3Pq3/6PK/5P1P/8 b - - 0 1',
+          '5r1k/1R6/3p3p/2b5/2P1B1p1/3P2P1/5r1P/1R5K b - - 0 1',
+          '8/8/2p2k2/1p1p1p1p/pP1P3P/P3PPK1/8/8 w - - 0 1',
+          '2k2r2/2p5/1Q4p1/3p1r1p/q1n5/4P3/5PPP/1RR3K1 w - - 0 1',
+          '4r2k/p1p3bp/2r3p1/2q2p2/Q1Pp1B2/1P3P1P/P5P1/R4RK1 b - - 0 1',
+          '6k1/p1p3pp/3qp2r/3pN3/1PpPbP2/4P3/Q7/R4RK1 b - - 0 1',
+          '5rk1/pp3p1p/q5p1/8/4NQ2/5KP1/Pr6/2R4R b - - 0 1',
+          '1b1q2k1/5ppp/2b5/8/3P4/2PQ2P1/P1BN1P1K/5R2 b - - 0 1',
+          'r5k1/1bq3rp/6pP/4p1p1/pp2P3/3B4/PPP1Q3/1K3R2 w - - 0 1',
+          'r3r1k1/2pR1p1p/p5p1/1p6/8/P1P2qP1/1PQ2P1P/3R2K1 b - - 0 1',
+          '2b5/4k3/p3nb2/1p3R2/6Bq/3P3P/P3Q2K/8 w - - 0 1',
+          '8/pP5k/6p1/1P1Bp3/4PbP1/1Q1K4/6q1/8 b - - 0 1',
+          '1r4k1/1r4p1/4p2p/2PpPp2/1pnP4/2q2N1P/1R2QPPK/1R6 w - - 0 1',
+          '1r6/R4R1p/1pp2np1/5pk1/8/8/6PP/6K1 w - - 0 1',
+          '6k1/6pp/2Q1b3/1p6/p4BnP/P1P3P1/1Pq3B1/6K1 b - - 0 1',
+          '8/1B2r1p1/1p1k4/p2n1R2/8/7P/4p1P1/2r1R2K w - - 0 1',
+          '1r1qr1k1/n2p1p1p/Bp4p1/3N4/P1P5/4R1P1/1P3P1P/R5K1 w - - 0 1',
+          '6k1/p4ppp/1p2p3/2rq4/5P2/4PQ2/PP4PP/5RK1 w - - 0 1',
+          '3r2k1/pp3pp1/2p2q1p/3n1B2/4Q3/8/PP3PPP/4R1K1 w - - 0 1',
+          '2r5/p7/1p1r2p1/2b5/kq5R/6P1/P3Q1PP/7K w - - 0 1',
+          'r1b2rk1/1p2q1pp/p3p3/3B4/3Q4/8/PPP2PPP/2KRR3 b - - 0 1',
+          '6kN/1pp2pp1/1pb5/8/3R1R2/2P3KP/r7/8 b - - 0 1',
+          '3q1r2/5pk1/p4np1/4Q2p/Pp5P/1P5N/2P3P1/1K2R3 b - - 0 1',
+          'r5k1/5pp1/p6p/1p6/8/2P1rQ2/q4PPP/3R2K1 w - - 0 1',
+          'rn3rk1/pB3ppp/6q1/8/8/3P2Pb/PP2PK1P/R1BQ3R b - - 0 1',
+          '8/8/1P5k/P2p4/3Pb3/4P3/r5p1/4K1R1 w - - 0 1',
+          'r2q3k/1p2r1pp/2p1B2R/p7/P5Q1/2Pn3P/6P1/6K1 w - - 0 1',
+          'r4k2/5p2/2p1b3/8/5Q2/6RP/5PPK/r1q5 w - - 0 1',
+          '2rqr1k1/5ppp/8/p1pb4/PpNP4/1P6/5PPP/2RQR1K1 w - - 0 1',
+          '4r3/7k/8/8/P2P1RQ1/1P1K2PP/8/2q5 b - - 0 1',
+          'Q7/6pk/3pr1pp/3N4/P7/KP6/2q5/6R1 b - - 0 1',
+          '6k1/B4p1p/b5p1/4n3/4B2P/4P1P1/2R2PK1/1r6 b - - 0 1',
+          'r4bk1/pp3rpp/n1p2p2/5N2/8/5NR1/PB2bPPP/R5K1 w - - 0 1',
+          'r2r2k1/pp1b1pqN/2n1p3/5p2/8/P2B2Q1/5PPP/2R2RK1 w - - 0 1',
+          '8/1B3R2/2K1P1p1/6kp/2n5/8/3r1P1P/8 b - - 0 1',
+          '6k1/Q2r1pp1/1B2p2p/4n3/8/3q2P1/5P1P/5RK1 w - - 0 1',
+          '6k1/p5r1/1pp4p/3p3q/3P1QP1/2P5/PP3R2/6K1 w - - 0 1',
+          '3n4/4r1p1/p3pk2/1p1r1pp1/N2Pp3/P1R1P2P/1PR2PP1/6K1 w - - 0 1',
+          '5rk1/5ppp/3Rp3/4P3/3P1QP1/8/2rq4/5RK1 w - - 0 1',
+          '5k2/8/5pp1/3Pp2P/4P1K1/3n1PN1/8/8 b - - 0 1',
+          'r7/2pkq1pQ/p1pp1p2/4n1p1/4P3/P1NP4/1PPB1b2/2K4R w - - 0 1',
+          '5rk1/2p2p2/6rp/1p4q1/1P1RQb2/P4P2/2B1KP2/7R b - - 0 1',
+          '4rk2/ppp2pp1/1q2b2p/3Q4/8/1P2R3/P1P2PPP/4R1K1 b - - 0 1',
+          '1k4r1/p1p3q1/2p5/4P3/1P1PQ3/2P5/P4R1p/5R1K b - - 0 1',
+          '1k2r3/pp4p1/2q5/2PR1Qp1/P7/4P3/r7/3R1K2 w - - 0 1',
+          '2r2k1r/p4qp1/1p2b2p/3p3Q/3R4/P1P3P1/1P3P1P/5RK1 w - - 0 1',
+          '5rk1/5bbp/R3ppp1/1q1n4/3P4/3N1N1P/1r3PPB/Q4RK1 b - - 0 1',
+          '1r3rk1/7p/1pBp4/2bP2p1/6R1/1Q6/P5PK/4q3 w - - 0 1',
+          '2k3r1/p2qn2p/2p5/3p4/N2P4/8/PPP1QP1K/R3R3 b - - 0 1'
+        ]
+      }
     }
   ]
 };
