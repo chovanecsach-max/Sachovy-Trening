@@ -26,7 +26,7 @@
 //  anglicky ako vo FEN (K Q R B N P).
 // ============================================================================
 
-(window.VERZIE = window.VERZIE || {})['trh-obsah.js'] = '2026-09-24c';
+(window.VERZIE = window.VERZIE || {})['trh-obsah.js'] = '2026-09-27';
 
 const OBSAH_TRH = {
   kluc: 'sachovy-trh',
@@ -54,8 +54,8 @@ const OBSAH_TRH = {
       zapamataj: 'Pešiak 1, jazdec 3, strelec 3, veža 5, dáma 9.',
       prePokrocilych: 'Tieto ceny sú dohoda. V skutočnej partii môže mať figúrka väčšiu alebo menšiu hodnotu ' +
                       '(aktívny jazdec, dvojica strelcov). V tejto hre však platia presne.',
-      preTrenerov: 'Hodnoty zodpovedajú PIECE_VALUE v generate_vision.py. Strelec a jazdec sú rovnocenní, ' +
-                   'preto je S×J krytého jazdca vždy výmena za 0 (kapitola 5).',
+      preTrenerov: 'Ceny figúrok sú rovnaké ako v tréningu Brania so ziskom v menu Zručnosti. Strelec a jazdec sú ' +
+                   'rovnocenní, preto je S×J krytého jazdca vždy výmena za 0 (kapitola 5).',
       ulohy: [
         { id: '1.1', typ: 'vazenie', a: 'R',  b: 'N',  vysvetlenie: 'Veža stojí 5 mincí, jazdec 3.' },
         { id: '1.2', typ: 'vazenie', a: 'R',  b: 'BP', vysvetlenie: 'Veža stojí 5 mincí, strelec a pešiak spolu 4.' },
@@ -79,8 +79,8 @@ const OBSAH_TRH = {
       ],
       zapamataj: 'Nekrytá figúrka = zisk celej jej ceny.',
       prePokrocilych: 'Nekrytá figúrka je branie so ziskom, nech ju berieš čímkoľvek, aj dámou. Súper nemá čím brať späť.',
-      preTrenerov: 'Pri nekrytej figúrke generátor pridá vetu „Nikto ho/ju nebráni." Krytie počíta funkcia ' +
-                   'count_attackers, teda vrátane batérií a bez absolútne viazaných figúrok (kapitola 9).',
+      preTrenerov: 'Pri nekrytej figúrke tréning v Zručnostiach vypíše vetu „Nikto ho/ju nebráni.“ Za obrancu sa ' +
+                   'počíta aj figúrka v batérii (kapitola 8), nepočíta sa figúrka viazaná na kráľa (kapitola 9).',
       ulohy: [
         { id: '2.1', typ: 'anonie', fen: '6k1/8/3n4/8/8/8/8/3R2K1 w - - 0 1', tah: 'd1d6',
           ocakavane: 3, vysvetlenie: 'Jazdca nikto nebráni.' },
@@ -108,8 +108,8 @@ const OBSAH_TRH = {
       uvodKoniec: 'V tejto kapitole ti pomôžem: ukážem, koľko braní so ziskom má každá strana.',
       zapamataj: 'Vždy sa pozri za oboch.',
       prePokrocilych: 'Obe strany môžu mať zisk naraz. V úlohe 3.1 berie veža jazdca a zároveň jazdec môže zobrať strelca.',
-      preTrenerov: 'Generátor pre každú stranu dočasne prepne, kto je na ťahu, a hľadá jej brania. Preto nesmie byť ' +
-                   'žiadny kráľ v šachu, inak by strana, ktorá nie je na ťahu, mohla „brať" kráľa.',
+      preTrenerov: 'Brania sa hľadajú za oboch bez ohľadu na to, kto je na ťahu. Preto sa v úlohách nikdy neobjaví ' +
+                   'pozícia, v ktorej je niektorý kráľ v šachu.',
       ulohy: [
         { id: '3.1', typ: 'najdi', pomocka: 'strany', fen: '6k1/8/8/8/4n3/6B1/8/4R1K1 w - - 0 1',
           ocakavane: ['e1e4', 'e4g3'],
@@ -139,8 +139,9 @@ const OBSAH_TRH = {
       prePokrocilych: 'Zisk je vtedy aspoň rozdiel cien: cena obete mínus cena mojej figúrky. Môže byť aj väčší, ' +
                       'keď súper späť nezoberie. Pozor na úlohu 4.3: veža berie dámu (+4), ale zároveň čierna dáma ' +
                       'môže zobrať nekrytú vežu (+5).',
-      preTrenerov: 'Pri krytej figúrke generátor priebeh výmeny nevysvetľuje, napíše len „Berie jazdca na d5 (zisk +2)." ' +
-                   'V hre to nahrádza rebrík výmeny.',
+      preTrenerov: 'Pri krytej figúrke tréning napíše len výsledok, napríklad „Berie jazdca na d5 (zisk +2).“ Celý ' +
+                   'priebeh výmeny ukazuje v hre rebrík výmeny — hodí sa, keď hráč nechápe, prečo je branie so ' +
+                   'ziskom.',
       ulohy: [
         { id: '4.1', typ: 'kolko', fen: '6k1/8/2p5/3n4/4P3/8/8/6K1 w - - 0 1', tah: 'e4d5',
           ocakavane: 2, vysvetlenie: 'Jazdca kryje pešiak c6. Dostaneš 3, zaplatíš 1.' },
@@ -170,8 +171,8 @@ const OBSAH_TRH = {
       zapamataj: 'Zisk musí byť väčší ako nula. Výmena sa nepočíta.',
       prePokrocilych: 'Výmena môže byť v partii dobrá, napríklad na zjednodušenie alebo proti dobrej figúrke súpera. ' +
                       'Branie so ziskom to však nie je.',
-      preTrenerov: 'Podmienka je ostrá: see_with_pins > 0. Rovnocenná výmena sa medzi riešeniami nikdy neobjaví, ' +
-                   'ani keď je pozične výhodná.',
+      preTrenerov: 'Branie musí priniesť viac, než hráč dá. Rovnocenná výmena (zisk 0) sa medzi riešeniami nikdy ' +
+                   'neobjaví, ani keď je pozične výhodná.',
       ulohy: [
         { id: '5.1', typ: 'anonie', fen: '6k1/1p6/2n5/1B6/8/8/8/6K1 w - - 0 1', tah: 'b5c6',
           ocakavane: 0, vysvetlenie: 'Strelec za jazdca — 3 za 3. To je výmena, nie zisk.' },
@@ -201,9 +202,10 @@ const OBSAH_TRH = {
       zapamataj: 'Nepočítaj figúrky, počítaj mince.',
       prePokrocilych: 'Každá strana berie svojou najlacnejšou figúrkou a môže kedykoľvek prestať. Keď súper späť ' +
                       'nezoberie (6.2, 6.3), zisk je celá cena obete.',
-      preTrenerov: 'Jadro výpočtu: zisk = cena obete − max(0, zisk súpera pri braní späť). Pozor na rozdiel oproti ' +
-                   'zručnosti Slabo pokryté figúrky (obrancov ≤ útočníkov). V pozícii 6.1 je pešiak d5 slabo pokrytý, ' +
-                   'a predsa naň nie je žiadne branie so ziskom.',
+      preTrenerov: 'Zisk = cena zobratej figúrky mínus to, čo súper získa braním späť — ale len ak sa mu braním ' +
+                   'späť oplatí. Pozor na rozdiel oproti zručnosti Slabo pokryté figúrky (obrancov je rovnako alebo ' +
+                   'menej ako útočníkov): v pozícii 6.1 je pešiak d5 slabo pokrytý, a predsa naň nie je žiadne ' +
+                   'branie so ziskom.',
       ulohy: [
         { id: '6.1', typ: 'kolko', fen: '4k3/8/2p5/3p4/5N2/8/8/3RK3 w - - 0 1', tah: 'f4d5',
           ocakavane: -1, vysvetlenie: 'Jazdec za dvoch pešiakov: +1 −3 +1 = −1.' },
@@ -231,8 +233,9 @@ const OBSAH_TRH = {
       zapamataj: 'Riešenie je ťah, nie pole.',
       prePokrocilych: 'Prvú figúrku vo výmene si vyberáš ty, preto záleží, ČÍM začneš. Ďalej už obe strany berú ' +
                       'svojou najlacnejšou figúrkou.',
-      preTrenerov: 'V see_with_pins je prvý krok vynútený figúrkou z ťahu (forced_i). Preto môže byť Jf4×d5 riešením ' +
-                   'a Da2×d5 nie. V úlohe Nájdi všetky sa každý ťah hodnotí samostatne.',
+      preTrenerov: 'Prvou figúrkou vo výmene je vždy tá, ktorou hráč berie; ďalej obe strany berú najlacnejšou ' +
+                   'figúrkou. Preto môže byť Jf4×d5 branie so ziskom a Da2×d5 nie. V úlohe Nájdi všetky sa každé ' +
+                   'branie hodnotí samostatne.',
       ulohy: [
         { id: '7.1', typ: 'pasca', fen: '7k/8/2p5/3r4/5N2/8/Q7/6K1 w - - 0 1', moznosti: ['f4d5', 'a2d5'],
           ocakavane: ['f4d5'],
@@ -261,8 +264,9 @@ const OBSAH_TRH = {
       zapamataj: 'Pozri sa aj ZA figúrku, môže tam stáť posila.',
       prePokrocilych: 'Batéria funguje na stĺpci a rade (veža + veža, veža + dáma) aj na uhlopriečke (strelec + dáma). ' +
                       'Zadná figúrka ide do výmeny až vtedy, keď predná odišla.',
-      preTrenerov: 'Výpočet po každom braní hľadá útočníkov na aktuálnej šachovnici, takže röntgenové útoky sa zapoja ' +
-                   'samy. Bez Db1 a Va2 v úlohe 8.4 (Biely: Kg1, Va1, Sc2) sú obe brania neziskové: Sc2×f5 = 0, Va1×a5 = −4.',
+      preTrenerov: 'Po každom braní sa do výmeny zapojí aj figúrka, ktorá stála v batérii za tou, čo práve brala. ' +
+                   'Porovnanie k 8.4: bez Db1 a Va2 (Biely: Kg1, Va1, Sc2) sú obe brania bez zisku, Sc2×f5 = 0 a ' +
+                   'Va1×a5 = −4.',
       ulohy: [
         { id: '8.1', typ: 'kolko', fen: '3rk3/8/8/3p4/8/8/3R4/3QK3 w - - 0 1', tah: 'd2d5',
           ocakavane: 1, vysvetlenie: 'Za vežou d2 stojí dáma. Keby čierny zobral vežu, dáma zoberie jeho vežu — preto čierny späť neberie.' },
@@ -290,9 +294,9 @@ const OBSAH_TRH = {
       zapamataj: 'Viazaná figúrka nie je obranca.',
       prePokrocilych: 'Viazaná figúrka môže brať po línii väzby, napríklad zobrať samotnú figúrku, ktorá ju viaže. ' +
                       'Viazaný môže byť aj pešiak (9.3).',
-      preTrenerov: 'see_with_pins vyradí z výmeny každú figúrku, ktorej branie by nechalo vlastného kráľa v šachu. ' +
-                   'Rovnako to robí count_attackers. Preto generátor pri 9.1 napíše „Nikto ho nebráni", hoci jazdec f6 ' +
-                   'na pole d5 vidí. Relatívna väzba (na dámu alebo vežu) sa NEráta, pozri kapitolu 10.',
+      preTrenerov: 'Figúrka viazaná na kráľa sa za obrancu nepočíta — brať nesmie, lebo by to bol nelegálny ťah. ' +
+                   'Preto tréning pri 9.1 napíše „Nikto ho nebráni“, hoci jazdec f6 na pole d5 vidí. Väzba na dámu ' +
+                   'alebo vežu sa nepočíta, pozri kapitolu 10.',
       ulohy: [
         { id: '9.1', typ: 'anonie', fen: '7k/8/5n2/3p4/8/8/1B6/3RK3 w - - 0 1', tah: 'd1d5',
           ocakavane: 1, vysvetlenie: 'Jazdec f6 je viazaný strelcom b2 na kráľa h8. Pešiaka d5 preto nikto nebráni.' },
@@ -322,10 +326,11 @@ const OBSAH_TRH = {
       prePokrocilych: 'Na našom stánku platia pravidlá šachu: viazaná figúrka na kráľa nesmie brať (kapitola 9), ' +
                       'kráľ nesmie zobrať krytú figúrku a pešiak na poslednom rade sa mení na dámu. Nepočítame však, ' +
                       'čo sa potom stane na inom stánku: väzbu na dámu, odkrytý útok, preťaženého obrancu, medziťah ani mat.',
-      preTrenerov: 'Zručnosť Branie so ziskom trénuje len videnie možnosti zisku materiálu na určitom poli. Netrénuje ' +
-                   'hľadanie najlepšieho ťahu. see_with_pins počíta výmenu len na cieľovom poli; relatívnu väzbu, odkrytý ' +
-                   'útok, preťaženého obrancu, medziťah ani mat po braní zámerne nevidí. Rešpektuje však legálnosť ' +
-                   '(absolútna väzba, kráľ nevstúpi do šachu) a premenu pešiaka.',
+      preTrenerov: 'Zručnosť Branie so ziskom trénuje len videnie možnosti zisku materiálu na určitom poli. ' +
+                   'Netrénuje hľadanie najlepšieho ťahu. Výmena sa počíta len na poli, kde sa začalo brať; väzbu na ' +
+                   'dámu, odkrytý útok, preťaženého obrancu, medziťah ani mat po braní zámerne nevidí. Pravidlá ' +
+                   'šachu na tom poli však platia: figúrka viazaná na kráľa nesmie brať, kráľ nevstúpi do šachu a ' +
+                   'pešiak na poslednom rade sa mení na dámu.',
       ulohy: [
         { id: '10.1', typ: 'stanok', fen: '1k5q/8/5n2/8/3Bp3/8/8/4RK2 w - - 0 1', tah: 'e1e4',
           moznosti: ['e4', 'f6', 'h8'], ocakavane: -4,
@@ -361,10 +366,11 @@ const OBSAH_TRH = {
       ],
       uvodKoniec: 'Ak sa nepodarí, poviem ti, ktoré kapitoly si zopakovať. Pozície budú zakaždým iné.',
       zapamataj: 'Obchodník vidí za oboch, počíta celú výmenu na stánku a berie len so ziskom.',
-      preTrenerov: 'Pozície sú skutočné pozície zo Skills.pgn, z ktorých generátor robí úlohy direct_attack (60 pozícií ' +
-                   's 1 až 4 riešeniami, náhodne sa vyberie 10). Čas ako v tréningu na úrovni 1: 15 s + 10 s na riešenie. ' +
-                   'Skúška sa nezapisuje do training_log a neovplyvní ELO zručnosti. ' +
-                   'Kto skúšku zložil a ako idú kapitoly, uvidíš v menu Tréner → Prehľad hier.',
+      preTrenerov: 'Pozície sú zo skutočných partií, z tých istých ako úlohy v tréningu Brania so ziskom (60 ' +
+                   'pozícií s 1 až 4 riešeniami, náhodne sa vyberie 10). Čas ako v tréningu na úrovni 1: 15 s + 10 ' +
+                   's na každé riešenie. Skúška sa nezapisuje do štatistík tréningu a nemení ELO. Skúšku možno ' +
+                   'opakovať, zakaždým s inými pozíciami. Kto ju zložil a ako idú kapitoly, uvidíš v menu Tréner → ' +
+                   'Prehľad hier.',
       skuska: {
         pocet: 10,
         hranica: 8,
