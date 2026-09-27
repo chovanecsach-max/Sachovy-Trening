@@ -114,6 +114,7 @@ tr.nezacal td.meno { color: #64748b; font-weight: normal; }
     <div class="tile"><div class="n" id="tHraci">0</div><div class="l">Hráčov</div></div>
     <div class="tile run"><div class="n" id="tZacali">0</div><div class="l">Začali hru</div></div>
     <div class="tile run"><div class="n" id="tKapitoly">0</div><div class="l">Prešli všetky kapitoly</div></div>
+    <div class="tile" id="tileOdomknuta" style="display:none;"><div class="n" id="tOdomknuta">0</div><div class="l">Majú hru odomknutú</div></div>
     <div class="tile done"><div class="n" id="tSkuska">0</div><div class="l">Zložili skúšku</div></div>
   </div>
 
@@ -132,16 +133,20 @@ tr.nezacal td.meno { color: #64748b; font-weight: normal; }
 <script src="js/auth.js"></script>
 <script src="js/player.js"></script>
 <script src="js/trh-obsah.js"></script>
+<script src="js/straz-obsah.js"></script>
 <script src="js/hra-postup.js"></script>
 <script>
 // ZNAČKA VERZIE — pri každej úprave tohto súboru prepíš dátum.
-(window.VERZIE = window.VERZIE || {})['hry-prehlad.html'] = '2026-09-24b';
+(window.VERZIE = window.VERZIE || {})['hry-prehlad.html'] = '2026-09-27';
 
 // ─── Hry ─────────────────────────────────────────────────────────────────────
 // Každá hra má svoj obsah (kapitoly, názvy) v samostatnom súbore. Nová hra =
 // nový riadok tu + <script src="js/...-obsah.js"> vyššie.
+// Hra, ktorá sa hráčovi odomyká až po skúške inej hry, má to zapísané
+// v HraPostup.HRY (odomknePo).
 const HRY = [
-  { kluc: 'sachovy-trh', obsah: OBSAH_TRH, zrucnost: 'Branie so ziskom' }
+  { kluc: 'sachovy-trh',   obsah: OBSAH_TRH,   zrucnost: 'Branie so ziskom' },
+  { kluc: 'straz-na-trhu', obsah: OBSAH_STRAZ, zrucnost: 'Slabo pokryté figúrky' }
 ];
 
 const USER_ROLE        = sessionStorage.getItem('user_role') || '';
@@ -155,6 +160,7 @@ let hraci = [];          // hráči zvolenej skupiny
 let postupy = {};        // user_id → { kapitola → riadok hra_postup }
 let treneri = {};        // id trénera → meno (pre stĺpec skupiny)
 let viacSkupin = false;  // ukazovať pri hráčovi aj skupinu
+let odomknuti = null;    // hra so zámkom: user_id hráčov, ktorí zložili skúšku predchádzajúcej hry
 
 function goHome() { location.href = 'index.html'; }
 
@@ -178,6 +184,14 @@ async function sbFetchAll(query) {
     off += PAGE;
   }
   return all;
+}
+
+// Po skúške ktorej hry sa hra hráčom odomyká? null = je otvorená hneď
+function zamokHry(hra) {
+  const h = HraPostup.HRY[hra.kluc];
+  if (!h || !h.odomknePo) return null;
+  const po = HraPostup.HRY[h.odomknePo];
+  return { po: h.odomknePo, nazov: po.nazov, skuska: po.skuska };
 }
 
 function aktualnaHra() {
@@ -232,6 +246,15 @@ async function load() {
       `hra_postup?hra=eq.${hra.kluc}&select=user_id,kapitola,dokoncene,hviezdy,najlepsie,posledne,pokusy,prve_dokoncenie,naposledy`);
     postupy = {};
     riadky.forEach(r => { (postupy[r.user_id] = postupy[r.user_id] || {})[r.kapitola] = r; });
+
+    // 3) Hra, ktorá sa odomyká po skúške inej hry: kto má tú skúšku zloženú
+    odomknuti = null;
+    const zamok = zamokHry(hra);
+    if (zamok) {
+      const zlozili = await sbFetchAll(
+        `hra_postup?hra=eq.${zamok.po}&kapitola=eq.${zamok.skuska}&dokoncene=eq.true&select=user_id`);
+      odomknuti = new Set(zlozili.map(r => r.user_id));
+    }
   } catch (e) {
     console.error(e);
     const t = String(e.message || e);
@@ -261,9 +284,11 @@ function vyhodnot(p, casti) {
   const hviezd = casti.bezne.reduce((s, k) => s + (moje[k.cislo]?.hviezdy || 0), 0);
   const sk = casti.skuska ? moje[casti.skuska.cislo] : null;
   const casy = Object.values(moje).map(r => r.naposledy).filter(Boolean).sort();
+  const zacal = Object.keys(moje).length > 0;
   return {
     moje, hotove, hviezd, sk,
-    zacal: Object.keys(moje).length > 0,
+    zacal,
+    odomknuta: zacal || !odomknuti || odomknuti.has(p.user_id),
     vsetky: hotove === casti.bezne.length,
     zlozena: !!sk?.dokoncene,
     naposledy: casy.length ? casy[casy.length - 1] : null
@@ -291,6 +316,8 @@ function render() {
   document.getElementById('tZacali').textContent   = riadky.filter(r => r.v.zacal).length;
   document.getElementById('tKapitoly').textContent = riadky.filter(r => r.v.vsetky).length;
   document.getElementById('tSkuska').textContent   = riadky.filter(r => r.v.zlozena).length;
+  document.getElementById('tOdomknuta').textContent = riadky.filter(r => r.v.odomknuta).length;
+  document.getElementById('tileOdomknuta').style.display = odomknuti ? '' : 'none';
   document.getElementById('tiles').style.display = '';
 
   // Hlavička
@@ -314,7 +341,9 @@ function render() {
     b += v.zacal
       ? `<td><div class="bar"><span class="${v.vsetky ? 'plna' : ''}" style="width:${pct}%"></span></div>` +
         `<span class="prog-txt">${v.hotove} / ${pocetKapitol}</span></td>`
-      : '<td><span class="prog-txt">nezačal</span></td>';
+      : (v.odomknuta ? '<td><span class="prog-txt">nezačal</span></td>'
+                     : `<td title="Hra sa odomkne po zložení skúšky hry ${escapeHtml(zamokHry(hra).nazov)}">` +
+                       '<span class="prog-txt">🔒 zamknutá</span></td>');
 
     const bunka = (k) => {
       const r = v.moje[k.cislo];
@@ -354,6 +383,11 @@ function render() {
          '(✓ zložená · ✗ zatiaľ nie, s najlepším pokusom).';
   }
   casti.bonus.forEach(k => { l += `<br><b>${escapeHtml(k.znacka)}</b> ${escapeHtml(k.nazov)}`; });
+  const zamok = zamokHry(hra);
+  if (zamok) {
+    l += `<br>🔒 Hráčovi sa hra odomkne, keď zloží záverečnú skúšku hry <b>${escapeHtml(zamok.nazov)}</b>. ` +
+         'Tréneri ju majú odomknutú hneď.';
+  }
   l += '<br>★ hviezdičky za najlepší pokus (1–3) · <span class="nic">·</span> kapitolu ešte nedohral. ' +
        'Hra sa nezapisuje do tréningu a nemení ELO ani štatistiky.';
   const leg = document.getElementById('legenda');
