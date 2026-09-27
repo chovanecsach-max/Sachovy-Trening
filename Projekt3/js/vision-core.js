@@ -45,7 +45,7 @@
 //  Prázdne pole = '', figúrky ako vo FEN (P N B R Q K biele, p n b r q k čierne).
 // ============================================================================
 
-if (typeof window !== 'undefined') (window.VERZIE = window.VERZIE || {})['vision-core.js'] = '2026-09-27b';
+if (typeof window !== 'undefined') (window.VERZIE = window.VERZIE || {})['vision-core.js'] = '2026-09-27c';
 
 const VisionCore = (function () {
   'use strict';
@@ -897,7 +897,7 @@ const VisionCore = (function () {
   //  VIDLIČKY (hra Vidlička na trhu, úloha fork)
   //  Verný prepis fork_moves_for_side a jej pomocných funkcií, stav 27. 9. 2026:
   //  hrozbe matu stačí jeden terč, mat musí byť nový, pešiak na poslednom rade
-  //  sa skúša ako jazdec aj dáma.
+  //  sa skúša ako jazdec aj dáma, jazdec viazaný na kráľa vo výmene nebráni ani neberie.
   // ════════════════════════════════════════════════════════════════════
   const MAX_VIDLICIEK = 12;                                    // MAX_FORKS
 
@@ -1001,11 +1001,8 @@ const VisionCore = (function () {
 
   // ── _least_valuable_attacker ───────────────────────────────────────────
   //  Najlacnejšia figúrka farby color, ktorá napáda pole sq (pri rovnakej cene
-  //  skoršie pole). Viazaná figúrka berie len po osi väzby.
-  //  POZOR, zámerne ako v Pythone: smer útoku sa počíta celočíselným delením
-  //  zaokrúhleným NADOL (dr // adiv). Pri skoku jazdca tak vznikne „smer",
-  //  ktorý sa môže náhodou zhodovať s osou väzby — generátor vtedy viazaného
-  //  jazdca do výmeny započíta. Kvôli zhode s úlohami v databáze to tu platí tiež.
+  //  skoršie pole). Viazaná figúrka berie len po osi väzby, viazaný jazdec
+  //  nikdy (oprava 27. 9. 2026 v generátore aj tu).
   function najlacnejsiVidlicka(board, sq, color) {
     let bestI = null, bestV = null;
     for (let i = 0; i < 64; i++) {
@@ -1013,6 +1010,7 @@ const VisionCore = (function () {
       if (!p || pieceColor(p) !== color) continue;
       if (!attacksSq(board, i, sq)) continue;
       const ax = pinAxis(board, i);
+      if (ax !== null && p.toLowerCase() === 'n') continue;
       if (ax !== null) {
         const dr = rowOf(sq) - rowOf(i), dc = colOf(sq) - colOf(i);
         const adiv = Math.max(Math.abs(dr), Math.abs(dc));
