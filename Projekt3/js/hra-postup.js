@@ -31,13 +31,27 @@
 //      insert into nastavenia (kluc, hodnota) values ('hry', 'vsetci')
 //      on conflict (kluc) do update set hodnota = excluded.hodnota, zmenene = now();
 //
+//  ODOMYKANIE HIER: hra s `odomknePo` (zoznam HRY nižšie) sa hráčovi odomkne,
+//  až keď zloží záverečnú skúšku inej hry. Stráž na trhu sa odomkne po skúške
+//  Šachového trhu. Tréneri a admin majú všetky hry odomknuté hneď.
+//
 //  Potrebuje: js/player.js (sbFetch) — pre úložisko databaza a pre prístup.
 // ============================================================================
 
-(window.VERZIE = window.VERZIE || {})['hra-postup.js'] = '2026-09-24c';
+(window.VERZIE = window.VERZIE || {})['hra-postup.js'] = '2026-09-27';
 
 const HraPostup = (function () {
   'use strict';
+
+  // ── Hry ─────────────────────────────────────────────────────────────────
+  //  kluc → názov, číslo kapitoly záverečnej skúšky a verzia číslovania kapitol
+  //  (musia sa zhodovať s obsahom hry: trh-obsah.js, straz-obsah.js).
+  //  POZOR: keď sa v niektorej hre prečíslujú kapitoly, uprav aj tento zoznam.
+  const HRY = {
+    'sachovy-trh':   { nazov: 'Šachový trh',   stranka: 'sachovy-trh.html',   skuska: 11, verzia: 2 },
+    'straz-na-trhu': { nazov: 'Stráž na trhu', stranka: 'straz-na-trhu.html', skuska: 9,  verzia: 1,
+                       odomknePo: 'sachovy-trh' }
+  };
 
   function prazdny() { return { verzia: 1, kapitoly: {} }; }
 
@@ -196,12 +210,66 @@ const HraPostup = (function () {
     return false;
   }
 
+  // ── Odomknutie hry ──────────────────────────────────────────────────────
+  // Zložil hráč záverečnú skúšku hry? Rozhoduje databáza; keď nie je dostupná,
+  // kópia postupu v prehliadači (skúška zložená bez siete sa odošle neskôr).
+  async function zlozilSkusku(hra, userId) {
+    const h = HRY[hra];
+    if (!h || !userId) return false;
+    try {
+      const rows = await sbFetch('hra_postup?user_id=eq.' + encodeURIComponent(userId) +
+                                 '&hra=eq.' + encodeURIComponent(hra) + '&kapitola=eq.' + h.skuska +
+                                 '&select=dokoncene&limit=1');
+      if (rows && rows[0] && rows[0].dokoncene) return true;
+    } catch (e) {
+      console.warn('Postup hry ' + hra + ' sa nenačítal z databázy, použijem kópiu z prehliadača:', e);
+    }
+    const lok = citajLokalne(klucLokalne(hra, userId, h.verzia));
+    return !!(lok.kapitoly[h.skuska] && lok.kapitoly[h.skuska].dokoncene);
+  }
+
+  // Smie hráč túto hru hrať? { ok: true } alebo { ok: false, po: 'sachovy-trh' }
+  // Tréneri a admin vždy; hráč, keď zložil skúšku hry, po ktorej sa hra odomyká.
+  async function odomknuta(hra, rola, userId) {
+    rola = rola || sessionStorage.getItem('user_role') || '';
+    userId = userId || sessionStorage.getItem('user_id') || '';
+    const h = HRY[hra];
+    if (!h || !h.odomknePo || PERSONAL.includes(rola)) return { ok: true };
+    return (await zlozilSkusku(h.odomknePo, userId)) ? { ok: true } : { ok: false, po: h.odomknePo };
+  }
+
+  // Na stránke hry: ak je hra pre hráča ešte zamknutá, ukáže oznam a vráti false
+  async function vyzadujOdomknutie(hra) {
+    const o = await odomknuta(hra);
+    if (o.ok) return true;
+    const h = HRY[hra], po = HRY[o.po];
+    const tlacidlo = 'margin:14px 4px 0;padding:11px 20px;border:none;border-radius:10px;font-size:14px;' +
+                     'font-weight:bold;cursor:pointer;';
+    document.body.innerHTML =
+      '<div style="max-width:520px;margin:60px auto;padding:26px;background:#fff;' +
+      'border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,.08);' +
+      'font-family:Arial,sans-serif;text-align:center;color:#111827;">' +
+      '<div style="font-size:40px;margin-bottom:10px;">🔒</div>' +
+      '<h2 style="margin:0 0 10px;color:#b45309;">' + h.nazov + ' je zatiaľ zamknutá</h2>' +
+      '<p style="color:#475569;font-size:15px;line-height:1.5;">' +
+      'Odomkne sa, keď zložíš záverečnú skúšku hry <b>' + po.nazov + '</b>.</p>' +
+      '<button onclick="location.href=\'' + po.stranka + '\'" style="' + tlacidlo +
+      'background:#16a34a;color:#fff;">Hrať ' + po.nazov + '</button>' +
+      '<button onclick="location.href=\'index.html\'" style="' + tlacidlo +
+      'background:#1e3a5f;color:#fff;">Späť na úvod</button></div>';
+    return false;
+  }
+
   return {
+    HRY: HRY,
     lokalne: lokalne,
     databaza: databaza,
     klucLokalne: klucLokalne,
     pristup: pristup,
     vyzadujPristup: vyzadujPristup,
+    zlozilSkusku: zlozilSkusku,
+    odomknuta: odomknuta,
+    vyzadujOdomknutie: vyzadujOdomknutie,
     // pre testy
     _lepsi: lepsi,
     _zluc: zluc
