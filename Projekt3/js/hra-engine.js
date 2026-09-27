@@ -1,16 +1,23 @@
 // ============================================================================
-//  hra-engine.js — herný rámec pre hry zručností (prvá hra: Šachový trh)
+//  hra-engine.js — herný rámec pre hry zručností
+//                  (Šachový trh, Stráž na trhu)
 // ----------------------------------------------------------------------------
 //  Rámec nevie nič o konkrétnej hre. Dostane obsah (napr. OBSAH_TRH z
-//  trh-obsah.js) a postará sa o všetko ostatné:
+//  trh-obsah.js alebo OBSAH_STRAZ zo straz-obsah.js) a postará sa o všetko
+//  ostatné:
 //    • mapa kapitol, odomykanie, hviezdičky, zošit pravidiel, odznak,
 //    • úvod kapitoly so sprievodcom Grošíkom,
-//    • úlohy (typy: vazenie, obchod, anonie, kolko, pasca, najdi, stanok),
+//    • úlohy — Šachový trh: vazenie, obchod, anonie, kolko, pasca, najdi, stanok
+//            — Stráž na trhu: pocet, slaba, ktora, najdiSlabe,
 //    • body: správne +10, chyba −5, séria 5 správnych +10, úloha Nájdi
 //      všetky bez chyby +10; skóre kapitoly neklesne pod nulu,
-//    • po odpovedi rebrík výmeny na šachovnici (RebrikVymeny),
+//    • po odpovedi rebrík výmeny (Šachový trh) alebo stráž figúrky
+//      (Stráž na trhu) na šachovnici,
 //    • záverečná skúška: náhodné pozície, časový limit, rozbor chýb
 //      a odporúčanie kapitol na zopakovanie.
+//
+//  Texty, ktoré sa medzi hrami líšia (pochvaly, odznak, zošit…), môže obsah
+//  hry prepísať v časti `texty`. Čo obsah neuvedie, platí ako v Šachovom trhu.
 //
 //  Správne odpovede pri úlohách so šachovnicou počíta VŽDY VisionCore —
 //  rovnako ako generátor úloh. Obsah hry ich neurčuje.
@@ -23,7 +30,7 @@
 //  Spustenie: HraEngine.spusti({ obsah, koren, rola, userId, testovaci, uloziste })
 // ============================================================================
 
-(window.VERZIE = window.VERZIE || {})['hra-engine.js'] = '2026-09-24c';
+(window.VERZIE = window.VERZIE || {})['hra-engine.js'] = '2026-09-27';
 
 const HraEngine = (function () {
   'use strict';
@@ -45,8 +52,22 @@ const HraEngine = (function () {
 
   const MENO_FIGURKY = { K: 'kráľ', Q: 'dáma', R: 'veža', B: 'strelec', N: 'jazdec', P: 'pešiak' };
   const MENO_FIGURKY_4 = { K: 'kráľa', Q: 'dámu', R: 'vežu', B: 'strelca', N: 'jazdca', P: 'pešiaka' };
+  const MENO_FIGURKY_7 = { K: 'kráľom', Q: 'dámou', R: 'vežou', B: 'strelcom', N: 'jazdcom', P: 'pešiakom' };
+
+  // Texty, ktoré si hra môže prepísať v obsahu (O.texty). Predvolené sú zo Šachového trhu.
+  const TEXTY_PREDVOLENE = {
+    pochvaly: ['Výborne! Dobrý obchod.', 'Presne tak!', 'Máš oko obchodníka.', 'Správne!', 'Tak sa to robí!'],
+    odznak: 'Obchodník',
+    zosit: 'Toto sú pravidlá, ktoré si už získal. Obchodník ich má vždy po ruke.',
+    bublinaUlohy: 'Rozmýšľaj ako obchodník: čo dostanem a čo zaplatím?',
+    odkazy: [{ text: 'Laboratórium výmeny', href: 'laboratorium.html' }],
+    koniec3: 'Skvelý obchod! Tri hviezdičky.',
+    koniec2: 'Dobrá práca! Na tri hviezdičky ti chýba len kúsok.',
+    koniec1: 'Kapitola je za tebou. Skús ju ešte raz — pôjde to lepšie.'
+  };
 
   let O = null;             // obsah hry
+  let T = TEXTY_PREDVOLENE; // texty hry (predvolené + O.texty)
   let koren = null;         // DOM prvok, do ktorého sa hra kreslí
   let nast = {};            // { rola, userId, testovaci, cestaObrazkov }
   let postup = null;        // uložený postup hráča
@@ -59,6 +80,7 @@ const HraEngine = (function () {
   // ════════════════════════════════════════════════════════════════════
   function spusti(moznosti) {
     O = moznosti.obsah;
+    T = Object.assign({}, TEXTY_PREDVOLENE, O.texty || {});
     koren = moznosti.koren;
     nast = {
       rola: moznosti.rola || '',
@@ -143,7 +165,18 @@ const HraEngine = (function () {
       if (u.ocakavane === undefined || !u.fen) return;
       const poz = VC.parseFen(u.fen);
       let vypocet;
-      if (u.typ === 'najdi') vypocet = VC.braniaSoZiskom(poz.board, poz.state).riesenia;
+      // Stráž na trhu: útočníci a obrancovia jednej figúrky, slabo pokryté figúrky
+      const straz = pole => VC.strazFigurky(poz.board, VC.sqIndex(pole));
+      if (u.typ === 'pocet') vypocet = straz(u.pole)[u.co === 'obrancovia' ? 'obrancovia' : 'utocnici'].length;
+      else if (u.typ === 'slaba') vypocet = straz(u.pole).slaba;
+      else if (u.typ === 'ktora') {
+        const slabe = u.moznosti.filter(p => straz(p).slaba);
+        vypocet = slabe.length === 1 ? slabe[0] : slabe;
+      } else if (u.typ === 'najdiSlabe') {
+        const v = VC.slaboPokryte(poz.board, poz.state);
+        vypocet = v.dovod ? 'vyradená: ' + v.dovod : v.riesenia;
+      }
+      else if (u.typ === 'najdi') vypocet = VC.braniaSoZiskom(poz.board, poz.state).riesenia;
       else if (u.typ === 'pasca') vypocet = u.moznosti.filter(x => ziskNaSachovnici(poz.board, x) > 0);
       else if (u.tah && !jeLegalny(poz.board, u.tah)) vypocet = 'nelegalny';
       else if (u.tah) vypocet = ziskNaSachovnici(poz.board, u.tah);
@@ -203,13 +236,12 @@ const HraEngine = (function () {
     if (t) t.innerHTML = grosikSvg(nalada);
   }
 
-  const POCHVALY = ['Výborne! Dobrý obchod.', 'Presne tak!', 'Máš oko obchodníka.', 'Správne!', 'Tak sa to robí!'];
-  function pochvala() { return POCHVALY[Math.floor(Math.random() * POCHVALY.length)]; }
+  function pochvala() { return T.pochvaly[Math.floor(Math.random() * T.pochvaly.length)]; }
 
-  // Odznak Obchodník (za zloženú záverečnú skúšku)
+  // Odznak za zloženú záverečnú skúšku (Obchodník, Strážca trhu…)
   function odznakHtml(velky) {
     return '<span class="odznak' + (velky ? ' velky' : '') + '"><span class="odznak-minca">★</span>' +
-           '<span class="odznak-text">Obchodník</span></span>';
+           '<span class="odznak-text">' + esc(T.odznak) + '</span></span>';
   }
 
   // ════════════════════════════════════════════════════════════════════
@@ -312,7 +344,8 @@ const HraEngine = (function () {
       '<div class="mapa-suhrn"><span class="mapa-hviezdy">★ ' + hviezd + ' / ' + (sObsahom.length * 3) +
       (zlozilSkusku() ? ' ' + odznakHtml(false) : '') + '</span>' +
       '<span class="mapa-tlacidla"><button class="accent" data-akcia="zosit">Zošit pravidiel</button>' +
-      '<a class="odkaz-tlacidlo" href="laboratorium.html">Laboratórium výmeny</a></span></div>' +
+      (T.odkazy || []).map(o => '<a class="odkaz-tlacidlo" href="' + esc(o.href) + '">' + esc(o.text) + '</a>').join('') +
+      '</span></div>' +
       '<div class="kapitoly">' + karty + '</div>' +
       (nast.testovaci ? '<div class="test-akcie"><button class="secondary male" data-akcia="vymaz">Vymazať postup (test)</button></div>' : '') +
       '</div>';
@@ -343,7 +376,7 @@ const HraEngine = (function () {
     });
     koren.innerHTML = lista(false) +
       '<div class="zosit">' +
-      grosikRiadok('vesely', 'Toto sú pravidlá, ktoré si už získal. Obchodník ich má vždy po ruke.', null, false) +
+      grosikRiadok('vesely', esc(T.zosit), null, false) +
       '<h2>Zošit pravidiel</h2>' + h +
       '<button class="primary" data-akcia="spat">Späť na kapitoly</button></div>';
     naviazListu();
@@ -367,6 +400,10 @@ const HraEngine = (function () {
     if (u.typ === 'najdi') {
       const poz = VC.parseFen(u.fen);
       return BODY_SPRAVNE * VC.braniaSoZiskom(poz.board, poz.state).riesenia.length + BONUS_BEZ_CHYBY;
+    }
+    if (u.typ === 'najdiSlabe') {
+      const poz = VC.parseFen(u.fen);
+      return BODY_SPRAVNE * VC.slaboPokryte(poz.board, poz.state).riesenia.length + BONUS_BEZ_CHYBY;
     }
     return BODY_SPRAVNE;
   }
@@ -552,7 +589,7 @@ const HraEngine = (function () {
       '<div class="odpovede" id="hraOdpovede"></div>' +
       '</div>' +
       '<div class="uloha-pravy">' +
-      grosikRiadok('rozmysla', 'Rozmýšľaj ako obchodník: čo dostanem a čo zaplatím?', 'hraBublina', false) +
+      grosikRiadok('rozmysla', esc(T.bublinaUlohy), 'hraBublina', false) +
       '<div id="hraSpatna"></div>' +
       '</div></div></div>';
     naviazListu();
@@ -1152,6 +1189,432 @@ const HraEngine = (function () {
   };
 
   // ════════════════════════════════════════════════════════════════════
+  //  Stráž figúrky (hra Stráž na trhu)
+  // ----------------------------------------------------------------------
+  //  Zlodeji = útočníci, strážnici = obrancovia. Počíta ich VisionCore presne
+  //  ako tréning Slabo pokryté figúrky: batérie, figúrka za súperovou strelou,
+  //  väzba na kráľa, kráľ na susednom poli. Figúrka je slabo pokrytá, keď
+  //  strážnikov nie je viac ako zlodejov (aj 0 : 0); kráľ sa nehľadá.
+  // ════════════════════════════════════════════════════════════════════
+  function menoFig(p) { return MENO_FIGURKY[p.toUpperCase()]; }
+  function menoNaPoli(board, sq) { return menoFig(board[sq]) + ' ' + VC.sqName(sq); }
+  function jeZenskyRod(p) { return 'RQ'.includes(p.toUpperCase()); }
+  function pokryty(p) { return jeZenskyRod(p) ? 'pokrytá' : 'pokrytý'; }
+  function jeKral(p) { return !!p && p.toUpperCase() === 'K'; }
+
+  // V kapitole 1 sa ešte len počíta — slovo „slabo pokrytá" príde až v kapitole 2
+  function ukazujeVerdikt() { return !(stav && stav.kapitola && stav.kapitola.bezVerdiktu); }
+
+  // Prvá figúrka na línii od strážnika k poľu — tá, za ktorou strážnik stojí
+  function predNim(board, odkial, kam) {
+    const r1 = Math.floor(odkial / 8), c1 = odkial % 8, r2 = Math.floor(kam / 8), c2 = kam % 8;
+    const dr = Math.sign(r2 - r1), dc = Math.sign(c2 - c1);
+    let r = r1 + dr, c = c1 + dc;
+    while ((r !== r2 || c !== c2) && r >= 0 && r < 8 && c >= 0 && c < 8) {
+      if (board[r * 8 + c]) return r * 8 + c;
+      r += dr; c += dc;
+    }
+    return null;
+  }
+
+  // „Veža d1 — v batérii za vežou d2", „Veža e1 — za súperovou vežou e4"
+  function popisStraznika(board, x, ciel) {
+    let t = velkePismeno(menoFig(x.figurka)) + ' ' + x.pole;
+    if (!x.cez) return t;
+    const pred = predNim(board, x.i, ciel);
+    if (pred === null) return t;
+    const p = board[pred];
+    const meno = MENO_FIGURKY_7[p.toUpperCase()] + ' ' + VC.sqName(pred);
+    if (VC.pieceColor(p) === VC.pieceColor(x.figurka)) return t + ' — v batérii za ' + meno;
+    return t + ' — za súperov' + (jeZenskyRod(p) ? 'ou ' : 'ým ') + meno;
+  }
+
+  function strazZnacky(board, sq, info) {
+    const z = {};
+    z[sq] = 'straz-ciel';
+    if (jeKral(board[sq])) return z;
+    info.utocnici.forEach(x => { z[x.i] = 'zlodej' + (x.cez ? ' za' : ''); });
+    info.obrancovia.forEach(x => { z[x.i] = 'straznik' + (x.cez ? ' za' : ''); });
+    return z;
+  }
+
+  function zlucZnacky(a, b) {
+    const z = Object.assign({}, a || {});
+    Object.keys(b).forEach(k => { z[k] = (z[k] ? z[k] + ' ' : '') + b[k]; });
+    return z;
+  }
+
+  // Text do pása pod šachovnicou: „Jazdec d5 · Zlodeji 2 : Strážnici 2 → slabo pokrytý"
+  function textStraze(board, sq, info, sVerdiktom) {
+    const meno = velkePismeno(menoNaPoli(board, sq));
+    if (jeKral(board[sq])) return { text: meno + ' — kráľa nehľadáme, nikto ho nesmie zobrať.', trieda: 'nula' };
+    const pocty = 'Zlodeji ' + info.utocnici.length + ' : Strážnici ' + info.obrancovia.length;
+    if (!sVerdiktom) return { text: meno + ' · ' + pocty, trieda: 'nula' };
+    return {
+      text: meno + ' · ' + pocty + ' → ' + (info.slaba ? 'slabo ' : 'dobre ') + pokryty(board[sq]),
+      trieda: info.slaba ? 'minus' : 'plus'
+    };
+  }
+
+  function nastavPasik(text, trieda) {
+    const pasik = document.getElementById('hraPasik');
+    if (!pasik) return;
+    pasik.hidden = false;
+    pasik.className = 'pasik' + (trieda ? ' ' + trieda : '');
+    document.getElementById('hraPasikUcetBox').hidden = true;
+    document.getElementById('hraPasikText').textContent = text;
+  }
+
+  // Karta „Stráž" do pravého panela
+  function htmlStraze(board, sq, prepinac) {
+    const p = board[sq];
+    let h = '<div class="panel-karta straz-karta"><h3>Stráž: ' + esc(menoNaPoli(board, sq)) + '</h3>' + (prepinac || '');
+    if (jeKral(p)) {
+      return h + '<div class="slabo">Kráľa nehľadáme. Nikto ho nesmie zobrať, takže strážnikov nepotrebuje.</div></div>';
+    }
+    const info = VC.strazFigurky(board, sq);
+    const zoznam = (pole, trieda) => pole.length
+      ? '<ul class="straz-zoznam">' + pole.map(x => '<li class="' + trieda + (x.cez ? ' za' : '') + '">' +
+          esc(popisStraznika(board, x, sq)) + '</li>').join('') + '</ul>'
+      : '<div class="slabo straz-nikto">nikto</div>';
+    h += '<div class="straz-nadpis zlodeji">Zlodeji (útočníci): ' + info.utocnici.length + '</div>' +
+         zoznam(info.utocnici, 'zlodej') +
+         '<div class="straz-nadpis straznici">Strážnici (obrancovia): ' + info.obrancovia.length + '</div>' +
+         zoznam(info.obrancovia, 'straznik');
+    if (ukazujeVerdikt()) {
+      const ut = info.utocnici.length, ob = info.obrancovia.length;
+      h += '<div class="straz-verdikt ' + (info.slaba ? 'slaba' : 'dobra') + '">' +
+           (info.slaba
+             ? (ob === 0 && ut === 0 ? 'Nikto ' + (jeZenskyRod(p) ? 'ju' : 'ho') + ' nestráži'
+                                     : (ob === ut ? 'Strážnikov je rovnako ako zlodejov' : 'Strážnikov je menej ako zlodejov'))
+               + ' → <b>slabo ' + pokryty(p) + '</b>.'
+             : 'Strážnikov je viac ako zlodejov → <b>dobre ' + pokryty(p) + '</b>.') + '</div>';
+      if (info.slaba) {
+        h += '<div class="straz-veta">V tréningu uvidíš: „' + esc(VC.vysvetliSlaboPokrytu(board, VC.sqName(sq))) + '“</div>';
+      }
+    }
+    h += '<div class="straz-legenda"><span><i class="lg ciel"></i>figúrka</span><span><i class="lg zlodej"></i>zlodej</span>' +
+         '<span><i class="lg straznik"></i>strážnik</span><span><i class="lg za"></i>stojí v rade za inou</span></div>' +
+         '<div class="slabo straz-tip">Klikni na hociktorú figúrku a uvidíš jej stráž.</div></div>';
+    return h;
+  }
+
+  // Ukáže stráž figúrky na šachovnici, v páse a v paneli.
+  //   o.zaklad   — značky, ktoré majú na šachovnici zostať (nájdené figúrky, kandidáti)
+  //   o.panelPred — HTML nad kartou stráže (zoznam nájdených figúrok)
+  //   o.prepinac — HTML s tlačidlami na prepínanie figúrok, o.poPaneli(el) ich naviaže
+  //   o.pasik    — vlastný text pása (inak pás ukáže počty stráže)
+  function ukazStraz(sq, o) {
+    o = o || {};
+    const board = stav.ulohy[stav.i]._poz.board;
+    const info = VC.strazFigurky(board, sq);
+    sachovnica.oznac(zlucZnacky(o.zaklad, strazZnacky(board, sq, info)));
+    if (o.pasik) nastavPasik(o.pasik.text, o.pasik.trieda);
+    else { const t = textStraze(board, sq, info, ukazujeVerdikt()); nastavPasik(t.text, t.trieda); }
+    const el = document.getElementById('hraSpatna');
+    if (el) {
+      el.innerHTML = (o.panelPred || '') + htmlStraze(board, sq, o.prepinac);
+      if (o.poPaneli) o.poPaneli(el);
+    }
+    return info;
+  }
+
+  // Po odpovedi: klik na ktorúkoľvek figúrku ukáže jej stráž
+  function rezimPrezerania(moznosti) {
+    const board = stav.ulohy[stav.i]._poz.board;
+    sachovnica.naKlik = pole => { if (board[pole]) ukazStraz(pole, moznosti ? moznosti() : {}); };
+  }
+
+  // ── Koľko? — koľko útočníkov (obrancov) má označená figúrka ──────────
+  TYPY.pocet = {
+    priprav(u) {
+      const board = u._poz.board, sq = VC.sqIndex(u.pole);
+      const obrancovia = u.co === 'obrancovia';
+      const info = VC.strazFigurky(board, sq);
+      const spravna = (obrancovia ? info.obrancovia : info.utocnici).length;
+      document.getElementById('hraZadanie').innerHTML = 'Koľko ' +
+        (obrancovia ? '<b>obrancov</b> (strážnikov)' : '<b>útočníkov</b> (zlodejov)') +
+        ' má ' + esc(menoNaPoli(board, sq)) + '?';
+      const z = {}; z[sq] = 'straz-ciel';
+      sachovnica.oznac(z);
+      const cisla = [];
+      for (let c = 0; c <= Math.max(4, spravna); c++) cisla.push(c);
+      nastavOdpovede('<div class="moznosti pocty">' + cisla.map(c =>
+        '<button class="moznost" data-h="' + c + '">' + c + '</button>').join('') + '</div>',
+        el => el.querySelectorAll('.moznost').forEach(b => b.onclick = () => {
+          const dobre = Number(b.dataset.h) === spravna;
+          vyznacVolbu(b, dobre);
+          ukazStraz(sq);
+          rezimPrezerania();
+          const kto = obrancovia ? 'strážnikov' : 'zlodejov';
+          if (dobre) {
+            const bonus = zapisSpravne();
+            grosikHovori('nadseny', pochvala() + ' ' + esc(u.vysvetlenie) + bonus);
+            ukazPokracovanie(true, '+' + BODY_SPRAVNE + ' bodov · ' + kto + ': ' + spravna);
+          } else {
+            zapisChybu();
+            grosikHovori('smutny', 'Správne je ' + spravna + '. ' + esc(u.vysvetlenie));
+            ukazPokracovanie(false, znak(BODY_CHYBA) + ' bodov · ' + kto + ': ' + spravna);
+          }
+        }));
+      grosikHovori('rozmysla', obrancovia
+        ? 'Spočítaj strážnikov: figúrky jeho farby, ktoré by mohli brať späť na to isté pole.'
+        : 'Spočítaj zlodejov: súperove figúrky, ktoré by ho mohli zobrať.');
+    }
+  };
+
+  // ── Slabá? — je označená figúrka slabo pokrytá? (Áno / Nie) ──────────
+  TYPY.slaba = {
+    priprav(u) {
+      const board = u._poz.board, sq = VC.sqIndex(u.pole);
+      const p = board[sq];
+      const info = VC.strazFigurky(board, sq);
+      const ut = info.utocnici.length, ob = info.obrancovia.length;
+      document.getElementById('hraZadanie').innerHTML = (u.otazka || 'Je {figurka} <b>slabo {pokryty}</b>?')
+        .replace('{figurka}', esc(menoNaPoli(board, sq))).replace('{pokryty}', pokryty(p));
+      const z = {}; z[sq] = 'straz-ciel';
+      sachovnica.oznac(z);
+      nastavOdpovede('<div class="moznosti dve">' +
+        '<button class="moznost ano" data-h="ano">Áno</button>' +
+        '<button class="moznost nie" data-h="nie">Nie</button></div>',
+        el => el.querySelectorAll('.moznost').forEach(b => b.onclick = () => {
+          const dobre = (b.dataset.h === 'ano') === info.slaba;
+          vyznacVolbu(b, dobre);
+          ukazStraz(sq);
+          rezimPrezerania();
+          const vysledok = (info.slaba ? 'slabo ' : 'dobre ') + pokryty(p) + ' ' + ut + ' : ' + ob;
+          if (dobre) {
+            const bonus = zapisSpravne();
+            grosikHovori('nadseny', pochvala() + ' ' + esc(u.vysvetlenie) + bonus);
+            ukazPokracovanie(true, '+' + BODY_SPRAVNE + ' bodov · ' + vysledok);
+          } else {
+            zapisChybu();
+            grosikHovori('smutny', esc(velkePismeno(menoNaPoli(board, sq))) + (info.slaba ? ' je' : ' nie je') +
+                         ' slabo ' + pokryty(p) + ': zlodeji ' + ut + ', strážnici ' + ob + '. ' + esc(u.vysvetlenie));
+            ukazPokracovanie(false, znak(BODY_CHYBA) + ' bodov · ' + vysledok);
+          }
+        }));
+      grosikHovori('rozmysla', 'Spočítaj zlodejov aj strážnikov. Figúrka je v bezpečí, len keď má viac strážnikov.');
+    }
+  };
+
+  // ── Ktorá? — ktorá z označených figúrok je slabo pokrytá ─────────────
+  TYPY.ktora = {
+    priprav(u) {
+      const board = u._poz.board;
+      const polia = u.moznosti.map(x => VC.sqIndex(x));
+      const slabe = polia.filter(sq => VC.strazFigurky(board, sq).slaba);
+      const zaklad = {};
+      polia.forEach(sq => { zaklad[sq] = 'kandidat'; });
+      document.getElementById('hraZadanie').innerHTML = u.otazka || 'Ktorá z označených figúrok je <b>slabo pokrytá</b>?';
+      sachovnica.oznac(zaklad);
+
+      const prepinac = vybrane => '<div class="prepinac">Stráž pre: ' + polia.map(sq =>
+        '<button class="secondary male' + (sq === vybrane ? ' vybrane' : '') + '" data-pole="' + sq + '">' +
+        esc(menoNaPoli(board, sq)) + '</button>').join('') + '</div>';
+      const moznosti = vybrane => ({
+        zaklad: zaklad,
+        prepinac: prepinac(vybrane),
+        poPaneli: el => el.querySelectorAll('.prepinac button').forEach(b => b.onclick = () => ukaz(Number(b.dataset.pole)))
+      });
+      const ukaz = sq => ukazStraz(sq, moznosti(sq));
+
+      let hotovo = false;
+      const vyber = sq => {
+        if (hotovo) return;
+        hotovo = true;
+        const dobre = slabe.includes(sq);
+        document.querySelectorAll('#hraOdpovede .moznost').forEach(x => {
+          const pole = Number(x.dataset.h);
+          if (slabe.includes(pole)) x.classList.add('spravna');
+          else if (pole === sq) x.classList.add('nespravna');
+        });
+        ukaz(sq);
+        sachovnica.naKlik = pole => { if (board[pole]) ukazStraz(pole, moznosti(pole)); };
+        const spravna = slabe.map(x => menoNaPoli(board, x)).join(', ');
+        if (dobre) {
+          const bonus = zapisSpravne();
+          grosikHovori('nadseny', pochvala() + ' ' + esc(u.vysvetlenie) + bonus);
+          ukazPokracovanie(true, '+' + BODY_SPRAVNE + ' bodov · slabo pokrytá: ' + spravna);
+        } else {
+          const info = VC.strazFigurky(board, sq);
+          zapisChybu();
+          grosikHovori('smutny', esc(velkePismeno(menoNaPoli(board, sq))) + ' nie je slabo ' + pokryty(board[sq]) +
+                       ': zlodeji ' + info.utocnici.length + ', strážnici ' + info.obrancovia.length + '. ' +
+                       esc(u.vysvetlenie));
+          ukazPokracovanie(false, znak(BODY_CHYBA) + ' bodov · slabo pokrytá je ' + spravna);
+        }
+      };
+
+      nastavOdpovede('<div class="moznosti">' + polia.map(sq =>
+        '<button class="moznost" data-h="' + sq + '">' + esc(velkePismeno(menoNaPoli(board, sq))) + '</button>').join('') +
+        '</div>',
+        el => el.querySelectorAll('.moznost').forEach(b => b.onclick = () => vyber(Number(b.dataset.h))));
+      sachovnica.naKlik = pole => { if (polia.includes(pole)) vyber(pole); };
+      grosikHovori('rozmysla', 'Pri každej označenej figúrke spočítaj zlodejov a strážnikov. Môžeš kliknúť aj priamo na figúrku.');
+    }
+  };
+
+  // ── Nájdi všetky slabo pokryté figúrky (za oboch) ────────────────────
+  //  Presne ako tréning Slabo pokryté figúrky v menu Zručnosti: hráč kliká
+  //  na figúrky (nie ťahy), hľadá za bieleho aj čierneho, kráľa nie.
+  TYPY.najdiSlabe = {
+    priprav(u) {
+      const board = u._poz.board;
+      const vysl = VC.slaboPokryte(board, u._poz.state);
+      const riesenia = vysl.riesenia;                     // polia, napr. 'e4'
+      const veta = {};
+      riesenia.forEach((x, i) => { veta[x] = vysl.vysvetlenia[i]; });
+      const ul = { najdene: [], chybne: [], hotovo: false, chybVUlohe: 0, casVyprsal: false };
+
+      document.getElementById('hraZadanie').innerHTML =
+        'Nájdi všetky <b>slabo pokryté</b> figúrky <span class="slabo">(biele aj čierne)</span>';
+      grosikHovori('rozmysla', stav.skuska
+        ? 'Skúška! Nájdi všetky slabo pokryté figúrky za oboch skôr, ako vyprší čas.'
+        : 'Klikni na každú slabo pokrytú figúrku — bielu aj čiernu. Keď už žiadnu nevidíš, stlač Hotovo.');
+
+      const farba = pole => VC.pieceColor(board[VC.sqIndex(pole)]);
+      const textPocitadla = () => {
+        let t = 'Nájdené: ' + ul.najdene.length + ' / ' + riesenia.length;
+        if (u.pomocka === 'strany') {
+          const w = riesenia.filter(x => farba(x) === 'w'), b = riesenia.filter(x => farba(x) === 'b');
+          t += ' · Biely ' + ul.najdene.filter(x => farba(x) === 'w').length + '/' + w.length +
+               ' · Čierny ' + ul.najdene.filter(x => farba(x) === 'b').length + '/' + b.length;
+        }
+        return t;
+      };
+
+      const znacky = () => {
+        const z = {};
+        ul.najdene.forEach(x => { z[VC.sqIndex(x)] = 'slaba-najdena'; });
+        ul.chybne.forEach(x => { z[VC.sqIndex(x)] = 'omyl'; });
+        if (ul.hotovo) riesenia.filter(x => !ul.najdene.includes(x)).forEach(x => { z[VC.sqIndex(x)] = 'prehliadnuta'; });
+        return z;
+      };
+
+      // Veta z tréningu so zvýraznenou figúrkou: „<b>Pešiak na a2</b>: útočníkov 1, obrancov 0…"
+      const vetaHtml = x => {
+        const m = /^(\S+ na [a-h][1-8])([\s\S]*)$/.exec(veta[x]);
+        return m ? '<b>' + esc(m[1]) + '</b>' + esc(m[2]) : esc(veta[x]);
+      };
+
+      const zoznamHtml = () => {
+        let h = '<div class="panel-karta"><h3>Tvoje figúrky</h3>';
+        if (!ul.najdene.length && !ul.chybne.length && !ul.hotovo) h += '<div class="slabo">Zatiaľ nič.</div>';
+        ul.najdene.forEach(x => { h += '<div class="zaznam dobre">' + vetaHtml(x) + '</div>'; });
+        ul.chybne.forEach(x => {
+          const sq = VC.sqIndex(x);
+          let t;
+          if (jeKral(board[sq])) t = 'kráľa nehľadáme';
+          else {
+            const i = VC.strazFigurky(board, sq);
+            t = 'zlodeji ' + i.utocnici.length + ' : strážnici ' + i.obrancovia.length + ' → dobre ' + pokryty(board[sq]);
+          }
+          h += '<div class="zaznam zle"><b>' + esc(velkePismeno(menoNaPoli(board, sq))) + '</b> ' + esc(t) + '</div>';
+        });
+        if (ul.hotovo) {
+          riesenia.filter(x => !ul.najdene.includes(x)).forEach(x => {
+            h += '<div class="zaznam prehliadnute">' + vetaHtml(x) + ' <span class="znacka-prehliadnuta">prehliadnutá</span></div>';
+          });
+        }
+        return h + '</div>';
+      };
+
+      // Prekreslí šachovnicu, pás a panel; sq = figúrka, ktorej stráž sa ukáže
+      const obnov = sq => {
+        const zaklad = znacky();
+        let pasik = textPocitadla();
+        if (sq !== null && sq !== undefined) {
+          const info = VC.strazFigurky(board, sq);
+          if (!jeKral(board[sq])) {
+            pasik += ' · ' + velkePismeno(menoNaPoli(board, sq)) + ': zlodeji ' + info.utocnici.length +
+                     ' : strážnici ' + info.obrancovia.length;
+          }
+          ukazStraz(sq, { zaklad: zaklad, panelPred: zoznamHtml(), pasik: { text: pasik, trieda: '' } });
+        } else {
+          sachovnica.oznac(zaklad);
+          nastavPasik(pasik, '');
+          document.getElementById('hraSpatna').innerHTML = zoznamHtml();
+        }
+      };
+
+      const dokonci = vzdal => {
+        if (ul.hotovo) return;
+        ul.hotovo = true;
+        zastavCasovac();
+        const vsetkyNajdene = ul.najdene.length === riesenia.length;
+        const bezChyby = vsetkyNajdene && ul.chybVUlohe === 0 && !ul.casVyprsal;
+        const prehliadnute = riesenia.filter(x => !ul.najdene.includes(x));
+        let text;
+        if (bezChyby) {
+          pripocitaj(BONUS_BEZ_CHYBY);
+          stav.bonusy += BONUS_BEZ_CHYBY;
+          obnovHlavu();
+          text = 'Všetky bez chyby: bonus +' + BONUS_BEZ_CHYBY;
+          grosikHovori('nadseny', 'Našiel si všetky slabo pokryté figúrky a ani raz si sa nepomýlil! ' + esc(u.vysvetlenie));
+        } else if (vsetkyNajdene) {
+          text = 'Všetky nájdené';
+          grosikHovori('vesely', 'Máš ich všetky. ' + esc(u.vysvetlenie));
+        } else {
+          stav.seria = 0;
+          obnovHlavu();
+          text = (ul.casVyprsal ? 'Čas vypršal · ' : '') + 'Prehliadnuté: ' + prehliadnute.length;
+          grosikHovori('smutny', (ul.casVyprsal ? 'Čas vypršal. ' : (vzdal ? 'Niečo ti ešte chýbalo. ' : '')) +
+                       'Prehliadnuté figúrky sú naoranžovo. ' + (u.vysvetlenie ? esc(u.vysvetlenie) + ' ' : '') +
+                       'Klikni na figúrku a uvidíš jej stráž.');
+        }
+        if (stav.skuska) stav.skuska.vysledky.push({ fen: u.fen, bezChyby: bezChyby });
+        obnov(null);
+        ukazPokracovanie(bezChyby || (vsetkyNajdene && !stav.skuska), text);
+      };
+
+      sachovnica.naKlik = pole => {
+        const p = board[pole];
+        if (ul.hotovo) { if (p) obnov(pole); return; }       // po skončení len prezeranie
+        if (!p) { grosikHovori('rozmysla', 'Tu nič nestojí. Klikni na figúrku.'); return; }
+        const meno = VC.sqName(pole);
+        if (ul.najdene.includes(meno)) {
+          grosikHovori('vesely', 'Túto už máš. Hľadaj ďalej.');
+        } else if (riesenia.includes(meno)) {
+          ul.najdene.push(meno);
+          const bonus = zapisSpravne();
+          grosikHovori('nadseny', pochvala() + ' ' + esc(veta[meno]) + bonus);
+        } else if (ul.chybne.includes(meno)) {
+          grosikHovori('rozmysla', jeKral(p) ? 'Kráľa nehľadáme.' : 'Túto si už skúšal — slabo ' + pokryty(p) + ' nie je.');
+        } else {
+          ul.chybne.push(meno);
+          ul.chybVUlohe++;
+          zapisChybu();
+          if (jeKral(p)) {
+            grosikHovori('smutny', 'Kráľa nehľadáme — nikto ho nesmie zobrať, takže strážnikov nepotrebuje. ' +
+                         znak(BODY_CHYBA) + ' bodov.');
+          } else {
+            const i = VC.strazFigurky(board, pole);
+            grosikHovori('smutny', esc(velkePismeno(menoNaPoli(board, pole))) + ' nie je slabo ' + pokryty(p) +
+                         ': zlodeji ' + i.utocnici.length + ', strážnici ' + i.obrancovia.length +
+                         '. Strážnikov je viac. ' + znak(BODY_CHYBA) + ' bodov.');
+          }
+        }
+        obnov(pole);
+        if (ul.najdene.length === riesenia.length) dokonci(false);
+      };
+
+      nastavOdpovede('<button class="secondary velke" id="hraHotovo">Hotovo — viac ich nevidím</button>',
+        el => el.querySelector('#hraHotovo').onclick = () => { if (!ul.hotovo) dokonci(true); });
+      obnov(null);
+
+      if (u.limit) {
+        spustiCasovac(u.limit, () => {
+          if (ul.hotovo) return;
+          ul.casVyprsal = true;
+          zvuk('loss');
+          dokonci(true);
+        });
+      }
+    }
+  };
+
+  // ════════════════════════════════════════════════════════════════════
   //  Koniec kapitoly
   // ════════════════════════════════════════════════════════════════════
   function hviezdyZaSkore(skore, max) {
@@ -1180,9 +1643,7 @@ const HraEngine = (function () {
     const i = O.kapitoly.indexOf(k);
     const dalsia = O.kapitoly.slice(i + 1).find(x => maObsah(x) && jeOdomknuta(x));
     const nalada = hviezdy === 3 ? 'nadseny' : (hviezdy === 2 ? 'vesely' : 'rozmysla');
-    const pozdrav = hviezdy === 3 ? 'Skvelý obchod! Tri hviezdičky.' :
-                    (hviezdy === 2 ? 'Dobrá práca! Na tri hviezdičky ti chýba len kúsok.' :
-                     'Kapitola je za tebou. Skús ju ešte raz — pôjde to lepšie.');
+    const pozdrav = hviezdy === 3 ? T.koniec3 : (hviezdy === 2 ? T.koniec2 : T.koniec1);
 
     koren.innerHTML = lista(true) +
       '<div class="koniec">' +
