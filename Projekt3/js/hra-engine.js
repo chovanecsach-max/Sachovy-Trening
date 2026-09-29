@@ -32,7 +32,7 @@
 //  Spustenie: HraEngine.spusti({ obsah, koren, rola, userId, testovaci, uloziste })
 // ============================================================================
 
-(window.VERZIE = window.VERZIE || {})['hra-engine.js'] = '2026-09-29';
+(window.VERZIE = window.VERZIE || {})['hra-engine.js'] = '2026-09-29b';
 
 const HraEngine = (function () {
   'use strict';
@@ -1949,10 +1949,17 @@ const HraEngine = (function () {
 
     // 3. Bezpečné pole
     const zs = r.ziskSupera;
+    // Figúrka, ktorú vidličkár zobral samotným ťahom (do výmeny na jeho poli sa nepočíta)
+    const zobral = board[r.na] || null;
     const t3 = zs === null ? 'Súper nemá čím ' + rod(kus, 'ho', 'ju') + ' zobrať.'
              : (zs < 0 ? 'Súper by ' + rod(kus, 'ho', 'ju') + ' mohol zobrať, ale stratil by ' + minceAku(-zs) + '.'
-             : (zs === 0 ? 'Súper ' + rod(kus, 'ho', 'ju') + ' zoberie a nastane výmena — nič nestratí.'
-                         : 'Súper ' + rod(kus, 'ho', 'ju') + ' zoberie a získa ' + minceAku(zs) + '.'));
+             : (zs === 0 ? 'Súper ' + rod(kus, 'ho', 'ju') + ' zoberie a nastane výmena — ' +
+                           (zobral ? 'potom už nič ďalšie nestratí.' : 'nič nestratí.')
+                         : 'Súper ' + rod(kus, 'ho', 'ju') + ' zoberie a získa ' + minceAku(zs) + '.')) +
+               (zobral && zs !== null && zs >= 0
+                 ? ' ' + esc(velkePismeno(menoNaPoli(board, r.na))) + ' ' + rod(zobral, 'padol', 'padla') +
+                   ' už samotným ťahom. To je branie, nie vidlička.'
+                 : '');
     li += riadok(r.bezpecne ? 'ok' : 'zle', 'Bezpečné pole', esc(velkePismeno(meno)) + ' na ' + VC.sqName(r.na) + ': ' + t3 +
                  (zs !== null ? htmlVymenyVidlickara(r) : ''));
 
