@@ -1,6 +1,6 @@
 // ============================================================================
 //  hra-engine.js — herný rámec pre hry zručností
-//                  (Šachový trh, Stráž na trhu, Vidlička na trhu)
+//                  (Šachový trh, Stráž na trhu, Vidlička na trhu, Hrozba na trhu)
 // ----------------------------------------------------------------------------
 //  Rámec nevie nič o konkrétnej hre. Dostane obsah (napr. OBSAH_TRH z
 //  trh-obsah.js alebo OBSAH_STRAZ zo straz-obsah.js) a postará sa o všetko
@@ -11,10 +11,12 @@
 //            — Stráž na trhu: pocet, slaba, ktora, najdiSlabe
 //            — Vidlička na trhu: jeVidlicka, precoNie, ktoreTerce, najdiVidlicku,
 //              najdiVidlicky,
+//            — Hrozba na trhu: jeHrozba, precoNieHrozba, coHrozi, najdiHrozbu, najdiHrozby,
 //    • body: správne +10, chyba −5, séria 5 správnych +10, úloha Nájdi
 //      všetky bez chyby +10; skóre kapitoly neklesne pod nulu,
 //    • po odpovedi rebrík výmeny (Šachový trh), stráž figúrky (Stráž na
-//      trhu) alebo rozbor vidličky so šípkami (Vidlička na trhu),
+//      trhu), rozbor vidličky so šípkami (Vidlička na trhu) alebo rozbor
+//      hrozby so šípkami (Hrozba na trhu),
 //    • záverečná skúška: náhodné pozície, časový limit, rozbor chýb
 //      a odporúčanie kapitol na zopakovanie.
 //
@@ -32,7 +34,7 @@
 //  Spustenie: HraEngine.spusti({ obsah, koren, rola, userId, testovaci, uloziste })
 // ============================================================================
 
-(window.VERZIE = window.VERZIE || {})['hra-engine.js'] = '2026-09-29b';
+(window.VERZIE = window.VERZIE || {})['hra-engine.js'] = '2026-09-29c';
 
 const HraEngine = (function () {
   'use strict';
@@ -195,6 +197,23 @@ const HraEngine = (function () {
         const v = VC.vidlicky(poz.board, poz.state);
         vypocet = v.dovod ? 'vyradená: ' + v.dovod : v.riesenia.slice().sort();
       }
+      // Hrozba na trhu
+      else if (u.typ === 'jeHrozba') vypocet = VC.rozoberHrozbu(poz.board, u.tah, poz.state).hrozba;
+      else if (u.typ === 'precoNieHrozba') {
+        const r = VC.rozoberHrozbu(poz.board, u.tah, poz.state);
+        vypocet = r.hrozba ? 'je to hrozba' : PRECO_Z_JADRA_H[r.dovod];
+        const n = nesplneneHrozby(r);
+        if (n.length > 1) console.warn('Úloha ' + u.id + ': ťah nesplní viac podmienok naraz: ' + n.join(', '));
+        if (u.moznosti && !u.moznosti.includes(vypocet)) console.warn('Úloha ' + u.id + ': medzi možnosťami chýba ' + vypocet);
+      }
+      else if (u.typ === 'coHrozi') vypocet = VC.rozoberHrozbu(poz.board, u.tah, poz.state).terce.map(t => VC.sqName(t.pole)).sort();
+      else if (u.typ === 'najdiHrozbu') {
+        vypocet = VC.hrozbyStrany(poz.board, poz.state, u.strana || poz.state.active).map(r => r.tah).sort();
+      }
+      else if (u.typ === 'najdiHrozby') {
+        const v = VC.hrozby(poz.board, poz.state);
+        vypocet = v.dovod ? 'vyradená: ' + v.dovod : v.riesenia.slice().sort();
+      }
       else if (u.typ === 'najdi') vypocet = VC.braniaSoZiskom(poz.board, poz.state).riesenia;
       else if (u.typ === 'pasca') vypocet = u.moznosti.filter(x => ziskNaSachovnici(poz.board, x) > 0);
       else if (u.tah && !jeLegalny(poz.board, u.tah)) vypocet = 'nelegalny';
@@ -202,7 +221,8 @@ const HraEngine = (function () {
       if (u.typ === 'stanok' && !(u.moznosti || []).includes(u.tah.slice(2, 4))) {
         console.warn('Úloha ' + u.id + ': medzi možnosťami chýba stánok ' + u.tah.slice(2, 4));
       }
-      const bezPoradia = ['ktoreTerce', 'najdiVidlicku', 'najdiVidlicky'].includes(u.typ) && Array.isArray(u.ocakavane);
+      const bezPoradia = ['ktoreTerce', 'najdiVidlicku', 'najdiVidlicky', 'coHrozi', 'najdiHrozbu', 'najdiHrozby'].includes(u.typ) &&
+                         Array.isArray(u.ocakavane);
       const ocakavane = bezPoradia ? u.ocakavane.slice().sort() : u.ocakavane;
       if (JSON.stringify(vypocet) !== JSON.stringify(ocakavane)) {
         console.warn('Úloha ' + u.id + ': scenár čaká ' + JSON.stringify(u.ocakavane) +
@@ -437,6 +457,10 @@ const HraEngine = (function () {
       const poz = VC.parseFen(u.fen);
       return BODY_SPRAVNE * VC.vidlicky(poz.board, poz.state).riesenia.length + BONUS_BEZ_CHYBY;
     }
+    if (u.typ === 'najdiHrozby') {
+      const poz = VC.parseFen(u.fen);
+      return BODY_SPRAVNE * VC.hrozby(poz.board, poz.state).riesenia.length + BONUS_BEZ_CHYBY;
+    }
     return BODY_SPRAVNE;
   }
 
@@ -486,6 +510,7 @@ const HraEngine = (function () {
     const poz = VC.parseFen(fen);
     if (typ === 'najdiSlabe') return VC.slaboPokryte(poz.board, poz.state).riesenia.length;
     if (typ === 'najdiVidlicky') return VC.vidlicky(poz.board, poz.state).riesenia.length;
+    if (typ === 'najdiHrozby') return VC.hrozby(poz.board, poz.state).riesenia.length;
     return VC.braniaSoZiskom(poz.board, poz.state).riesenia.length;
   }
 
@@ -2120,7 +2145,8 @@ const HraEngine = (function () {
   //   povolenaStrana — 'w' / 'b' / null (obe)
   //   naTah(uci)     — hráč zahral ťah na dosiahnuteľné pole
   //   zaklad()       — značky a šípky, ktoré majú na šachovnici zostať
-  function vyberTahu(u, povolenaStrana, naTah, zaklad) {
+  //   slovo          — čo sa hľadá, 4. pád ('vidličku', 'hrozbu'); predvolene vidličku
+  function vyberTahu(u, povolenaStrana, naTah, zaklad, slovo) {
     const board = u._poz.board;
     let vybrane = null, ciele = [];
     const kresli = () => {
@@ -2151,7 +2177,7 @@ const HraEngine = (function () {
                                            (VC.pinAxis(board, pole) ? ' — je viazan' + rod(p, 'ý', 'á') + ' na kráľa.' : '.'));
         }
       } else if (p) {
-        grosikHovori('rozmysla', 'Teraz hľadáme vidličku ' + stranaText(povolenaStrana, 2) + '. Klikni na ' +
+        grosikHovori('rozmysla', 'Teraz hľadáme ' + (slovo || 'vidličku') + ' ' + stranaText(povolenaStrana, 2) + '. Klikni na ' +
                      (povolenaStrana === 'w' ? 'bielu' : 'čiernu') + ' figúrku.');
         vybrane = null; ciele = [];
       } else {
@@ -2396,6 +2422,599 @@ const HraEngine = (function () {
     if (r.druh === 'sach_kral_neubrani') return 5;
     const terce = r.napadnute.filter(x => x.pocita && x.dovod !== 'kral');
     if (terce.length && terce.every(x => x.figurka.toLowerCase() === 'p' && x.dovod === 'zisk')) return 3;
+    return 1;
+  }
+
+  // ════════════════════════════════════════════════════════════════════
+  //  Priama hrozba (hra Hrozba na trhu)
+  // ----------------------------------------------------------------------
+  //  Či je ťah priama hrozba, počíta VisionCore.rozoberHrozbu presne ako
+  //  tréning Priame hrozby. Po odpovedi hra ukáže pozíciu po ťahu: hroziaca
+  //  figúrka nazlato, zelená šípka od figúrky, ktorá by brala so ziskom,
+  //  k terču, pole matu nafialovo a červená šípka k tomu, čo by po ťahu
+  //  získal súper. V paneli sú tri podmienky s ✓ / ✗:
+  //  tichý ťah – hrozí zisk alebo mat – súper nič nezíska.
+  // ════════════════════════════════════════════════════════════════════
+  const PRECO_NIE_H = {
+    ticha: 'Nie je to tichý ťah',
+    nic:   'Nič nové nehrozí',
+    super: 'Súper niečo získa',
+    vazba: 'Figúrka je viazaná'
+  };
+  const PRECO_Z_JADRA_H = {
+    branie: 'ticha', sach: 'ticha', nic_nehrozi: 'nic', super_ziska: 'super', super_mat: 'super', nelegalny: 'vazba'
+  };
+
+  // Všetky nesplnené podmienky (odpoveď v úlohe „Prečo nie?" platí, keď trafí
+  // ktorúkoľvek z nich; hlavný dôvod podľa generátora je PRECO_Z_JADRA_H).
+  // Terče bez kráľa (pri šachu jadro pripíše aj „branie" kráľa — to hrozba nie je)
+  function terceH(r) { return r.terce.filter(t => !jeKral(t.figurka)); }
+
+  function nesplneneHrozby(r) {
+    if (r.hrozba) return [];
+    if (!r.legalny) return ['vazba'];
+    const out = [];
+    if (r.branie || r.sach) out.push('ticha');
+    if (!terceH(r).length && !r.mat.length) out.push('nic');
+    if (r.superCiele.length || r.superMat.length) out.push('super');
+    return out;
+  }
+
+  function rozborHrozby(u, uci) { return VC.rozoberHrozbu(u._poz.board, uci, u._poz.state); }
+  function najlepsieZ(kto) { return kto.reduce((a, b) => (!a || b.zisk > a.zisk) ? b : a, null); }
+  function superStranyH(s) { return s === 'w' ? 'b' : 'w'; }
+
+  // Figúrky strany `farba`, ktoré na poli `pole` útočia (priamo, bez batérií)
+  function utocniciNa(board, pole, farba) {
+    const out = [];
+    for (let i = 0; i < 64; i++) if (board[i] && VC.pieceColor(board[i]) === farba && VC.attacksSq(board, i, pole)) out.push(i);
+    return out;
+  }
+
+  // Zisk súpera, keby zobral hroziacu figúrku (null = nemá čím brať)
+  function ziskSuperaNaPohnutej(r) {
+    const opp = superStranyH(r.strana), st = { active: opp, castling: '-', ep: '-' };
+    let best = null;
+    for (let i = 0; i < 64; i++) {
+      const p = r.poTahu[i];
+      if (!p || VC.pieceColor(p) !== opp || !VC.isLegal(r.poTahu, st, i, r.na, '')) continue;
+      const g = VC.seeWithPins(r.poTahu, i, r.na, opp);
+      if (best === null || g > best) best = g;
+    }
+    return best;
+  }
+
+  // Súperove figúrky, ktoré hroziaca figúrka po ťahu napadne, ale branie sa neoplatí
+  function napadnuteBezZisku(r) {
+    const opp = superStranyH(r.strana), out = [];
+    const ciele = new Set(terceH(r).map(t => t.pole));
+    for (let i = 0; i < 64; i++) {
+      const p = r.poTahu[i];
+      if (!p || VC.pieceColor(p) !== opp || jeKral(p) || ciele.has(i) || !VC.attacksSq(r.poTahu, r.na, i)) continue;
+      out.push({ pole: i, figurka: p, zisk: VC.seeWithPins(r.poTahu, r.na, i, r.strana) });
+    }
+    return out;
+  }
+
+  // Figúrka strany `strana`, ktorá dá na poli `pole` mat jedným ťahom (len pre šípku)
+  function matujuca(board, strana, pole) {
+    const st = { active: strana, castling: '-', ep: '-' }, opp = superStranyH(strana);
+    for (let z = 0; z < 64; z++) {
+      const p = board[z];
+      if (!p || VC.pieceColor(p) !== strana || !VC.isLegal(board, st, z, pole, 'q')) continue;
+      const b = board.slice();
+      b[pole] = (p.toLowerCase() === 'p' && (pole < 8 || pole >= 56)) ? (strana === 'w' ? 'Q' : 'q') : p;
+      b[z] = '';
+      if (VC.isKingInCheck(b, opp) && !VC.legalMoves(b, { active: opp, castling: '-', ep: '-' }).length) return z;
+    }
+    return null;
+  }
+
+  // Figúrky súpera, ktoré môžu hroziacu figúrku zobrať (ale nič tým nezískajú)
+  function beruciPohnutu(r) {
+    const opp = superStranyH(r.strana), st = { active: opp, castling: '-', ep: '-' }, out = [];
+    for (let i = 0; i < 64; i++) {
+      const p = r.poTahu[i];
+      if (p && VC.pieceColor(p) === opp && VC.isLegal(r.poTahu, st, i, r.na, '')) out.push(i);
+    }
+    return out;
+  }
+
+  // Šachujúce figúrky po ťahu (pri úlohách „nie je to tichý ťah")
+  function sachujuci(r) {
+    const kral = VC.findKing(r.poTahu, superStranyH(r.strana));
+    return kral === -1 ? [] : utocniciNa(r.poTahu, kral, r.strana).map(i => ({ z: i, na: kral }));
+  }
+
+  // Značky a šípky rozboru na šachovnici
+  function rozborHrozbyNaSachovnici(u, r, pred) {
+    const board = u._poz.board;
+    if (!r.legalny) {
+      sachovnica.nastav(board);
+      const z = oznacTahVidlicky(r.tah); z[r.z] = 'omyl';
+      const v = viazac(board, r.z);
+      const sipky = [sipkaTahu(r.tah)];
+      if (v !== null) { z[v] = 'hrozi'; sipky.push({ z: v, na: VC.findKing(board, r.strana), typ: 'vazba' }); }
+      sachovnica.oznac(z);
+      kresliSipky(sipky);
+      return;
+    }
+    if (pred) {
+      sachovnica.nastav(board);
+      const z = oznacTahVidlicky(r.tah);
+      z[r.z] = 'vidlickar';
+      sachovnica.oznac(z);
+      kresliSipky([sipkaTahu(r.tah)]);
+      return;
+    }
+    sachovnica.nastav(r.poTahu);
+    const z = {}, sipky = [];
+    z[r.z] = 'last-from';
+    z[r.na] = 'vidlickar';
+    terceH(r).forEach(t => {
+      z[t.pole] = 'terc-pocita';
+      sipky.push({ z: najlepsieZ(t.kto).z, na: t.pole, typ: 'pocita' });
+    });
+    r.mat.forEach(p => {
+      z[p] = 'mat-pole';
+      const m = matujuca(r.poTahu, r.strana, p);
+      if (m !== null) sipky.push({ z: m, na: p, typ: 'pocita' });
+    });
+    if (!terceH(r).length && !r.mat.length) {
+      napadnuteBezZisku(r).forEach(x => { z[x.pole] = 'terc-nepocita'; sipky.push({ z: r.na, na: x.pole, typ: 'nepocita' }); });
+    }
+    if (r.sach) sachujuci(r).forEach(s => { z[s.na] = 'terc-nepocita'; sipky.push({ z: s.z, na: s.na, typ: 'nepocita' }); });
+    r.superCiele.forEach(t => {
+      z[t.pole] = 'hrozi';
+      sipky.push({ z: najlepsieZ(t.kto).z, na: t.pole, typ: 'hrozba' });
+    });
+    r.superMat.forEach(p => {
+      z[p] = 'mat-pole hrozi';
+      const m = matujuca(r.poTahu, superStranyH(r.strana), p);
+      if (m !== null) sipky.push({ z: m, na: p, typ: 'hrozba' });
+    });
+    // Súper môže hroziacu figúrku zobrať, ale nič nezíska (výmena alebo strata) — sivá šípka
+    if (!r.superCiele.some(t => t.pole === r.na)) {
+      beruciPohnutu(r).forEach(i => sipky.push({ z: i, na: r.na, typ: 'nepocita' }));
+    }
+    sachovnica.oznac(z);
+    kresliSipky(sipky);
+  }
+
+  // Ako hrozba vznikla, keď neberie figúrka, ktorá ťahala
+  function textMechanizmu(t, kto, nb) {
+    const meno = velkePismeno(menoNaPoli(nb, kto.z));
+    if (t.mech === 'odkryty') return ' Je to odkrytý útok: ťah uvoľnil cestu figúrke ' + VC.sqName(kto.z) + '.';
+    if (t.mech === 'podpora') return ' Pribudol druhý útočník, preto sa branie oplatí.';
+    if (t.mech === 'uvolnenie') return ' ' + meno + ' bol' + rod(nb[kto.z], '', 'a') + ' viazan' + rod(nb[kto.z], 'ý', 'á') +
+                                      ' na kráľa — ťah ' + rod(nb[kto.z], 'ho', 'ju') + ' uvoľnil.';
+    if (t.mech === 'prerusenie') return ' Ťah sa postavil do cesty obrancovi a obrana sa prerušila.';
+    if (t.mech === 'vazba') return ' Ťah zviazal obrancu na kráľa — viazaný strážnik nestráži.';
+    if (t.mech === 'ine') return ' Rozhoduje celá výmena na tomto poli.';
+    return '';
+  }
+
+  // Rebrík výmeny, keby hráč na terči naozaj bral (z jeho pohľadu)
+  function htmlRebrikaHrozby(nb, kto, pole, strana) {
+    const rb = VC.rebrikVymeny(nb, VC.sqName(kto.z) + VC.sqName(pole));
+    if (!rb.kroky.length) return '';
+    let h = '<table class="rebrik vidl-rebrik"><thead><tr><th>Keby si bral</th><th class="cislo">Pre teba</th></tr></thead><tbody>';
+    rb.kroky.forEach(k => {
+      h += '<tr><td><span class="bodka ' + k.strana + '"></span>' + esc(k.tah) + ' <span class="slabo">— ' +
+           (k.strana === strana ? 'beriem ' : 'súper berie ') + esc(k.figurka) + (k.premena ? ' a mení sa na dámu' : '') +
+           '</span></td><td class="cislo ' + RV.triedaZnamienka(k.ucet) + '">' + znak(k.ucet) + '</td></tr>';
+    });
+    h += '<tr class="koniec"><td>' + esc(RV.textKonca(rb.koniec)) + '</td><td class="cislo ' + RV.triedaZnamienka(rb.vysledok) +
+         '"><b>' + znak(rb.vysledok) + '</b></td></tr></tbody></table>';
+    return h;
+  }
+
+  // Karta „Rozbor hrozby" do pravého panela
+  function htmlRozboruHrozby(u, r, pred) {
+    const board = u._poz.board;
+    const kus = r.figurka, meno = MENO_FIGURKY[kus.toUpperCase()];
+    let h = '<div class="panel-karta vidl-karta"><h3>Rozbor: ' + esc(r.nazov) + '</h3>';
+    h += '<div class="vidl-verdikt ' + (r.hrozba ? 'ano' : 'nie') + '">' +
+         (r.hrozba ? '✓ Je to priama hrozba.'
+                   : '✗ Nie je to hrozba — ' + esc(PRECO_NIE_H[PRECO_Z_JADRA_H[r.dovod]]).toLowerCase() + '.') + '</div>';
+    if (!r.legalny) {
+      const v = viazac(board, r.z);
+      h += '<div class="vidl-text">' + esc(velkePismeno(menoNaPoli(board, r.z))) + ' je viazan' + rod(kus, 'ý', 'á') +
+           (v !== null ? ' ' + MENO_FIGURKY_7[board[v].toUpperCase()] + ' ' + VC.sqName(v) : '') +
+           ' na kráľa. Nesmie sa pohnúť, lebo by kráľ ostal v šachu.</div></div>';
+      return h;
+    }
+    const riadok = (stavR, nazov, text) => '<li class="' + stavR + '"><span class="vidl-znak">' +
+      (stavR === 'ok' ? '✓' : (stavR === 'zle' ? '✗' : '–')) + '</span><div><b>' + nazov + '</b><div class="vidl-text">' + text + '</div></div></li>';
+    const nb = r.poTahu, opp = superStranyH(r.strana);
+    let li = '';
+
+    // 1. Tichý ťah
+    let t1;
+    if (r.branie) t1 = 'Ťah berie ' + esc(menoNaPoli4(board[r.na], VC.sqName(r.na))) + '. Branie nie je hrozba — ' +
+                       'patrí do zručnosti Branie so ziskom.';
+    else if (r.sach) {
+      const s = sachujuci(r);
+      const odkryty = s.length && !s.some(x => x.z === r.na);
+      t1 = odkryty ? 'Ťah odkryje šach: ' + esc(menoNaPoli(nb, s[0].z)) + ' napadne kráľa. Aj odkrytý šach je šach, nie tichý ťah.'
+                   : 'Ťah dáva šach. Šach nie je hrozba — šachy majú vlastnú zručnosť.';
+    } else t1 = 'Ťah nič neberie a nedáva šach.';
+    li += riadok(r.branie || r.sach ? 'zle' : 'ok', 'Tichý ťah', t1);
+
+    // 2. Hrozí zisk alebo mat
+    let t2 = r.mat.length ? 'Hrozí mat na ' + r.mat.map(VC.sqName).join(', ') + '.' : '';
+    const terce = terceH(r);
+    terce.forEach((t, i) => {
+      const kto = najlepsieZ(t.kto);
+      const bezObrany = VC.countAttackers(nb, t.pole, opp) === 0;
+      t2 += (i || r.mat.length ? '<br>' : '') + esc(velkePismeno(menoNaPoli(nb, kto.z))) + ' by ' + rod(nb[kto.z], 'zobral', 'zobrala') + ' ' +
+            esc(menoNaPoli4(t.figurka, VC.sqName(t.pole))) + ' so ziskom ' + znak(t.zisk) +
+            (bezObrany ? ' — nikto ' + rod(t.figurka, 'ho', 'ju') + ' nestráži.' : '.') + esc(textMechanizmu(t, kto, nb));
+      if (i === 0 && !bezObrany) t2 += htmlRebrikaHrozby(nb, kto, t.pole, r.strana);
+    });
+    if (!terce.length && !r.mat.length) {
+      t2 = 'Keby si bol hneď znova na ťahu, nemal by si nič, čo sa oplatí zobrať.';
+      napadnuteBezZisku(r).forEach(x => {
+        t2 += ' ' + esc(velkePismeno(meno)) + ' napadne ' + esc(menoNaPoli4(x.figurka, VC.sqName(x.pole))) + ', ale branie by ' +
+              (x.zisk === 0 ? 'bola len výmena.' : 'prinieslo stratu ' + znak(x.zisk) + '.');
+      });
+      if (r.matStary.length) t2 += ' Mat na ' + r.matStary.map(VC.sqName).join(', ') + ' hrozil už pred ťahom — tento ťah ho nevytvoril.';
+    }
+    li += riadok(terce.length || r.mat.length ? 'ok' : 'zle', 'Hrozí zisk alebo mat', t2);
+
+    // 3. Súper nič nezíska
+    let t3 = '';
+    r.superCiele.forEach((t, i) => {
+      t3 += (i ? '<br>' : '') + 'Súper by zobral ' + esc(menoNaPoli4(t.figurka, VC.sqName(t.pole))) + ' so ziskom ' + znak(t.zisk) +
+            (t.pole === r.na ? ' — hroziaca figúrka stojí na zlom poli.' : ' — pred ťahom to nešlo, tento ťah ' +
+             rod(t.figurka, 'ho', 'ju') + ' odkryl.');
+    });
+    if (r.superMat.length) t3 += (t3 ? '<br>' : '') + 'Súper by dal mat na ' + r.superMat.map(VC.sqName).join(', ') + '.';
+    if (!t3) {
+      const v = ziskSuperaNaPohnutej(r);
+      t3 = v === null ? 'Súper nemá čím ' + rod(kus, 'ho', 'ju') + ' zobrať a nič iné nezíska.'
+         : (v < 0 ? 'Súper by ' + rod(kus, 'ho', 'ju') + ' mohol zobrať, ale stratil by ' + minceAku(-v) + '.'
+                  : 'Súper ' + rod(kus, 'ho', 'ju') + ' môže len vymeniť — výmena nie je zisk, hrozba platí.');
+    }
+    li += riadok(r.superCiele.length || r.superMat.length ? 'zle' : 'ok', 'Súper nič nezíska',
+                 esc(velkePismeno(meno)) + ' na ' + VC.sqName(r.na) + ': ' + t3);
+
+    h += '<ul class="vidl-podmienky">' + li + '</ul>';
+    if (r.hrozba) h += '<div class="straz-veta">V tréningu uvidíš: „' + esc(r.vysvetlenie) + '“</div>';
+    h += '<div class="vidl-legenda"><span><i class="lg vidlickar"></i>' + (r.hrozba ? 'hroziaca figúrka' : 'figúrka, ktorá ťahala') + '</span>' +
+         (terce.length ? '<span><i class="lc pocita"></i>čo hrozí</span>' : '') +
+         (r.superCiele.length ? '<span><i class="lc hrozba"></i>čo získa súper</span>' : '') + '</div>' +
+         '<button class="secondary male vidl-prepni" data-akcia="hrozPrepni">' +
+         (pred ? 'Ukáž pozíciu po ťahu' : 'Ukáž pozíciu pred ťahom') + '</button></div>';
+    return h;
+  }
+
+  function ukazRozborHrozby(u, r, o) {
+    o = o || {};
+    rozborHrozbyNaSachovnici(u, r, !!o.pred);
+    const el = document.getElementById('hraSpatna');
+    if (!el) return;
+    el.innerHTML = (o.panelPred || '') + htmlRozboruHrozby(u, r, !!o.pred);
+    const prepni = el.querySelector('[data-akcia="hrozPrepni"]');
+    if (prepni) prepni.onclick = () => ukazRozborHrozby(u, r, Object.assign({}, o, { pred: !o.pred }));
+    if (o.poPaneli) o.poPaneli(el);
+  }
+
+  function vyhodnotHrozbu(u, r, dobre, textDobre, textChyby, vysledok) {
+    sachovnica.naKlik = null;
+    ukazRozborHrozby(u, r);
+    if (dobre) {
+      const bonus = zapisSpravne();
+      grosikHovori('nadseny', pochvala() + ' ' + textDobre + bonus);
+      ukazPokracovanie(true, '+' + BODY_SPRAVNE + ' bodov · ' + vysledok);
+    } else {
+      zapisChybu();
+      grosikHovori('smutny', textChyby);
+      ukazPokracovanie(false, znak(BODY_CHYBA) + ' bodov · ' + vysledok);
+    }
+  }
+
+  const TIP_HROZBY = 'Predstav si, že súper vynechá ťah. Mohol by si potom niečo zobrať so ziskom? A nezíska tvojím ťahom niečo súper?';
+
+  // ── Je to hrozba? — Áno / Nie pri vyznačenom ťahu ───────────────────
+  TYPY.jeHrozba = {
+    priprav(u) {
+      const r = rozborHrozby(u, u.tah);
+      document.getElementById('hraZadanie').innerHTML = (u.otazka || 'Je <b>{tah}</b> priama hrozba?').replace('{tah}', esc(r.nazov));
+      ukazTahNaSachovnici(u, u.tah);
+      nastavOdpovede('<div class="moznosti dve">' +
+        '<button class="moznost ano" data-h="ano">Áno</button>' +
+        '<button class="moznost nie" data-h="nie">Nie</button></div>',
+        el => el.querySelectorAll('.moznost').forEach(b => b.onclick = () => {
+          const dobre = (b.dataset.h === 'ano') === r.hrozba;
+          vyznacVolbu(b, dobre);
+          const vysledok = r.hrozba ? 'je to hrozba' : 'nie je to hrozba';
+          vyhodnotHrozbu(u, r, dobre, esc(u.vysvetlenie),
+            (r.hrozba ? 'Je to hrozba! ' : 'Nie je to hrozba. ') + esc(u.vysvetlenie) + ' Pozri rozbor vpravo.', vysledok);
+        }));
+      grosikHovori('rozmysla', u.tip || stav.kapitola.tip || TIP_HROZBY);
+    }
+  };
+
+  // ── Prečo nie? — prečo vyznačený ťah nie je hrozba ──────────────────
+  TYPY.precoNieHrozba = {
+    priprav(u) {
+      const r = rozborHrozby(u, u.tah);
+      const neplatne = nesplneneHrozby(r);
+      const moznosti = u.moznosti || ['ticha', 'nic', 'super'];
+      document.getElementById('hraZadanie').innerHTML =
+        (u.otazka || '<b>{tah}</b> nie je hrozba. Prečo?').replace('{tah}', esc(r.nazov));
+      ukazTahNaSachovnici(u, u.tah);
+      nastavOdpovede('<div class="moznosti">' + moznosti.map(m =>
+        '<button class="moznost" data-h="' + m + '">' + esc(PRECO_NIE_H[m]) + '</button>').join('') + '</div>',
+        el => el.querySelectorAll('.moznost').forEach(b => b.onclick = () => {
+          const dobre = neplatne.includes(b.dataset.h);
+          vyznacVolbu(b, dobre);
+          el.querySelectorAll('.moznost').forEach(x => { if (neplatne.includes(x.dataset.h)) x.classList.add('spravna'); });
+          const spravne = neplatne.map(m => PRECO_NIE_H[m].toLowerCase()).join(', ');
+          vyhodnotHrozbu(u, r, dobre, esc(u.vysvetlenie),
+            'Správne je: ' + esc(spravne) + '. ' + esc(u.vysvetlenie), spravne);
+        }));
+      grosikHovori('rozmysla', 'Prejdi si podmienky jednu po druhej: tichý ťah, hrozí zisk alebo mat, súper nič nezíska.');
+    }
+  };
+
+  // ── Čo hrozí? — klikne na figúrky, ktoré by po ťahu zobral so ziskom ─
+  TYPY.coHrozi = {
+    priprav(u) {
+      const r = rozborHrozby(u, u.tah);
+      const spravne = r.terce.map(t => VC.sqName(t.pole)).sort();
+      const opp = superStranyH(r.strana);
+      const kandidati = [];
+      for (let i = 0; i < 64; i++) {
+        const p = r.poTahu[i];
+        if (p && VC.pieceColor(p) === opp && !jeKral(p) && utocniciNa(r.poTahu, i, r.strana).length) kandidati.push(i);
+      }
+      const vybrane = new Set();
+      let hotovo = false;
+      document.getElementById('hraZadanie').innerHTML = (u.otazka || 'Po ťahu <b>{tah}</b> — čo by si mohol zobrať so ziskom?')
+        .replace('{tah}', esc(r.nazov));
+      const kresli = () => {
+        sachovnica.nastav(r.poTahu);
+        const z = {};
+        z[r.z] = 'last-from';
+        z[r.na] = 'vidlickar';
+        kandidati.forEach(i => { z[i] = vybrane.has(i) ? 'kandidat vybrany' : 'kandidat'; });
+        sachovnica.oznac(z);
+        kresliSipky([sipkaTahu(r.tah)]);
+      };
+      const odoslat = () => {
+        if (hotovo) return;
+        hotovo = true;
+        const volba = Array.from(vybrane).map(VC.sqName).sort();
+        const dobre = JSON.stringify(volba) === JSON.stringify(spravne);
+        const text = spravne.length ? 'hrozí zobrať: ' + spravne.join(', ') : 'nič sa nedá zobrať so ziskom';
+        vyhodnotHrozbu(u, r, dobre, esc(u.vysvetlenie), 'Nie celkom — ' + esc(text) + '. ' + esc(u.vysvetlenie), text);
+      };
+      sachovnica.naKlik = pole => {
+        if (hotovo) return;
+        if (!kandidati.includes(pole)) {
+          grosikHovori('rozmysla', 'Klikaj na súperove figúrky označené namodro — tie po ťahu niekto napáda.');
+          return;
+        }
+        if (vybrane.has(pole)) vybrane.delete(pole); else vybrane.add(pole);
+        kresli();
+      };
+      nastavOdpovede('<button class="primary velke" id="hraTerceHotovo">Hotovo</button>',
+        el => el.querySelector('#hraTerceHotovo').onclick = odoslat);
+      kresli();
+      grosikHovori('rozmysla', 'Namodro sú súperove figúrky, na ktoré po ťahu niekto útočí. Klikni na tie, ktoré by si ' +
+                   'zobral so ziskom, keby súper vynechal ťah. Potom stlač Hotovo.');
+    }
+  };
+
+  // ── Nájdi hrozbu — hráč zahrá tichý ťah jednej strany ───────────────
+  TYPY.najdiHrozbu = {
+    priprav(u) {
+      const board = u._poz.board;
+      const strana = u.strana || u._poz.state.active;
+      const hrozby = VC.hrozbyStrany(board, u._poz.state, strana);
+      const naTahu = u._poz.state.active;
+      document.getElementById('hraZadanie').innerHTML = u.otazka ||
+        ('Nájdi priamu hrozbu <b>' + stranaText(strana, 2) + '</b>' +
+         (strana !== naTahu ? ' <span class="slabo">(hoci je na ťahu ' + stranaText(naTahu) + ')</span>' : ''));
+      let hotovo = false;
+      const vyber = vyberTahu(u, strana, uci => {
+        if (hotovo) return;
+        hotovo = true;
+        sachovnica.naKlik = null;
+        const r = rozborHrozby(u, uci);
+        if (r.hrozba) {
+          vyhodnotHrozbu(u, r, true, esc(r.vysvetlenie) + (u.vysvetlenie ? ' ' + esc(u.vysvetlenie) : ''), '', r.nazov);
+          return;
+        }
+        const prepinac = zvoleny => '<div class="prepinac">Rozbor pre: ' + [uci].concat(hrozby.map(x => x.tah)).map(t =>
+          '<button class="secondary male' + (t === zvoleny ? ' vybrane' : '') + '" data-tah="' + t + '">' +
+          esc(t === uci ? r.nazov + ' (tvoj ťah)' : hrozby.find(x => x.tah === t).nazov) + '</button>').join('') + '</div>';
+        const ukaz = t => {
+          const rr = t === uci ? r : hrozby.find(x => x.tah === t);
+          ukazRozborHrozby(u, rr, { panelPred: '<div class="panel-karta">' + prepinac(t) + '</div>',
+                                    poPaneli: el => el.querySelectorAll('.prepinac button').forEach(b => b.onclick = () => ukaz(b.dataset.tah)) });
+        };
+        zapisChybu();
+        ukaz(uci);
+        const spravne = hrozby.map(x => x.nazov).join(', ');
+        grosikHovori('smutny', esc(r.nazov) + ' nie je hrozba — ' + esc(PRECO_NIE_H[PRECO_Z_JADRA_H[r.dovod]]).toLowerCase() + '. ' +
+                     'Hrozba bola ' + esc(spravne) + '. ' + (u.vysvetlenie ? esc(u.vysvetlenie) : ''));
+        ukazPokracovanie(false, znak(BODY_CHYBA) + ' bodov · správne: ' + spravne);
+      }, null, 'hrozbu');
+      nastavOdpovede('<div class="slabo stred">Klikni na figúrku a potom na pole, kam má ísť.</div>');
+      grosikHovori('rozmysla', u.tip || 'Klikni na figúrku — ukážu sa polia, kam môže ísť. Hľadaj tichý ťah, po ktorom ' +
+                   'by si nabudúce zobral niečo so ziskom.');
+      vyber.kresli();
+    }
+  };
+
+  // ── Nájdi všetky hrozby (za oboch) — ako tréning v Zručnostiach ───────
+  TYPY.najdiHrozby = {
+    priprav(u) {
+      const board = u._poz.board;
+      const vysl = VC.hrozby(board, u._poz.state);
+      const riesenia = vysl.riesenia;
+      const rozbory = {};
+      vysl.rozbory.forEach(r => { rozbory[r.tah] = r; });
+      const ul = { najdene: [], chybne: [], hotovo: false, chybVUlohe: 0, casVyprsal: false, zobrazeny: null };
+      const prezerane = {};
+      const strana = t => VC.pieceColor(board[VC.sqIndex(t.slice(0, 2))]);
+
+      document.getElementById('hraZadanie').innerHTML = 'Nájdi všetky <b>priame hrozby</b> <span class="slabo">(biele aj čierne)</span>';
+      grosikHovori('rozmysla', stav.skuska
+        ? 'Skúška! Nájdi všetky priame hrozby za oboch skôr, ako vyprší čas.'
+        : 'Klikni na figúrku a potom na pole, kam má ísť. Hľadaj za bieleho aj za čierneho. Keď už žiadnu nevidíš, stlač Hotovo.');
+
+      const pocitadlo = () => {
+        let t = 'Nájdené: ' + ul.najdene.length + ' / ' + riesenia.length;
+        if (u.pomocka === 'strany') {
+          const w = riesenia.filter(x => strana(x) === 'w'), b = riesenia.filter(x => strana(x) === 'b');
+          t += ' · Biely ' + ul.najdene.filter(x => strana(x) === 'w').length + '/' + w.length +
+               ' · Čierny ' + ul.najdene.filter(x => strana(x) === 'b').length + '/' + b.length;
+        }
+        nastavPasik(t, '');
+      };
+      const zaklad = () => {
+        const znacky = {}, sipky = [];
+        ul.najdene.forEach(t => { sipky.push(sipkaTahu(t, 'najdena')); znacky[VC.sqIndex(t.slice(2, 4))] = 'najdene'; });
+        ul.chybne.forEach(c => sipky.push(sipkaTahu(c.tah, 'chybna')));
+        if (ul.hotovo) riesenia.filter(t => !ul.najdene.includes(t)).forEach(t => {
+          sipky.push(sipkaTahu(t, 'prehliadnuta')); znacky[VC.sqIndex(t.slice(2, 4))] = 'prehliadnuta';
+        });
+        return { znacky: znacky, sipky: sipky };
+      };
+      const zoznamHtml = () => {
+        let h = '<div class="panel-karta"><h3>Tvoje hrozby</h3>';
+        if (!ul.najdene.length && !ul.chybne.length && !ul.hotovo) h += '<div class="slabo">Zatiaľ nič.</div>';
+        ul.najdene.forEach(t => {
+          h += '<div class="zaznam dobre klik" data-tah="' + t + '"><b>' + esc(rozbory[t].nazov) + '</b> ' + esc(rozbory[t].vysvetlenie) + '</div>';
+        });
+        ul.chybne.forEach(c => {
+          h += '<div class="zaznam zle klik" data-tah="' + c.tah + '"><b>' + esc(c.r.nazov) + '</b> ' +
+               esc(PRECO_NIE_H[PRECO_Z_JADRA_H[c.r.dovod]].toLowerCase()) + '</div>';
+        });
+        if (ul.hotovo) {
+          riesenia.filter(t => !ul.najdene.includes(t)).forEach(t => {
+            h += '<div class="zaznam prehliadnute klik" data-tah="' + t + '"><b>' + esc(rozbory[t].nazov) + '</b> ' +
+                 esc(rozbory[t].vysvetlenie) + ' <span class="znacka-prehliadnuta">prehliadnutá</span></div>';
+          });
+        }
+        return h + '<div class="slabo straz-tip">Klikni na riadok a uvidíš rozbor ťahu.</div></div>';
+      };
+      const obnov = () => {
+        vyber.kresli();
+        pocitadlo();
+        const el = document.getElementById('hraSpatna');
+        let h = zoznamHtml();
+        if (ul.zobrazeny) {
+          const t = ul.zobrazeny;
+          const r = rozbory[t] || (ul.chybne.find(c => c.tah === t) || {}).r || prezerane[t];
+          if (r) h += htmlRozboruHrozby(u, r, true).replace(/<button class="secondary male vidl-prepni"[\s\S]*?<\/button>/, '');
+        }
+        el.innerHTML = h;
+        el.querySelectorAll('.zaznam.klik').forEach(d => d.onclick = () => { ul.zobrazeny = d.dataset.tah; obnov(); });
+      };
+      const dokonci = vzdal => {
+        if (ul.hotovo) return;
+        ul.hotovo = true;
+        zastavCasovac();
+        sachovnica.naKlik = null;
+        const vsetkyNajdene = ul.najdene.length === riesenia.length;
+        const bezChyby = vsetkyNajdene && ul.chybVUlohe === 0 && !ul.casVyprsal;
+        const prehliadnute = riesenia.filter(t => !ul.najdene.includes(t));
+        let text;
+        if (bezChyby) {
+          pripocitaj(BONUS_BEZ_CHYBY);
+          stav.bonusy += BONUS_BEZ_CHYBY;
+          obnovHlavu();
+          text = 'Všetky bez chyby: bonus +' + BONUS_BEZ_CHYBY;
+          grosikHovori('nadseny', 'Našiel si všetky hrozby a ani raz si sa nepomýlil! ' + esc(u.vysvetlenie || ''));
+        } else if (vsetkyNajdene) {
+          text = 'Všetky nájdené';
+          grosikHovori('vesely', 'Máš ich všetky. ' + esc(u.vysvetlenie || ''));
+        } else {
+          stav.seria = 0;
+          obnovHlavu();
+          text = (ul.casVyprsal ? 'Čas vypršal · ' : '') + 'Prehliadnuté: ' + prehliadnute.length;
+          grosikHovori('smutny', (ul.casVyprsal ? 'Čas vypršal. ' : (vzdal ? 'Niečo ti ešte chýbalo. ' : '')) +
+                       'Prehliadnuté hrozby sú naoranžovo. ' + (u.vysvetlenie ? esc(u.vysvetlenie) : ''));
+          ul.zobrazeny = prehliadnute[0];
+        }
+        if (stav.skuska) {
+          prehliadnute.forEach(t => zapisDiagnozu(dovodPrehliadnutejHrozby(rozbory[t], u._poz.state.active)));
+          stav.skuska.vysledky.push({ fen: u.fen, bezChyby: bezChyby });
+        }
+        obnov();
+        vyber = vyberTahu(u, null, t => {
+          if (!rozbory[t] && !ul.chybne.find(c => c.tah === t)) prezerane[t] = rozborHrozby(u, t);
+          ul.zobrazeny = t;
+          obnov();
+        }, zaklad, 'hrozbu');
+        ukazPokracovanie(bezChyby || (vsetkyNajdene && !stav.skuska), text);
+      };
+      let vyber = vyberTahu(u, null, t => {
+        if (ul.hotovo) return;
+        ul.zobrazeny = t;
+        if (ul.najdene.includes(t)) {
+          grosikHovori('vesely', 'Túto hrozbu už máš. Hľadaj ďalej.');
+        } else if (riesenia.includes(t)) {
+          ul.najdene.push(t);
+          const bonus = zapisSpravne();
+          grosikHovori('nadseny', pochvala() + ' ' + esc(rozbory[t].vysvetlenie) + bonus);
+        } else if (ul.chybne.find(c => c.tah === t)) {
+          grosikHovori('rozmysla', 'Tento ťah si už skúšal — hrozba to nie je.');
+        } else {
+          const r = rozborHrozby(u, t);
+          ul.chybne.push({ tah: t, r: r });
+          ul.chybVUlohe++;
+          zapisChybu();
+          if (stav.skuska) zapisDiagnozu(dovodOmyluHrozby(r));
+          grosikHovori('smutny', esc(r.nazov) + ' nie je hrozba — ' + esc(PRECO_NIE_H[PRECO_Z_JADRA_H[r.dovod]]).toLowerCase() +
+                       '. Rozbor je vpravo. ' + znak(BODY_CHYBA) + ' bodov.');
+        }
+        obnov();
+        if (ul.najdene.length === riesenia.length) dokonci(false);
+      }, zaklad, 'hrozbu');
+
+      nastavOdpovede('<button class="secondary velke" id="hraHotovo">Hotovo — viac ich nevidím</button>',
+        el => el.querySelector('#hraHotovo').onclick = () => { if (!ul.hotovo) dokonci(true); });
+      obnov();
+
+      if (u.limit) {
+        spustiCasovac(u.limit, () => {
+          if (ul.hotovo) return;
+          ul.casVyprsal = true;
+          zvuk('loss');
+          dokonci(true);
+        });
+      }
+    }
+  };
+
+  // ── Rozbor chýb v skúške Hrozby na trhu — ktorú kapitolu zopakovať ───
+  //  1 Čo je hrozba · 2 Len tichý ťah · 3 Hrozba musí stáť za to · 4 Súper nič nezíska
+  //  5 Hrozí iná figúrka · 6 Pokazená obrana · 7 Hrozba matu · 8 Každá figúrka, obe strany
+  function dovodOmyluHrozby(r) {
+    if (!r.legalny) return 6;                        // ťah viazanou figúrkou
+    const d = PRECO_Z_JADRA_H[r.dovod];
+    if (d === 'ticha') return 2;
+    if (d === 'super') return 4;
+    return 3;                                        // nič nehrozí (krytý terč, výmena)
+  }
+
+  function dovodPrehliadnutejHrozby(r, naTahu) {
+    if (!r) return 1;
+    if (!r.terce.length && r.mat.length) return 7;
+    const mech = r.terce.map(t => t.mech);
+    if (mech.length && !mech.includes('priamy')) {
+      return mech.some(m => m === 'prerusenie' || m === 'vazba' || m === 'uvolnenie') ? 6 : 5;
+    }
+    const kus = r.figurka.toLowerCase();
+    if (r.strana !== naTahu || kus === 'k' || kus === 'p') return 8;
+    const opp = superStranyH(r.strana);
+    if (r.terce.some(t => VC.countAttackers(r.poTahu, t.pole, opp) > 0)) return 3;
     return 1;
   }
 
