@@ -31,7 +31,7 @@
 //  Figúrky v textoch: K D V S J (slovensky), vo FEN anglicky (K Q R B N P).
 // ============================================================================
 
-(window.VERZIE = window.VERZIE || {})['vidlicka-obsah.js'] = '2026-09-27b';
+(window.VERZIE = window.VERZIE || {})['vidlicka-obsah.js'] = '2026-09-29';
 
 const OBSAH_VIDLICKA = {
   kluc: 'vidlicka-na-trhu',
@@ -78,12 +78,13 @@ const OBSAH_VIDLICKA = {
           ocakavane: true, vysvetlenie: 'Pešiak napadne jazdca c6 aj jazdca e6. Súper zachráni len jedného.' },
         { id: '1.2', typ: 'jeVidlicka', fen: '1r4k1/4qppp/8/8/3N4/7P/5PP1/6K1 w - - 0 1', tah: 'd4c6',
           ocakavane: true, vysvetlenie: 'Jazdec napadne dámu e7 aj vežu b8.' },
-        { id: '1.3', typ: 'jeVidlicka', fen: '1r4k1/5ppp/8/8/3N4/7P/5PP1/6K1 w - - 0 1', tah: 'd4c6',
-          ocakavane: false, vysvetlenie: 'Jazdec napadne len vežu b8. Jeden terč nie je vidlička. Porovnaj s úlohou 1.2.' },
-        { id: '1.4', typ: 'ktoreTerce', fen: '1r4k1/4qppp/8/8/3N4/7P/5PP1/6K1 w - - 0 1', tah: 'd4c6',
-          ocakavane: ['b8', 'e7'], vysvetlenie: 'Jazdec na c6 napadá dámu e7 aj vežu b8 — počítajú sa oba terče.' },
-        { id: '1.5', typ: 'najdiVidlicku', fen: '6k1/5ppp/8/1b1n4/8/2PB4/5PPP/6K1 w - - 0 1',
-          ocakavane: ['c3c4'], vysvetlenie: 'Aj pešiak vie vidličkovať.' },
+        { id: '1.3', typ: 'jeVidlicka', fen: '6k1/5ppp/8/2b5/8/PP6/5PPP/6K1 w - - 0 1', tah: 'b3b4',
+          ocakavane: false, vysvetlenie: 'Pešiak napadne len strelca c5. Jeden terč nie je vidlička.' },
+        { id: '1.4', typ: 'ktoreTerce', fen: '6k1/p4pp1/7p/1n5b/8/8/5PPP/2R3K1 w - - 0 1', tah: 'c1c5',
+          ocakavane: ['b5', 'h5'], vysvetlenie: 'Veža na c5 napadá jazdca b5 aj strelca h5 — počítajú sa oba terče.' },
+        { id: '1.5', typ: 'najdiVidlicku', fen: '6k1/5ppp/3n1b2/8/3PP3/8/5PPP/6K1 w - - 0 1',
+          ocakavane: ['e4e5'], vysvetlenie: 'Aj pešiak vie vidličkovať. Pešiak e5 napadne jazdca d6 aj strelca f6 ' +
+                                            'a kryje ho pešiak d4.' },
         { id: '1.6', typ: 'najdiVidlicku', fen: '6k1/5r2/8/8/8/1r6/5PBP/6K1 w - - 0 1',
           ocakavane: ['g2d5'], vysvetlenie: 'Zo stredu šachovnice dosiahne strelec na obe veže.' }
       ]
@@ -110,13 +111,13 @@ const OBSAH_VIDLICKA = {
           ocakavane: false, vysvetlenie: 'Veža napadne strelca h4, ale jazdca d6 napádala už z d1. Nový je len jeden terč.' },
         { id: '2.2', typ: 'jeVidlicka', fen: '6k1/1r3r2/8/8/8/8/5PBP/6K1 w - - 0 1', tah: 'g2d5',
           ocakavane: false, vysvetlenie: 'Vežu b7 napádal strelec už z g2. Nový terč je len veža f7. Porovnaj s úlohou 1.6.' },
-        { id: '2.3', typ: 'ktoreTerce', fen: '6k1/1r3r2/8/8/8/8/5PBP/6K1 w - - 0 1', tah: 'g2d5',
-          ocakavane: ['f7'], vysvetlenie: 'Počíta sa len veža f7. Vežu b7 strelec napádal už predtým.' },
+        { id: '2.3', typ: 'ktoreTerce', fen: 'r5k1/5ppp/8/5n2/8/8/5PPP/1B4K1 w - - 0 1', tah: 'b1e4',
+          ocakavane: ['a8'], vysvetlenie: 'Počíta sa len veža a8. Jazdca f5 strelec napádal už z b1.' },
         { id: '2.4', typ: 'jeVidlicka', fen: '4k3/pp3ppp/8/4N3/5q2/8/PP3PPP/4R1K1 w - - 0 1', tah: 'e5d3',
           ocakavane: false, vysvetlenie: 'Jazdec napadne len dámu f4. Šach dáva veža e1, ktorá sa nepohla — to je odkrytý ' +
                                          'šach. V partii biely dámu vyhrá, ale vidlička to nie je.' },
-        { id: '2.5', typ: 'precoNie', fen: '4k3/pp3ppp/8/4N3/5q2/8/PP3PPP/4R1K1 w - - 0 1', tah: 'e5d3',
-          ocakavane: 'dva_terce', vysvetlenie: 'Jazdec napadne len dámu. Kráľa napáda veža e1 — odkrytý útok sa nepočíta.' }
+        { id: '2.5', typ: 'precoNie', fen: '4q1k1/3r1pp1/7p/8/4N3/8/5PPP/4R1K1 w - - 0 1', tah: 'e4c5',
+          ocakavane: 'dva_terce', vysvetlenie: 'Jazdec napadne len vežu d7. Dámu e8 napáda veža e1 — odkrytý útok sa nepočíta.' }
       ]
     },
 
@@ -140,16 +141,16 @@ const OBSAH_VIDLICKA = {
       ulohy: [
         { id: '3.1', typ: 'jeVidlicka', fen: '3k4/2b1b3/8/8/8/2N5/8/4K3 w - - 0 1', tah: 'c3d5',
           ocakavane: false, vysvetlenie: 'Oba strelce stráži kráľ d8. Jazdec by za strelca dal jazdca — nič by nezískal.' },
-        { id: '3.2', typ: 'jeVidlicka', fen: '3k4/2b1r3/8/8/8/2N5/8/6K1 w - - 0 1', tah: 'c3d5',
-          ocakavane: false, vysvetlenie: 'Veža e7 je cennejšia ako jazdec, tá sa počíta. Strelca c7 však stráži kráľ ' +
-                                         'a nie je cennejší. Počíta sa len jeden terč.' },
+        { id: '3.2', typ: 'jeVidlicka', fen: '6k1/5p1b/4r3/8/8/5N2/5PPP/6K1 w - - 0 1', tah: 'f3g5',
+          ocakavane: false, vysvetlenie: 'Veža e6 je cennejšia ako jazdec, tá sa počíta. Pešiaka f7 aj strelca h7 však ' +
+                                         'stráži kráľ a nie sú cennejšie ako jazdec. Počíta sa len jeden terč.' },
         { id: '3.3', typ: 'jeVidlicka', fen: '8/8/k7/6K1/8/1Q6/1p3r1r/8 w - - 0 1', tah: 'b3g3',
           ocakavane: false, vysvetlenie: 'Dáma napadne dve veže, ale veže sa strážia navzájom a sú lacnejšie ako dáma. ' +
                                          'Ani jedna nestojí za to.' },
-        { id: '3.4', typ: 'ktoreTerce', fen: '6k1/p4pp1/7p/8/7p/8/5PPP/3Q2K1 w - - 0 1', tah: 'd1d4',
-          ocakavane: ['a7', 'h4'], vysvetlenie: 'Pešiaky a7 a h4 nikto nestráži. Pešiaka g7 stráži kráľ, ten sa nepočíta.' },
-        { id: '3.5', typ: 'precoNie', fen: '3k4/2b1r3/8/8/8/2N5/8/6K1 w - - 0 1', tah: 'c3d5',
-          ocakavane: 'cena', vysvetlenie: 'Strelca c7 stráži kráľ a nie je cennejší ako jazdec.' },
+        { id: '3.4', typ: 'ktoreTerce', fen: '6k1/2p2pp1/7p/p7/8/5Q2/5PPP/6K1 w - - 0 1', tah: 'f3c3',
+          ocakavane: ['a5', 'c7'], vysvetlenie: 'Pešiaky a5 a c7 nikto nestráži. Pešiaka g7 stráži kráľ, ten sa nepočíta.' },
+        { id: '3.5', typ: 'precoNie', fen: '6k1/1p3p1p/2b3b1/8/8/5N2/5PPP/6K1 w - - 0 1', tah: 'f3e5',
+          ocakavane: 'cena', vysvetlenie: 'Oba strelce strážia pešiaky a nie sú cennejšie ako jazdec. Pešiaka f7 stráži kráľ.' },
         { id: '3.6', typ: 'najdiVidlicku', fen: '2r3k1/5pp1/b6p/8/5n2/7P/5PP1/3Q2K1 w - - 0 1',
           ocakavane: ['d1a4', 'd1d6'], vysvetlenie: 'Strelca a6 ani jazdca f4 nikto nestráži. Dáma ich napadne naraz ' +
                                                      'z a4 aj z d6.' }
@@ -165,24 +166,24 @@ const OBSAH_VIDLICKA = {
         'Zlodej musí stáť tam, kde ho <b>nechytia bez straty</b>. Keď súper vidličkára zoberie a nič nestratí, ' +
         'krádež sa nekoná.',
         'Pole je bezpečné, keď na ňom súper nemá čím brať, alebo keď by braním stratil. Pomôže rebrík výmeny zo ' +
-        'Šachového trhu. Pozor: <b>výmena nastojato</b> (jazdec za jazdca) nestačí — také pole bezpečné nie je.'
+        'Šachového trhu. Pozor: <b>výmena</b> (jazdec za jazdca) nestačí — také pole bezpečné nie je.'
       ],
       zapamataj: 'Vidličkár musí stáť tam, kde ho súper nezoberie bez straty.',
       prePokrocilych: 'Bezpečnosť poľa sa počíta celou výmenou: súper berie najlacnejšou figúrkou a ďalej berie, ' +
                       'len keď sa mu to oplatí.',
       preTrenerov: 'Zručnosť nezisťuje, či má súper inú obranu, počíta len výmenu na poli vidličkára. Preto jazdec ' +
-                   'takmer nikdy nevidličkuje jazdca: napadnutý jazdec ho môže zobrať a vznikne výmena nastojato.',
+                   'takmer nikdy nevidličkuje jazdca: napadnutý jazdec ho môže zobrať a vznikne výmena.',
       ulohy: [
         { id: '4.1', typ: 'jeVidlicka', fen: '6k1/5ppp/8/1b1n4/8/2P5/5PPP/6K1 w - - 0 1', tah: 'c3c4',
           ocakavane: false, vysvetlenie: 'Strelec b5 pešiaka c4 zoberie zadarmo — nikto ho nestráži.' },
-        { id: '4.2', typ: 'jeVidlicka', fen: '6k1/5ppp/8/1b1n4/8/2PB4/5PPP/6K1 w - - 0 1', tah: 'c3c4',
+        { id: '4.2', typ: 'jeVidlicka', fen: '2r3k1/5ppp/6n1/3N4/8/7P/5PP1/4R1K1 w - - 0 1', tah: 'd5e7',
+          ocakavane: false, vysvetlenie: 'Jazdec g6 zoberie jazdca e7 a veža e1 vezme späť. Jazdec za jazdca je výmena ' +
+                                         '— pole nie je bezpečné.' },
+        { id: '4.3', typ: 'precoNie', fen: 'r5k1/5ppp/4p3/7n/8/1Q6/5PPP/6K1 w - - 0 1', tah: 'b3d5',
+          ocakavane: 'pole', vysvetlenie: 'Dáma napadne vežu a8 aj jazdca h5, ale pešiak e6 ju zoberie.' },
+        { id: '4.4', typ: 'jeVidlicka', fen: '6k1/5ppp/8/1b1n4/8/2PB4/5PPP/6K1 w - - 0 1', tah: 'c3c4',
           ocakavane: true, vysvetlenie: 'Teraz pešiaka stráži strelec d3. Po S×c4 S×c4 by čierny prerobil — pole je ' +
                                         'bezpečné. Porovnaj s úlohou 4.1.' },
-        { id: '4.3', typ: 'jeVidlicka', fen: '2r3k1/5ppp/6n1/3N4/8/7P/5PP1/4R1K1 w - - 0 1', tah: 'd5e7',
-          ocakavane: false, vysvetlenie: 'Jazdec g6 zoberie jazdca e7 a veža e1 vezme späť. Jazdec za jazdca je výmena ' +
-                                         'nastojato — pole nie je bezpečné.' },
-        { id: '4.4', typ: 'precoNie', fen: '2r3k1/5ppp/6n1/3N4/8/7P/5PP1/4R1K1 w - - 0 1', tah: 'd5e7',
-          ocakavane: 'pole', vysvetlenie: 'Jazdca e7 zoberie jazdec g6. Výmena nastojato nestačí.' },
         { id: '4.5', typ: 'najdiVidlicku', fen: '2r3k1/5p1p/1r6/8/4Q3/8/6P1/6K1 w - - 0 1',
           ocakavane: ['e4g4'], tip: 'Pozor na pascu: jedna lákavá vidlička stojí na nebezpečnom poli.',
           vysvetlenie: 'De8+ láka, ale veža c8 dámu zoberie. Z g4 dáma napadne kráľa aj vežu c8 a stojí bezpečne.' }
@@ -208,7 +209,7 @@ const OBSAH_VIDLICKA = {
       ulohy: [
         { id: '5.1', typ: 'jeVidlicka', fen: '2r3k1/5ppp/8/3N4/8/7P/5PP1/4R1K1 w - - 0 1', tah: 'd5e7',
           ocakavane: true, vysvetlenie: 'Šach a veža c8, ktorá je cennejšia ako jazdec. Kráľ musí uhnúť a veža padne. ' +
-                                        'Porovnaj s úlohou 4.3 — tam jazdca e7 zobral jazdec g6.' },
+                                        'Porovnaj s úlohou 4.2 — tam jazdca e7 zobral jazdec g6.' },
         { id: '5.2', typ: 'jeVidlicka', fen: '4k3/p4ppp/8/8/8/7P/2Q2PP1/6K1 w - - 0 1', tah: 'c2a4',
           ocakavane: true, vysvetlenie: 'Šach a nestrážený pešiak a7. Kráľ z e8 k pešiakovi nedôjde — nech ustúpi ' +
                                         'kamkoľvek, pešiak padne.' },
@@ -217,10 +218,11 @@ const OBSAH_VIDLICKA = {
         { id: '5.4', typ: 'jeVidlicka', fen: '6k1/1p3ppp/2b5/3N4/8/8/5PPP/6K1 w - - 0 1', tah: 'd5e7',
           ocakavane: false, vysvetlenie: 'Šach je, ale strelca c6 stráži pešiak b7 a strelec nie je cennejší ako jazdec. ' +
                                          'Druhý terč nestojí za to.' },
-        { id: '5.5', typ: 'precoNie', fen: 'Q7/5k1p/8/5p2/8/8/5PPP/6K1 w - - 0 1', tah: 'a8d5',
-          ocakavane: 'kral', vysvetlenie: 'Kráľ ustúpi na f6 alebo g6 a pešiaka f5 ubráni.' },
-        { id: '5.6', typ: 'ktoreTerce', fen: '2r3k1/5ppp/8/3N4/8/7P/5PP1/4R1K1 w - - 0 1', tah: 'd5e7',
-          ocakavane: ['c8', 'g8'], vysvetlenie: 'Počíta sa veža c8 aj kráľ g8. Aj kráľ je terč.' }
+        { id: '5.5', typ: 'precoNie', fen: '8/2k4p/8/2p5/8/8/3Q1PPP/6K1 w - - 0 1', tah: 'd2a5',
+          ocakavane: 'kral', vysvetlenie: 'Kráľ ustúpi na c6 alebo d6 a pešiaka c5 ubráni.' },
+        { id: '5.6', typ: 'ktoreTerce', fen: '3q3k/6p1/3N3p/8/8/8/5PPP/6K1 w - - 0 1', tah: 'd6f7',
+          ocakavane: ['d8', 'h8'], vysvetlenie: 'Počíta sa dáma d8 aj kráľ h8. Aj kráľ je terč. Pešiaka h6 stráži pešiak g7, ' +
+                                                 'ten sa nepočíta.' }
       ]
     },
 
@@ -247,11 +249,12 @@ const OBSAH_VIDLICKA = {
         { id: '6.2', typ: 'najdiVidlicku', fen: '1b4k1/5ppp/8/8/5p2/8/5QPP/6K1 w - - 0 1',
           ocakavane: ['f2b6'], tip: 'Hľadaj ťah, ktorý napadne figúrku a zároveň pripraví mat.',
           vysvetlenie: 'Db6 napadne strelca b8 a hrozí mat Dd8 — kráľ nemá kam ujsť.' },
-        { id: '6.3', typ: 'jeVidlicka', fen: '1b4k1/5pp1/8/7p/5p2/8/5QPP/6K1 w - - 0 1', tah: 'f2b6',
+        { id: '6.3', typ: 'najdiVidlicky', fen: '6k1/3B1p1p/5nN1/5r2/8/8/5PPP/6K1 w - - 0 1', pomocka: 'strany',
+          ocakavane: ['g6e7', 'f5d5'], vysvetlenie: 'Biely: Je7+ dá šach a napadne vežu f5. Čierny: Vd5 napadne ' +
+                                                     'strelca d7 a hrozí mat Vd1.' },
+        { id: '6.4', typ: 'jeVidlicka', fen: '1b4k1/5pp1/8/7p/5p2/8/5QPP/6K1 w - - 0 1', tah: 'f2b6',
           ocakavane: false, vysvetlenie: 'Teraz má čierny kráľ okienko na h7, takže Dd8 už mat nie je. Dáma napadne len ' +
-                                         'strelca b8 — jeden terč. Porovnaj s úlohou 6.2.' },
-        { id: '6.4', typ: 'najdiVidlicky', fen: '7k/6pp/2P5/1n6/8/8/8/6KQ w - - 0 1',
-          ocakavane: ['h1d5', 'h1h5'], vysvetlenie: 'Dd5 hrozí mat na d8 a Dh5 mat na e8. Obe napadnú jazdca b5.' }
+                                         'strelca b8 — jeden terč. Porovnaj s úlohou 6.2.' }
       ]
     },
 
@@ -310,14 +313,15 @@ const OBSAH_VIDLICKA = {
         { id: '8.2', typ: 'jeVidlicka', fen: '4k3/4n3/2n5/8/7b/8/5PPP/3QR1K1 w - - 0 1', tah: 'd1a4',
           ocakavane: true, vysvetlenie: 'Jazdca c6 kryje len jazdec e7, a ten je viazaný vežou e1 na kráľa. Viazaný ' +
                                         'strážnik nestráži, takže jazdec c6 aj strelec h4 sa dajú zobrať so ziskom.' },
-        { id: '8.3', typ: 'ktoreTerce', fen: '4k3/4n3/2n5/8/7b/8/5PPP/3QR1K1 w - - 0 1', tah: 'd1a4',
-          ocakavane: ['c6', 'h4'], vysvetlenie: 'Počíta sa jazdec c6 aj strelec h4. Jazdca c6 kryje len viazaný jazdec e7.' },
+        { id: '8.3', typ: 'ktoreTerce', fen: '4k3/3b4/8/1B3n2/8/7r/5PPP/3Q2K1 w - - 0 1', tah: 'd1g4',
+          ocakavane: ['f5', 'h3'], vysvetlenie: 'Počíta sa jazdec f5 aj veža h3. Jazdca f5 kryje len strelec d7, a ten je ' +
+                                                 'viazaný strelcom b5 na kráľa.' },
         { id: '8.4', typ: 'jeVidlicka', fen: '3qk3/8/5n2/6B1/8/2R5/8/4K3 b - - 0 1', tah: 'f6e4',
           ocakavane: true, vysvetlenie: 'Jazdec napadne vežu c3 a nestráženého strelca g5. Že je jazdec viazaný na dámu ' +
                                         'd8, zručnosť nevidí — v partii by biely zobral S×d8.' },
-        { id: '8.5', typ: 'precoNie', fen: '6k1/5ppp/1b6/4r3/1r6/8/5NPP/6K1 w - - 0 1', tah: 'f2d3',
+        { id: '8.5', typ: 'precoNie', fen: '4r1k1/5ppp/1q6/8/5r2/4N3/5PPP/4K3 w - - 0 1', tah: 'e3d5',
           moznosti: ['dva_terce', 'cena', 'pole', 'vazba'],
-          ocakavane: 'vazba', vysvetlenie: 'Jazdec f2 je viazaný na kráľa g1 a nesmie sa pohnúť.' }
+          ocakavane: 'vazba', vysvetlenie: 'Jazdec e3 je viazaný vežou e8 na kráľa e1 a nesmie sa pohnúť.' }
       ]
     },
 
