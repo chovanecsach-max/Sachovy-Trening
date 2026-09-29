@@ -30,6 +30,9 @@
 //  Zmena v SQL editore (netreba nič nahrávať na GitHub):
 //      insert into nastavenia (kluc, hodnota) values ('hry', 'vsetci')
 //      on conflict (kluc) do update set hodnota = excluded.hodnota, zmenene = now();
+//  Okrem toho vidia hry vybraní TESTERI (tabuľka hry_testeri, pozri hry-testeri.sql).
+//  Vyberá ich admin v admin paneli políčkom „Testuje hry“. Tester ostáva hráčom:
+//  hry sa mu odomykajú postupne ako ostatným hráčom.
 //
 //  ODOMYKANIE HIER: hra s `odomknePo` (zoznam HRY nižšie) sa hráčovi odomkne,
 //  až keď zloží záverečnú skúšku inej hry. Stráž na trhu sa odomkne po skúške
@@ -39,7 +42,7 @@
 //  Potrebuje: js/player.js (sbFetch) — pre úložisko databaza a pre prístup.
 // ============================================================================
 
-(window.VERZIE = window.VERZIE || {})['hra-postup.js'] = '2026-09-27b';
+(window.VERZIE = window.VERZIE || {})['hra-postup.js'] = '2026-09-29';
 
 const HraPostup = (function () {
   'use strict';
@@ -178,8 +181,25 @@ const HraPostup = (function () {
   // ── Prístup k hrám ──────────────────────────────────────────────────────
   const PERSONAL = ['admin', 'hlavny_trener', 'trener'];
   let _pristupCache = null;
+  let _testerCache = null;
 
-  // Smie prihlásený používateľ hry vidieť? Admin vždy.
+  // Je prihlásený používateľ medzi vybranými testermi hier? Databáza mu povie
+  // len o ňom samom — zoznam ostatných testerov nevidí.
+  async function jeTester(userId) {
+    userId = userId || sessionStorage.getItem('user_id') || '';
+    if (!userId) return false;
+    if (_testerCache === null) {
+      try {
+        const rows = await sbFetch('hry_testeri?user_id=eq.' + encodeURIComponent(userId) + '&select=user_id&limit=1');
+        _testerCache = !!(rows && rows.length);
+      } catch (e) {
+        _testerCache = false;         // pri chybe (aj keď tabuľka ešte nie je) radšej zatvorené
+      }
+    }
+    return _testerCache;
+  }
+
+  // Smie prihlásený používateľ hry vidieť? Admin vždy, vybraní testeri tiež.
   async function pristup(rola) {
     rola = rola || sessionStorage.getItem('user_role') || '';
     if (rola === 'admin') return true;
@@ -192,8 +212,8 @@ const HraPostup = (function () {
       }
     }
     if (_pristupCache === 'vsetci') return true;
-    if (_pristupCache === 'personal') return PERSONAL.includes(rola);
-    return false;
+    if (_pristupCache === 'personal' && PERSONAL.includes(rola)) return true;
+    return jeTester();
   }
 
   // Na stránke hry: ak hry ešte nie sú sprístupnené, ukáže oznam a vráti false
@@ -269,6 +289,7 @@ const HraPostup = (function () {
     databaza: databaza,
     klucLokalne: klucLokalne,
     pristup: pristup,
+    jeTester: jeTester,
     vyzadujPristup: vyzadujPristup,
     zlozilSkusku: zlozilSkusku,
     odomknuta: odomknuta,
