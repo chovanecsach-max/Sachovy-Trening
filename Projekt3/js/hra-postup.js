@@ -33,24 +33,27 @@
 //
 //  ODOMYKANIE HIER: hra s `odomknePo` (zoznam HRY nižšie) sa hráčovi odomkne,
 //  až keď zloží záverečnú skúšku inej hry. Stráž na trhu sa odomkne po skúške
-//  Šachového trhu. Tréneri a admin majú všetky hry odomknuté hneď.
+//  Šachového trhu, Vidlička na trhu po skúške Stráže na trhu. Tréneri a admin
+//  majú všetky hry odomknuté hneď.
 //
 //  Potrebuje: js/player.js (sbFetch) — pre úložisko databaza a pre prístup.
 // ============================================================================
 
-(window.VERZIE = window.VERZIE || {})['hra-postup.js'] = '2026-09-27';
+(window.VERZIE = window.VERZIE || {})['hra-postup.js'] = '2026-09-27b';
 
 const HraPostup = (function () {
   'use strict';
 
   // ── Hry ─────────────────────────────────────────────────────────────────
   //  kluc → názov, číslo kapitoly záverečnej skúšky a verzia číslovania kapitol
-  //  (musia sa zhodovať s obsahom hry: trh-obsah.js, straz-obsah.js).
+  //  (musia sa zhodovať s obsahom hry: trh-obsah.js, straz-obsah.js, vidlicka-obsah.js).
   //  POZOR: keď sa v niektorej hre prečíslujú kapitoly, uprav aj tento zoznam.
   const HRY = {
     'sachovy-trh':   { nazov: 'Šachový trh',   stranka: 'sachovy-trh.html',   skuska: 11, verzia: 2 },
     'straz-na-trhu': { nazov: 'Stráž na trhu', stranka: 'straz-na-trhu.html', skuska: 9,  verzia: 1,
-                       odomknePo: 'sachovy-trh' }
+                       odomknePo: 'sachovy-trh' },
+    'vidlicka-na-trhu': { nazov: 'Vidlička na trhu', stranka: 'vidlicka-na-trhu.html', skuska: 10, verzia: 1,
+                          odomknePo: 'straz-na-trhu' }
   };
 
   function prazdny() { return { verzia: 1, kapitoly: {} }; }
