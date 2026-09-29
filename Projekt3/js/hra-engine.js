@@ -32,7 +32,7 @@
 //  Spustenie: HraEngine.spusti({ obsah, koren, rola, userId, testovaci, uloziste })
 // ============================================================================
 
-(window.VERZIE = window.VERZIE || {})['hra-engine.js'] = '2026-09-27d';
+(window.VERZIE = window.VERZIE || {})['hra-engine.js'] = '2026-09-29';
 
 const HraEngine = (function () {
   'use strict';
@@ -1951,7 +1951,7 @@ const HraEngine = (function () {
     const zs = r.ziskSupera;
     const t3 = zs === null ? 'Súper nemá čím ' + rod(kus, 'ho', 'ju') + ' zobrať.'
              : (zs < 0 ? 'Súper by ' + rod(kus, 'ho', 'ju') + ' mohol zobrať, ale stratil by ' + minceAku(-zs) + '.'
-             : (zs === 0 ? 'Súper ' + rod(kus, 'ho', 'ju') + ' zoberie a vymení sa nastojato — nič nestratí.'
+             : (zs === 0 ? 'Súper ' + rod(kus, 'ho', 'ju') + ' zoberie a nastane výmena — nič nestratí.'
                          : 'Súper ' + rod(kus, 'ho', 'ju') + ' zoberie a získa ' + minceAku(zs) + '.'));
     li += riadok(r.bezpecne ? 'ok' : 'zle', 'Bezpečné pole', esc(velkePismeno(meno)) + ' na ' + VC.sqName(r.na) + ': ' + t3 +
                  (zs !== null ? htmlVymenyVidlickara(r) : ''));
