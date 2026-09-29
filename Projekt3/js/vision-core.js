@@ -41,11 +41,19 @@
 //  Poradie riešení sa môže od generátora líšiť (generátor prechádza polia
 //  v neurčenom poradí); zoznam ťahov aj vysvetlenia k nim sú rovnaké.
 //
+//  Priame hrozby (hra Hrozba na trhu, úloha direct_threat) — stav generátora 29. 9. 2026:
+//    VisionCore.hrozby(board, state)            → { riesenia, vysvetlenia, rozbory, dovod }
+//    VisionCore.rozoberHrozbu(board, 'c3d5', state) → je to hrozba a prečo (nie):
+//        tichý ťah, čo hrozí (terče, mat), čo by získal súper (popis polí je pri funkcii)
+//
+//  Rošáda (oprava 29. 9. 2026, rovnako v generátore): s kráľom sa pohne aj
+//  veža, kráľ nesmie byť v šachu ani prejsť cez napadnuté pole.
+//
 //  Šachovnica je pole 64 reťazcov: index 0 = a8, 7 = h8, 56 = a1, 63 = h1.
 //  Prázdne pole = '', figúrky ako vo FEN (P N B R Q K biele, p n b r q k čierne).
 // ============================================================================
 
-if (typeof window !== 'undefined') (window.VERZIE = window.VERZIE || {})['vision-core.js'] = '2026-09-27c';
+if (typeof window !== 'undefined') (window.VERZIE = window.VERZIE || {})['vision-core.js'] = '2026-09-29';
 
 const VisionCore = (function () {
   'use strict';
@@ -180,6 +188,11 @@ const VisionCore = (function () {
     }
     if (piece === 'P' && tr === 0) b[ti] = (promo || 'q').toUpperCase();
     if (piece === 'p' && tr === 7) b[ti] = (promo || 'q').toLowerCase();
+    // Rošáda: s kráľom sa pohne aj veža (oprava 29. 9. 2026, ako v generátore)
+    if (piece.toLowerCase() === 'k' && Math.abs(tc - fc) === 2) {
+      if (tc === 6) { b[toIdx(tr, 5)] = b[toIdx(tr, 7)]; b[toIdx(tr, 7)] = ''; }
+      else if (tc === 2) { b[toIdx(tr, 3)] = b[toIdx(tr, 0)]; b[toIdx(tr, 0)] = ''; }
+    }
     let cast = state.castling;
     if (piece === 'K') cast = cast.replace('K', '').replace('Q', '');
     if (piece === 'k') cast = cast.replace('k', '').replace('q', '');
@@ -224,14 +237,22 @@ const VisionCore = (function () {
     if (low === 'q') return ((ar === ac) || (fr === tr || fc === tc)) && isPathClear(board, fr, fc, tr, tc);
     if (low === 'k') {
       if (ar <= 1 && ac <= 1) return true;
+      // Rošáda (oprava 29. 9. 2026, ako v generátore): veža musí stáť v rohu,
+      // kráľ nesmie byť v šachu ani prejsť cez napadnuté pole. Cieľové pole stráži isLegal.
       const cast = state.castling;
+      const opp = piece === 'K' ? 'b' : 'w';
+      const smie = (rad, cez, veza, prazdne) =>
+        board[toIdx(rad, veza)] === (piece === 'K' ? 'R' : 'r') &&
+        prazdne.every(c => !board[toIdx(rad, c)]) &&
+        !isSquareAttacked(board, fi, opp) &&
+        !isSquareAttacked(board, toIdx(rad, cez), opp);
       if (piece === 'K' && fi === toIdx(7, 4)) {
-        if (ti === toIdx(7, 6) && cast.includes('K') && !board[toIdx(7, 5)] && !board[toIdx(7, 6)]) return true;
-        if (ti === toIdx(7, 2) && cast.includes('Q') && !board[toIdx(7, 1)] && !board[toIdx(7, 2)] && !board[toIdx(7, 3)]) return true;
+        if (ti === toIdx(7, 6) && cast.includes('K') && smie(7, 5, 7, [5, 6])) return true;
+        if (ti === toIdx(7, 2) && cast.includes('Q') && smie(7, 3, 0, [1, 2, 3])) return true;
       }
       if (piece === 'k' && fi === toIdx(0, 4)) {
-        if (ti === toIdx(0, 6) && cast.includes('k') && !board[toIdx(0, 5)] && !board[toIdx(0, 6)]) return true;
-        if (ti === toIdx(0, 2) && cast.includes('q') && !board[toIdx(0, 1)] && !board[toIdx(0, 2)] && !board[toIdx(0, 3)]) return true;
+        if (ti === toIdx(0, 6) && cast.includes('k') && smie(0, 5, 7, [5, 6])) return true;
+        if (ti === toIdx(0, 2) && cast.includes('q') && smie(0, 3, 0, [1, 2, 3])) return true;
       }
     }
     return false;
@@ -1062,9 +1083,11 @@ const VisionCore = (function () {
   }
 
   // ── _mate_in_one_squares ───────────────────────────────────────────────
-  //  Cieľové polia ťahov, ktorými strana side dáva mat (bez rošády a mimochodom).
-  function matovePolia(board, side) {
-    const st = { active: side, castling: '', ep: '-' };
+  //  Cieľové polia ťahov, ktorými strana side dáva mat (bez mimochodom).
+  //  castling: práva na rošádu (predvolene žiadne — tak to volajú vidličky;
+  //  priame hrozby odovzdávajú práva z FEN-u presne ako generátor).
+  function matovePolia(board, side, castling) {
+    const st = { active: side, castling: castling || '', ep: '-' };
     const opp = super_(side);
     const polia = new Set();
     for (const [fi, ti, promo] of legalMoves(board, st)) {
@@ -1357,6 +1380,241 @@ const VisionCore = (function () {
     return { kroky: kroky, koniec: koniec, vysledok: kroky.length ? ucet : null };
   }
 
+  // ══════════════════════════════════════════════════════════════════════
+  //  PRIAME HROZBY (úloha direct_threat, hra Hrozba na trhu)
+  //  Prepis direct_threats_for_side a find_direct_threats_both_sides
+  //  z generate_vision.py (stav 29. 9. 2026). Popri rozhodnutí sa zbiera
+  //  všetko, čo hra ukazuje: čo hrozí, kto berie, čo by získal súper.
+  // ══════════════════════════════════════════════════════════════════════
+  const MAX_PRIAMYCH_HROZIEB = 6;                              // MAX_DIRECT_THREATS
+
+  // ── _pmn_targets ───────────────────────────────────────────────────────
+  //  Polia, na ktorých má strana side branie so ziskom (SEE > 0).
+  //  Práva na rošádu ani mimochodom tu nehrajú rolu (rátajú sa len brania).
+  function cieleZisku(board, side) {
+    const st = { active: side, castling: '-', ep: '-' };
+    const out = new Set();
+    for (const [fi, ti] of legalMoves(board, st)) {
+      if (out.has(ti) || !isCapture(board, st, fi, ti)) continue;
+      if (seeWithPins(board, fi, ti, side) > 0) out.add(ti);
+    }
+    return out;
+  }
+
+  // Všetky legálne brania strany side na poli sq so ziskom > 0, v poradí
+  // ťahov generátora: [{ z, zisk }]. Prvé s najväčším ziskom je to, ktoré
+  // uvádza vysvetlenie (vysvetli_hrozbu berie prvé pri rovnosti).
+  function braniaNaPoli(board, side, sq) {
+    const st = { active: side, castling: '-', ep: '-' };
+    const out = [], videne = new Set();
+    for (const [fi, ti] of legalMoves(board, st)) {
+      if (ti !== sq || videne.has(fi) || !isCapture(board, st, fi, ti)) continue;
+      videne.add(fi);
+      const g = seeWithPins(board, fi, ti, side);
+      if (g > 0) out.push({ z: fi, zisk: g });
+    }
+    return out;
+  }
+  function najlepsieBranie(brania) {
+    let best = null;
+    for (const b of brania) if (!best || b.zisk > best.zisk) best = b;
+    return best;
+  }
+
+  // ── vysvetli_hrozbu ────────────────────────────────────────────────────
+  //  terce: zoradené polia nových cieľov (ako sorted() v Pythone), matPolia: polia matu
+  function vysvetliHrozbu(nb, side, terce, matPolia) {
+    if (!terce.length && !matPolia.length) return 'Vytvára novú hrozbu.';
+    const opp = super_(side);
+    const popis = [];
+    for (const sq of terce) {
+      const best = najlepsieBranie(braniaNaPoli(nb, side, sq));
+      if (!best) continue;
+      const obet = String(nb[sq]).toLowerCase();
+      const kto = SK_FIGURKA[nb[best.z].toLowerCase()] || 'figúrka';
+      const co = SK_FIGURY[obet] || 'figúrku';
+      const prem = nb[best.z].toLowerCase() === 'p' && (rowOf(sq) === 0 || rowOf(sq) === 7);
+      let text = kto + ' z ' + sqName(best.z) + ' berie ' + co + ' na ' + sqName(sq) +
+                 (prem ? ' s premenou na dámu' : '') + ' (zisk +' + best.zisk + ')';
+      if (countAttackers(nb, sq, opp) === 0) text += ' a nikto ' + (SK_ROD[obet] || 'ju') + ' nebráni';
+      popis.push(text);
+    }
+    const matova = matPolia.length ? 'MAT na ' + sqName(Math.min.apply(null, matPolia)) : '';
+    if (!popis.length) return matova ? 'Hrozí ' + matova + '.' : 'Vytvára novú hrozbu.';
+    const zaklad = popis.length === 1 ? popis[0] : popis[0] + ', a tiež ' + popis[1];
+    if (matova) return 'Hrozí ' + matova + '! A tiež: ' + zaklad + '.';
+    return 'Hrozí: ' + zaklad + '.';
+  }
+
+  // Názov ťahu pre hru: 'Jc3–d5', 'd2–d1D' (premena), 'O-O' (rošáda)
+  function nazovHrozby(board, z, na) {
+    const p = board[z];
+    if (p && p.toLowerCase() === 'k' && Math.abs(colOf(na) - colOf(z)) === 2) return colOf(na) === 6 ? 'O-O' : 'O-O-O';
+    return nazovTahu(board, z, na);
+  }
+
+  // Polia medzi a a b na priamke (bez nich), alebo null, keď nie sú na priamke
+  function poliaMedzi(a, b) {
+    const dr = rowOf(b) - rowOf(a), dc = colOf(b) - colOf(a);
+    if (!(dr === 0 || dc === 0 || Math.abs(dr) === Math.abs(dc))) return null;
+    const sr = znamienko(dr), sc = znamienko(dc);
+    const out = [];
+    let r = rowOf(a) + sr, c = colOf(a) + sc;
+    while (r !== rowOf(b) || c !== colOf(b)) { out.push(toIdx(r, c)); r += sr; c += sc; }
+    return out;
+  }
+  function utocnici(board, sq, color) {
+    const out = [];
+    for (let i = 0; i < 64; i++) if (board[i] && pieceColor(board[i]) === color && attacksSq(board, i, sq)) out.push(i);
+    return out;
+  }
+
+  // Ako hrozba na poli t vznikla (len pre vysvetlenie v hre, rozhodnutie od toho nezávisí):
+  //   'priamy'     berie figúrka, ktorá ťahala
+  //   'odkryty'    ťah uvoľnil líniu inej vlastnej figúrke (odkrytý útok)
+  //   'uvolnenie'  iná figúrka predtým brať nemohla, lebo bola viazaná na kráľa
+  //   'prerusenie' ťah sa postavil medzi súperovho obrancu a terč
+  //   'vazba'      ťah viaže súperovho obrancu na kráľa
+  //   'podpora'    pribudol ďalší útočník (aj batéria alebo odkrytá podpora)
+  //   'ine'        zložitejšia výmena
+  function mechanizmus(board, nb, side, z, na, t, brania) {
+    if (brania.some(b => b.z === na)) return 'priamy';
+    const opp = super_(side);
+    const f = najlepsieBranie(brania).z;
+    const st = { active: side, castling: '-', ep: '-' };
+    const predtym = isLegal(board, st, f, t, board[f].toLowerCase() === 'p' && (rowOf(t) === 0 || rowOf(t) === 7) ? 'q' : '') &&
+                    isCapture(board, st, f, t);
+    if (!predtym) {
+      const medzi = poliaMedzi(f, t);
+      return medzi && medzi.includes(z) ? 'odkryty' : 'uvolnenie';
+    }
+    const obrPred = utocnici(board, t, opp), obrPo = utocnici(nb, t, opp);
+    if (obrPred.some(o => { const m = poliaMedzi(o, t); return m && m.includes(na); })) return 'prerusenie';
+    if (obrPo.some(o => pinAxis(nb, o) !== null && pinAxis(board, o) === null)) return 'vazba';
+    if (attacksSq(nb, na, t)) return 'podpora';
+    const utocPo = utocnici(nb, t, side);
+    for (const a of utocPo) {                 // batéria: pohnutá figúrka za vlastným útočníkom
+      const m = poliaMedzi(na, t);
+      if (m && m.includes(a) && m.every(x => !nb[x] || x === a || pieceColor(nb[x]) === side)) return 'podpora';
+    }
+    for (const a of utocPo) {                 // odkrytá podpora: ťah uvoľnil líniu inému útočníkovi
+      const m = poliaMedzi(a, t);
+      if (m && m.includes(z)) return 'podpora';
+    }
+    return 'ine';
+  }
+
+  // Kontext jednej strany v pozícii (počíta sa raz, platí pre všetky jej ťahy)
+  function kontextHrozieb(board, state, side) {
+    const opp = super_(side);
+    const cast = (state && state.castling) || '-';
+    return {
+      side: side, castling: cast,
+      stareCiele: cieleZisku(board, side),               // old_targets
+      matPred: matovePolia(board, side, cast),            // mat_pred
+      stareCieleSupera: cieleZisku(board, opp),           // opp_old_targets
+      matSuperaPred: matovePolia(board, opp, cast)        // mat_supera_pred
+    };
+  }
+
+  // ── Rozbor jedného ťahu: je to priama hrozba a prečo (nie) ─────────────
+  //  uci 'c3d5' (piaty znak premeny sa ignoruje — generátor skúša len dámu).
+  //  Ťah hodnotí za figúrku, ktorá na poli stojí — nezáleží na tom, kto je na ťahu.
+  //  state: pozícia z parseFen (kvôli právam na rošádu); dá sa vynechať.
+  //  dovod (keď nie je hrozba), v poradí ako generátor:
+  //    'nelegalny'   figúrka tam nemôže ísť (napr. je viazaná)
+  //    'branie'      je to branie — nie tichý ťah
+  //    'sach'        dáva šach (aj odkrytý) — nie tichý ťah
+  //    'super_ziska' súper po ťahu získa branie so ziskom (polia v superCiele)
+  //    'super_mat'   súper po ťahu dá mat jedným ťahom (polia v superMat)
+  //    'nic_nehrozi' po ťahu nehrozí žiadne nové branie so ziskom ani mat
+  //  Ostatné polia sa vyplnia pre každý legálny ťah, aj keď rozhodol skorší dôvod
+  //  (hra vie ukázať všetky nesplnené podmienky naraz).
+  function rozoberHrozbu(board, uci, state, kontext) {
+    const z = sqIndex(uci.slice(0, 2)), na = sqIndex(uci.slice(2, 4));
+    const p = board[z];
+    if (!p) return null;
+    const side = pieceColor(p), opp = super_(side);
+    const cast = (state && state.castling) || '-';
+    if (!kontext || kontext.side !== side) kontext = kontextHrozieb(board, { castling: cast }, side);
+    const st = { active: side, castling: kontext.castling, ep: '-' };
+    const r = { tah: sqName(z) + sqName(na), z: z, na: na, strana: side, figurka: p,
+                nazov: nazovHrozby(board, z, na), legalny: false, viazany: pinAxis(board, z) !== null,
+                branie: false, sach: false, poTahu: null, terce: [], mat: [], matStary: [],
+                superCiele: [], superMat: [], hrozba: false, dovod: 'nelegalny', vysvetlenie: null };
+    if (!isLegal(board, st, z, na, '')) return r;
+    r.legalny = true;
+    r.branie = isCapture(board, st, z, na);
+    const nb = applyMoveEp(board, st, z, na, '').board;
+    r.poTahu = nb;
+    r.sach = isKingInCheck(nb, opp);
+    // Čo by získal súper (poistka generátora: nesmie dostať nič nové)
+    const cS = cieleZisku(nb, opp);
+    for (const t of cS) {
+      if (kontext.stareCieleSupera.has(t)) continue;
+      const br = braniaNaPoli(nb, opp, t);
+      r.superCiele.push({ pole: t, figurka: nb[t], zisk: najlepsieBranie(br).zisk, kto: br });
+    }
+    r.superCiele.sort((a, b) => a.pole - b.pole);
+    const mS = matovePolia(nb, opp, kontext.castling);
+    r.superMat = Array.from(mS).filter(t => !kontext.matSuperaPred.has(t)).sort((a, b) => a - b);
+    // Čo hrozí (akoby súper vynechal ťah)
+    const cN = cieleZisku(nb, side);
+    for (const t of Array.from(cN).sort((a, b) => a - b)) {
+      if (kontext.stareCiele.has(t)) continue;
+      const br = braniaNaPoli(nb, side, t);
+      r.terce.push({ pole: t, figurka: nb[t], zisk: najlepsieBranie(br).zisk, kto: br,
+                     mech: mechanizmus(board, nb, side, z, na, t, br) });
+    }
+    const mN = matovePolia(nb, side, '');
+    r.mat = Array.from(mN).filter(t => !kontext.matPred.has(t)).sort((a, b) => a - b);
+    r.matStary = Array.from(mN).filter(t => kontext.matPred.has(t)).sort((a, b) => a - b);
+    // Rozhodnutie v poradí generátora
+    if (r.branie) r.dovod = 'branie';
+    else if (r.sach) r.dovod = 'sach';
+    else if (r.superCiele.length) r.dovod = 'super_ziska';
+    else if (r.superMat.length) r.dovod = 'super_mat';
+    else if (r.terce.length || r.mat.length) {
+      r.hrozba = true; r.dovod = null;
+      r.vysvetlenie = vysvetliHrozbu(nb, side, r.terce.map(t => t.pole), r.mat);
+    } else r.dovod = 'nic_nehrozi';
+    return r;
+  }
+
+  // ── direct_threats_for_side ────────────────────────────────────────────
+  //  Všetky priame hrozby jednej strany ako zoznam rozborov (v poradí generátora).
+  //  Rýchla cesta: brania a šachy sa vyradia hneď, bez ďalšieho počítania.
+  function hrozbyStrany(board, state, side) {
+    const kontext = kontextHrozieb(board, state, side);
+    const st = { active: side, castling: kontext.castling, ep: '-' };
+    const out = [], videne = new Set();
+    for (const [fi, ti] of legalMoves(board, st)) {
+      const kluc = fi * 64 + ti;
+      if (videne.has(kluc)) continue;          // premena: rovnaký ťah 4×
+      videne.add(kluc);
+      if (isCapture(board, st, fi, ti)) continue;
+      const nb = applyMoveEp(board, st, fi, ti, '').board;
+      if (isKingInCheck(nb, super_(side))) continue;
+      const r = rozoberHrozbu(board, sqName(fi) + sqName(ti), state, kontext);
+      if (r.hrozba) out.push(r);
+    }
+    return out;
+  }
+
+  // ── find_direct_threats_both_sides ─────────────────────────────────────
+  //  Úloha „Nájdi všetky priame hrozby" za oboch (biele, potom čierne).
+  //  dovod: null | 'sach' (niektorý kráľ je v šachu) | 'visi' (niekto už má
+  //         branie so ziskom) | 'prilis_vela' (viac ako 6)
+  function hrozby(board, state) {
+    const prazdne = d => ({ riesenia: [], vysvetlenia: [], rozbory: [], dovod: d });
+    if (isKingInCheck(board, 'w') || isKingInCheck(board, 'b')) return prazdne('sach');
+    if (cieleZisku(board, 'w').size || cieleZisku(board, 'b').size) return prazdne('visi');
+    const vsetky = hrozbyStrany(board, state, 'w').concat(hrozbyStrany(board, state, 'b'));
+    if (vsetky.length > MAX_PRIAMYCH_HROZIEB) return prazdne('prilis_vela');
+    return { riesenia: vsetky.map(r => r.tah), vysvetlenia: vsetky.map(r => r.vysvetlenie),
+             rozbory: vsetky, dovod: null };
+  }
+
   return {
     HODNOTA: HODNOTA,
     MAX_BRANI_SO_ZISKOM: MAX_BRANI_SO_ZISKOM,
@@ -1397,7 +1655,13 @@ const VisionCore = (function () {
     rebrikVidlicky: rebrikVidlicky,
     hodnotaBrania: hodnotaBrania,
     dosiahnutelnePolia: dosiahnutelnePolia,
-    matovePolia: matovePolia
+    matovePolia: matovePolia,
+    // priame hrozby
+    MAX_PRIAMYCH_HROZIEB: MAX_PRIAMYCH_HROZIEB,
+    hrozby: hrozby,
+    hrozbyStrany: hrozbyStrany,
+    rozoberHrozbu: rozoberHrozbu,
+    cieleZisku: cieleZisku
   };
 })();
 
