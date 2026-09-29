@@ -598,9 +598,13 @@ button {
       <option value="meno">podľa mena</option>
       <option value="platnost">podľa platnosti (najskôr končiace)</option>
     </select>
-    <label style="font-size:13px;color:#475569;display:flex;align-items:center;gap:5px;">
-      <input type="checkbox" id="userLenVyprsane"
+    <label style="font-size:13px;color:#475569;display:flex;align-items:center;gap:5px;white-space:nowrap;">
+      <input type="checkbox" id="userLenVyprsane" style="width:auto;margin:0;"
              onchange="renderUserList(window._playerMap || {})"> len vypršané
+    </label>
+    <label id="userLenTesteriWrap" style="font-size:13px;color:#475569;display:none;align-items:center;gap:5px;white-space:nowrap;">
+      <input type="checkbox" id="userLenTesteri" style="width:auto;margin:0;"
+             onchange="renderUserList(window._playerMap || {})"> len testeri hier
     </label>
     <span id="userPocty" style="font-size:12px;color:#94a3b8;"></span>
   </div>
@@ -642,6 +646,17 @@ button {
           </select>
         </div>
       </div>
+      <!-- Testovanie hier — kým sú hry v príprave, vidí ich admin a vybraní testeri -->
+      <div id="uTesterWrap" style="margin-top:14px;padding:12px;background:#fefce8;border:1px solid #fde68a;border-radius:10px;">
+        <label style="display:flex;align-items:center;gap:8px;font-size:14px;font-weight:bold;color:#374151;cursor:pointer;">
+          <input type="checkbox" id="uEditTester" style="width:auto;margin:0;"> 🎲 Testuje hry
+        </label>
+        <div id="uTesterInfo" style="font-size:12px;color:#64748b;margin-top:6px;line-height:1.45;">
+          Kým sú hry v príprave, menu Hry vidí len admin a používatelia s týmto políčkom.
+          Hráč ostáva hráčom — hry sa mu odomykajú postupne ako ostatným hráčom.
+        </div>
+      </div>
+
       <!-- Platnosť účtu -->
       <div id="uValidityWrap" style="margin-top:14px;padding:12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;">
         <div style="font-size:13px;font-weight:bold;margin-bottom:8px;color:#374151;">📅 Platnosť účtu</div>
@@ -730,7 +745,7 @@ button {
 // ZNAČKA VERZIE — pri každej úprave tohto súboru prepíš dátum.
 // Vypíše sa v konzole, alebo na mobile po pridaní ?verzia do adresy.
 // Mechanika je v player.js pri funkcii verzie().
-(window.VERZIE = window.VERZIE || {})['admin.html'] = '2026-09-17';
+(window.VERZIE = window.VERZIE || {})['admin.html'] = '2026-09-29';
 
 // SUPABASE_URL a SUPABASE_KEY poskytuje js/auth.js (nedeklarovať znova!)
 
@@ -1534,6 +1549,17 @@ async function loadUsers() {
     const playerMap = {};
     (players || []).forEach(p => { if (p.user_id) playerMap[p.user_id] = p.trener_id; });
 
+    // Testeri hier (tabuľka hry_testeri zo skriptu hry-testeri.sql). Kým skript
+    // nie je spustený, dotaz zlyhá — políčko „Testuje hry" sa potom len vypne.
+    try {
+      const testeri = await sbFetch('hry_testeri?select=user_id');
+      window._testeri = new Set((testeri || []).map(t => t.user_id));
+    } catch (e) {
+      window._testeri = null;
+    }
+    const lenTesteriWrap = document.getElementById('userLenTesteriWrap');
+    if (lenTesteriWrap) lenTesteriWrap.style.display = window._testeri ? 'flex' : 'none';
+
     renderUserList(playerMap);
     populateTrenerSelect('mrTrener');
     setUserStatus(`Načítaných ${allUsers.length} používateľov`, 'success');
@@ -1747,7 +1773,11 @@ function renderUserList(playerMap) {
   const lenVyprsane = document.getElementById('userLenVyprsane')?.checked;
   const zoradit = document.getElementById('userSort')?.value || 'meno';
 
+  const testeri = window._testeri || new Set();
+  const lenTesteri = !!window._testeri && document.getElementById('userLenTesteri')?.checked;
+
   let zoznam = lenVyprsane ? vyprsane : allUsers.slice();
+  if (lenTesteri) zoznam = zoznam.filter(u => testeri.has(u.id));
   if (zoradit === 'platnost') {
     // Bez platnosti (Infinity) skončia na konci — nemajú čo riešiť
     zoznam.sort((a, b) => koniec(a) - koniec(b));
@@ -1762,11 +1792,14 @@ function renderUserList(playerMap) {
   const pocty = document.getElementById('userPocty');
   if (pocty) {
     pocty.textContent = `zobrazených ${zoznam.length} z ${allUsers.length}`
-      + (vyprsane.length ? ` · vypršaných ${vyprsane.length}` : '');
+      + (vyprsane.length ? ` · vypršaných ${vyprsane.length}` : '')
+      + (testeri.size ? ` · testerov hier ${testeri.size}` : '');
   }
 
   if (!zoznam.length) {
-    el.innerHTML = '<div style="color:#166534;padding:10px;">✅ Žiadny účet nemá vypršanú platnosť.</div>';
+    el.innerHTML = lenTesteri && !lenVyprsane
+      ? '<div style="color:#64748b;padding:10px;">Zatiaľ nikto netestuje hry. Testera pridáš cez Upraviť → 🎲 Testuje hry.</div>'
+      : '<div style="color:#166534;padding:10px;">✅ Žiadny účet nemá vypršanú platnosť.</div>';
     return;
   }
 
@@ -1811,6 +1844,7 @@ function renderUserList(playerMap) {
           ${trenerName}
           <div style="font-size:12px;color:#94a3b8;">${escapeHtml(u.email)}</div>
         </div>
+        ${testeri.has(u.id) ? '<span title="Testuje hry" style="padding:3px 8px;border-radius:999px;font-size:12px;font-weight:bold;background:#fefce8;color:#a16207;border:1px solid #fde68a;">🎲 Tester</span>' : ''}
         <span style="padding:3px 10px;border-radius:999px;font-size:12px;font-weight:bold;${roleStyle}">${roleLabel}</span>
         <button class="secondary" style="padding:6px 12px;font-size:13px;" onclick="openUserEdit('${u.id}')">Upraviť</button>
         <button class="danger" style="padding:6px 12px;font-size:13px;" onclick="deleteUser('${u.id}', '${escapeHtml(displayName).replace(/&#39;/g, '')}')">🗑️</button>
@@ -1830,6 +1864,16 @@ async function openUserEdit(userId) {
   document.getElementById('uEditSurname').value        = selectedUser.surname || '';
   document.getElementById('uEditNick').value           = selectedUser.nick_name || '';
   document.getElementById('uEditRole').value           = selectedUser.role || 'hrac';
+
+  // Testovanie hier
+  const testerEl = document.getElementById('uEditTester');
+  testerEl.checked  = !!(window._testeri && window._testeri.has(userId));
+  testerEl.disabled = !window._testeri;
+  document.getElementById('uTesterInfo').innerHTML = window._testeri
+    ? 'Kým sú hry v príprave, menu Hry vidí len admin a používatelia s týmto políčkom. '
+      + 'Hráč ostáva hráčom — hry sa mu odomykajú postupne ako ostatným hráčom.'
+    : '⚠️ Najprv treba v Supabase (SQL Editor) spustiť skript <b>hry-testeri.sql</b>, '
+      + 'potom znova načítaj používateľov.';
 
   // Vyčisti zmenu hesla po predošlom hráčovi
   document.getElementById('uNewPassword').value = '';
@@ -1898,6 +1942,8 @@ async function openUserEdit(userId) {
 function onUserRoleChange() {
   const role = document.getElementById('uEditRole').value;
   document.getElementById('uTrenerWrap').style.display = role === 'hrac' ? 'block' : 'none';
+  // Admin vidí hry vždy — políčko „Testuje hry" nepotrebuje
+  document.getElementById('uTesterWrap').style.display = role === 'admin' ? 'none' : 'block';
 }
 
 async function saveUser() {
@@ -1934,6 +1980,26 @@ async function saveUser() {
         method: 'PATCH',
         body: JSON.stringify({ trener_id: trenerId })
       });
+    }
+
+    // 4. Testovanie hier — zapíše sa len zmena. Databáza vráti zapísaný alebo
+    //    zmazaný riadok; keď nevráti nič, zmenu odmietla.
+    const testerEl = document.getElementById('uEditTester');
+    if (window._testeri && !testerEl.disabled && newRole !== 'admin') {
+      const bol = window._testeri.has(selectedUser.id);
+      if (testerEl.checked !== bol) {
+        const zmena = testerEl.checked
+          ? await sbFetch('hry_testeri?select=user_id', {
+              method: 'POST', prefer: 'return=representation',
+              body: JSON.stringify({ user_id: selectedUser.id })
+            })
+          : await sbFetch(`hry_testeri?user_id=eq.${selectedUser.id}&select=user_id`, {
+              method: 'DELETE', prefer: 'return=representation'
+            });
+        if (!zmena || !zmena.length) {
+          throw new Error('databáza odmietla zmenu políčka Testuje hry');
+        }
+      }
     }
 
     setUserStatus(`✅ Používateľ ${selectedUser.email} bol aktualizovaný.`, 'success');
