@@ -134,10 +134,11 @@ tr.nezacal td.meno { color: #64748b; font-weight: normal; }
 <script src="js/player.js"></script>
 <script src="js/trh-obsah.js"></script>
 <script src="js/straz-obsah.js"></script>
+<script src="js/vidlicka-obsah.js"></script>
 <script src="js/hra-postup.js"></script>
 <script>
 // ZNAČKA VERZIE — pri každej úprave tohto súboru prepíš dátum.
-(window.VERZIE = window.VERZIE || {})['hry-prehlad.html'] = '2026-09-27';
+(window.VERZIE = window.VERZIE || {})['hry-prehlad.html'] = '2026-09-27b';
 
 // ─── Hry ─────────────────────────────────────────────────────────────────────
 // Každá hra má svoj obsah (kapitoly, názvy) v samostatnom súbore. Nová hra =
@@ -146,7 +147,8 @@ tr.nezacal td.meno { color: #64748b; font-weight: normal; }
 // v HraPostup.HRY (odomknePo).
 const HRY = [
   { kluc: 'sachovy-trh',   obsah: OBSAH_TRH,   zrucnost: 'Branie so ziskom' },
-  { kluc: 'straz-na-trhu', obsah: OBSAH_STRAZ, zrucnost: 'Slabo pokryté figúrky' }
+  { kluc: 'straz-na-trhu', obsah: OBSAH_STRAZ, zrucnost: 'Slabo pokryté figúrky' },
+  { kluc: 'vidlicka-na-trhu', obsah: OBSAH_VIDLICKA, zrucnost: 'Vidličky' }
 ];
 
 const USER_ROLE        = sessionStorage.getItem('user_role') || '';
