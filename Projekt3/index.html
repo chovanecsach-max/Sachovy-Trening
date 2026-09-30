@@ -522,6 +522,10 @@ body {
       <div class="sub-icon i-hry">🍴</div>Vidlička na trhu
       <span class="sub-pozn" id="hraVidlickaPozn">vysvetľuje Vidličky</span>
     </button>
+    <button class="sub-btn" id="hraHrozbaBtn" onclick="goHra('hrozba-na-trhu')">
+      <div class="sub-icon i-hry">🎯</div>Hrozba na trhu
+      <span class="sub-pozn" id="hraHrozbaPozn">vysvetľuje Priame hrozby</span>
+    </button>
   </div>
 
   <!-- 5 rebríčkov vedľa seba -->
@@ -556,7 +560,7 @@ body {
 <script src="js/hra-postup.js"></script>
 <script>
 // ZNAČKA VERZIE — pri každej úprave tohto súboru prepíš dátum.
-(window.VERZIE = window.VERZIE || {})['index.html'] = '2026-09-27b';
+(window.VERZIE = window.VERZIE || {})['index.html'] = '2026-09-30';
 
 // Hlavné menu: všetky tlačidlá v jednom rade; keď ich je viac než 9, v dvoch
 // rovnakých radoch. Tlačidlá sa zobrazujú postupne (Zadania, Súťaže, Hry sa
@@ -610,6 +614,12 @@ async function initPage() {
       if (o.ok) return;
       document.getElementById('hraVidlickaBtn').classList.add('zamknuta');
       document.getElementById('hraVidlickaPozn').textContent = '🔒 odomkne sa po skúške Stráže na trhu';
+    });
+    // Hrozba na trhu sa hráčovi odomkne až po zložení skúšky Vidličky na trhu
+    HraPostup.odomknuta('hrozba-na-trhu', role).then(o => {
+      if (o.ok) return;
+      document.getElementById('hraHrozbaBtn').classList.add('zamknuta');
+      document.getElementById('hraHrozbaPozn').textContent = '🔒 odomkne sa po skúške Vidličky na trhu';
     });
   });
   if (role === 'admin') {
