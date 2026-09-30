@@ -41,10 +41,14 @@
 //  Poradie riešení sa môže od generátora líšiť (generátor prechádza polia
 //  v neurčenom poradí); zoznam ťahov aj vysvetlenia k nim sú rovnaké.
 //
-//  Priame hrozby (hra Hrozba na trhu, úloha direct_threat) — stav generátora 29. 9. 2026:
+//  Priame hrozby (hra Hrozba na trhu, úloha direct_threat) — stav generátora 30. 9. 2026:
 //    VisionCore.hrozby(board, state)            → { riesenia, vysvetlenia, rozbory, dovod }
 //    VisionCore.rozoberHrozbu(board, 'c3d5', state) → je to hrozba a prečo (nie):
-//        tichý ťah, čo hrozí (terče, mat), čo by získal súper (popis polí je pri funkcii)
+//        tichý ťah, čo hrozí (terče, premeny, mat), čo by získal súper (popis polí je pri funkcii)
+//    VisionCore.ziskPremeny(board, strana, pole) → tichá premena so ziskom { z, na, zisk } alebo null
+//  Hrozba premeny (30. 9. 2026): premena bez brania je zisk ako branie (dáma − pešiak,
+//  mínus súperov zisk pri braní novej dámy). Hrozbou je aj nová premena so ziskom,
+//  súper po hrozbe nesmie získať novú premenu a premena sama hrozbou nie je.
 //
 //  Rošáda (oprava 29. 9. 2026, rovnako v generátore): s kráľom sa pohne aj
 //  veža, kráľ nesmie byť v šachu ani prejsť cez napadnuté pole.
@@ -53,7 +57,7 @@
 //  Prázdne pole = '', figúrky ako vo FEN (P N B R Q K biele, p n b r q k čierne).
 // ============================================================================
 
-if (typeof window !== 'undefined') (window.VERZIE = window.VERZIE || {})['vision-core.js'] = '2026-09-29';
+if (typeof window !== 'undefined') (window.VERZIE = window.VERZIE || {})['vision-core.js'] = '2026-09-30';
 
 const VisionCore = (function () {
   'use strict';
@@ -1383,8 +1387,9 @@ const VisionCore = (function () {
   // ══════════════════════════════════════════════════════════════════════
   //  PRIAME HROZBY (úloha direct_threat, hra Hrozba na trhu)
   //  Prepis direct_threats_for_side a find_direct_threats_both_sides
-  //  z generate_vision.py (stav 29. 9. 2026). Popri rozhodnutí sa zbiera
-  //  všetko, čo hra ukazuje: čo hrozí, kto berie, čo by získal súper.
+  //  z generate_vision.py (stav 30. 9. 2026, s hrozbou premeny). Popri
+  //  rozhodnutí sa zbiera všetko, čo hra ukazuje: čo hrozí, kto berie,
+  //  čo by získal súper.
   // ══════════════════════════════════════════════════════════════════════
   const MAX_PRIAMYCH_HROZIEB = 6;                              // MAX_DIRECT_THREATS
 
@@ -1415,6 +1420,38 @@ const VisionCore = (function () {
     }
     return out;
   }
+  // ── _promo_gain / _promo_targets (hrozba premeny, 30. 9. 2026) ─────────
+  //  Tichá premena strany side na pole sq: pešiak ide o pole dopredu na prázdne
+  //  pole posledného radu a stane sa dámou. Zisk = 8 (dáma − pešiak) mínus
+  //  najväčší zisk súpera pri braní novej dámy (rebrík výmeny, aspoň 0).
+  //  Vráti { z, na, zisk } pri zisku > 0, inak null.
+  function ziskPremeny(board, side, sq) {
+    if (board[sq]) return null;
+    let fi, pesiak;
+    if (side === 'w') { if (rowOf(sq) !== 0) return null; fi = sq + 8; pesiak = 'P'; }
+    else { if (rowOf(sq) !== 7) return null; fi = sq - 8; pesiak = 'p'; }
+    if (board[fi] !== pesiak) return null;
+    const st = { active: side, castling: '-', ep: '-' };
+    if (!isLegal(board, st, fi, sq, 'q')) return null;
+    const nb = applyMoveEp(board, st, fi, sq, 'q').board;
+    const opp = super_(side);
+    let najlepsie = 0;
+    for (const [a, b] of legalMoves(nb, { active: opp, castling: '-', ep: '-' })) {
+      if (b !== sq) continue;
+      const g = seeWithPins(nb, a, sq, opp);
+      if (g > najlepsie) najlepsie = g;
+    }
+    const zisk = BONUS_PREMENY - najlepsie;
+    return zisk > 0 ? { z: fi, na: sq, zisk: zisk } : null;
+  }
+  //  Polia premeny, na ktorých má strana side tichú premenu so ziskom.
+  function cielePremeny(board, side) {
+    const rad = side === 'w' ? 0 : 7;
+    const out = new Set();
+    for (let sq = rad * 8; sq < rad * 8 + 8; sq++) if (ziskPremeny(board, side, sq)) out.add(sq);
+    return out;
+  }
+
   function najlepsieBranie(brania) {
     let best = null;
     for (const b of brania) if (!best || b.zisk > best.zisk) best = b;
@@ -1422,9 +1459,11 @@ const VisionCore = (function () {
   }
 
   // ── vysvetli_hrozbu ────────────────────────────────────────────────────
-  //  terce: zoradené polia nových cieľov (ako sorted() v Pythone), matPolia: polia matu
-  function vysvetliHrozbu(nb, side, terce, matPolia) {
-    if (!terce.length && !matPolia.length) return 'Vytvára novú hrozbu.';
+  //  terce: zoradené polia nových cieľov (ako sorted() v Pythone), matPolia: polia matu,
+  //  premeny: zoradené polia nových premien (za braniami, 30. 9. 2026)
+  function vysvetliHrozbu(nb, side, terce, matPolia, premeny) {
+    premeny = premeny || [];
+    if (!terce.length && !matPolia.length && !premeny.length) return 'Vytvára novú hrozbu.';
     const opp = super_(side);
     const popis = [];
     for (const sq of terce) {
@@ -1438,6 +1477,11 @@ const VisionCore = (function () {
                  (prem ? ' s premenou na dámu' : '') + ' (zisk +' + best.zisk + ')';
       if (countAttackers(nb, sq, opp) === 0) text += ' a nikto ' + (SK_ROD[obet] || 'ju') + ' nebráni';
       popis.push(text);
+    }
+    for (const sq of premeny) {
+      const pr = ziskPremeny(nb, side, sq);
+      if (!pr) continue;
+      popis.push('pešiak z ' + sqName(pr.z) + ' sa premení na dámu na ' + sqName(sq) + ' (zisk +' + pr.zisk + ')');
     }
     const matova = matPolia.length ? 'MAT na ' + sqName(Math.min.apply(null, matPolia)) : '';
     if (!popis.length) return matova ? 'Hrozí ' + matova + '.' : 'Vytvára novú hrozbu.';
@@ -1504,6 +1548,27 @@ const VisionCore = (function () {
     return 'ine';
   }
 
+  // Ako vznikla hrozba premeny pr = { z: pešiak, na: pole premeny } (len pre hru):
+  //   'priamy'     premení sa pešiak, ktorý ťahal
+  //   'cesta'      ťah uvoľnil pole premeny (stála na ňom vlastná figúrka)
+  //   'uvolnenie'  pešiak bol viazaný na kráľa a ťah ho uvoľnil
+  //   'prerusenie' ťah sa postavil medzi súperovho strážcu a pole premeny
+  //   'vazba'      ťah viaže súperovho strážcu poľa premeny na kráľa
+  //   'podpora'    figúrka, ktorá ťahala, podporí premenu (po braní dámy berie späť)
+  //   'ine'        zložitejšia výmena
+  function mechanizmusPremeny(board, nb, side, z, na, pr) {
+    if (pr.z === na) return 'priamy';
+    if (z === pr.na) return 'cesta';
+    if (pinAxis(board, pr.z) !== null && pinAxis(nb, pr.z) === null) return 'uvolnenie';
+    const opp = super_(side), dama = side === 'w' ? 'Q' : 'q';
+    const s1 = board.slice(); s1[pr.na] = dama; s1[pr.z] = '';      // premena pred ťahom
+    const s2 = nb.slice();    s2[pr.na] = dama; s2[pr.z] = '';      // premena po ťahu
+    if (utocnici(s1, pr.na, opp).some(o => { const m = poliaMedzi(o, pr.na); return m && m.includes(na); })) return 'prerusenie';
+    if (utocnici(s2, pr.na, opp).some(o => pinAxis(s2, o) !== null && pinAxis(s1, o) === null)) return 'vazba';
+    if (attacksSq(s2, na, pr.na)) return 'podpora';
+    return 'ine';
+  }
+
   // Kontext jednej strany v pozícii (počíta sa raz, platí pre všetky jej ťahy)
   function kontextHrozieb(board, state, side) {
     const opp = super_(side);
@@ -1513,7 +1578,9 @@ const VisionCore = (function () {
       stareCiele: cieleZisku(board, side),               // old_targets
       matPred: matovePolia(board, side, cast),            // mat_pred
       stareCieleSupera: cieleZisku(board, opp),           // opp_old_targets
-      matSuperaPred: matovePolia(board, opp, cast)        // mat_supera_pred
+      matSuperaPred: matovePolia(board, opp, cast),       // mat_supera_pred
+      starePremeny: cielePremeny(board, side),            // old_promo
+      starePremenySupera: cielePremeny(board, opp)        // opp_old_promo
     };
   }
 
@@ -1524,10 +1591,13 @@ const VisionCore = (function () {
   //  dovod (keď nie je hrozba), v poradí ako generátor:
   //    'nelegalny'   figúrka tam nemôže ísť (napr. je viazaná)
   //    'branie'      je to branie — nie tichý ťah
+  //    'premena'     premena bez brania — zisk hneď, nie tichý ťah (30. 9. 2026)
   //    'sach'        dáva šach (aj odkrytý) — nie tichý ťah
   //    'super_ziska' súper po ťahu získa branie so ziskom (polia v superCiele)
+  //                  alebo premenu so ziskom (superPremeny)
   //    'super_mat'   súper po ťahu dá mat jedným ťahom (polia v superMat)
-  //    'nic_nehrozi' po ťahu nehrozí žiadne nové branie so ziskom ani mat
+  //    'nic_nehrozi' po ťahu nehrozí žiadne nové branie so ziskom, premena ani mat
+  //  premeny / superPremeny: [{ z: pešiak, na: pole premeny, zisk, mech }]
   //  Ostatné polia sa vyplnia pre každý legálny ťah, aj keď rozhodol skorší dôvod
   //  (hra vie ukázať všetky nesplnené podmienky naraz).
   function rozoberHrozbu(board, uci, state, kontext) {
@@ -1540,11 +1610,12 @@ const VisionCore = (function () {
     const st = { active: side, castling: kontext.castling, ep: '-' };
     const r = { tah: sqName(z) + sqName(na), z: z, na: na, strana: side, figurka: p,
                 nazov: nazovHrozby(board, z, na), legalny: false, viazany: pinAxis(board, z) !== null,
-                branie: false, sach: false, poTahu: null, terce: [], mat: [], matStary: [],
-                superCiele: [], superMat: [], hrozba: false, dovod: 'nelegalny', vysvetlenie: null };
+                branie: false, premena: false, sach: false, poTahu: null, terce: [], premeny: [], mat: [], matStary: [],
+                superCiele: [], superPremeny: [], superMat: [], hrozba: false, dovod: 'nelegalny', vysvetlenie: null };
     if (!isLegal(board, st, z, na, '')) return r;
     r.legalny = true;
     r.branie = isCapture(board, st, z, na);
+    r.premena = !r.branie && p.toLowerCase() === 'p' && (rowOf(na) === 0 || rowOf(na) === 7);
     const nb = applyMoveEp(board, st, z, na, '').board;
     r.poTahu = nb;
     r.sach = isKingInCheck(nb, opp);
@@ -1558,6 +1629,9 @@ const VisionCore = (function () {
     r.superCiele.sort((a, b) => a.pole - b.pole);
     const mS = matovePolia(nb, opp, kontext.castling);
     r.superMat = Array.from(mS).filter(t => !kontext.matSuperaPred.has(t)).sort((a, b) => a - b);
+    for (const t of Array.from(cielePremeny(nb, opp)).sort((a, b) => a - b)) {
+      if (!kontext.starePremenySupera.has(t)) r.superPremeny.push(ziskPremeny(nb, opp, t));
+    }
     // Čo hrozí (akoby súper vynechal ťah)
     const cN = cieleZisku(nb, side);
     for (const t of Array.from(cN).sort((a, b) => a - b)) {
@@ -1566,17 +1640,24 @@ const VisionCore = (function () {
       r.terce.push({ pole: t, figurka: nb[t], zisk: najlepsieBranie(br).zisk, kto: br,
                      mech: mechanizmus(board, nb, side, z, na, t, br) });
     }
+    for (const t of Array.from(cielePremeny(nb, side)).sort((a, b) => a - b)) {
+      if (kontext.starePremeny.has(t)) continue;
+      const pr = ziskPremeny(nb, side, t);
+      pr.mech = mechanizmusPremeny(board, nb, side, z, na, pr);
+      r.premeny.push(pr);
+    }
     const mN = matovePolia(nb, side, '');
     r.mat = Array.from(mN).filter(t => !kontext.matPred.has(t)).sort((a, b) => a - b);
     r.matStary = Array.from(mN).filter(t => kontext.matPred.has(t)).sort((a, b) => a - b);
     // Rozhodnutie v poradí generátora
     if (r.branie) r.dovod = 'branie';
+    else if (r.premena) r.dovod = 'premena';
     else if (r.sach) r.dovod = 'sach';
-    else if (r.superCiele.length) r.dovod = 'super_ziska';
+    else if (r.superCiele.length || r.superPremeny.length) r.dovod = 'super_ziska';
     else if (r.superMat.length) r.dovod = 'super_mat';
-    else if (r.terce.length || r.mat.length) {
+    else if (r.terce.length || r.mat.length || r.premeny.length) {
       r.hrozba = true; r.dovod = null;
-      r.vysvetlenie = vysvetliHrozbu(nb, side, r.terce.map(t => t.pole), r.mat);
+      r.vysvetlenie = vysvetliHrozbu(nb, side, r.terce.map(t => t.pole), r.mat, r.premeny.map(t => t.na));
     } else r.dovod = 'nic_nehrozi';
     return r;
   }
@@ -1604,11 +1685,12 @@ const VisionCore = (function () {
   // ── find_direct_threats_both_sides ─────────────────────────────────────
   //  Úloha „Nájdi všetky priame hrozby" za oboch (biele, potom čierne).
   //  dovod: null | 'sach' (niektorý kráľ je v šachu) | 'visi' (niekto už má
-  //         branie so ziskom) | 'prilis_vela' (viac ako 6)
+  //         branie so ziskom alebo premenu so ziskom) | 'prilis_vela' (viac ako 6)
   function hrozby(board, state) {
     const prazdne = d => ({ riesenia: [], vysvetlenia: [], rozbory: [], dovod: d });
     if (isKingInCheck(board, 'w') || isKingInCheck(board, 'b')) return prazdne('sach');
     if (cieleZisku(board, 'w').size || cieleZisku(board, 'b').size) return prazdne('visi');
+    if (cielePremeny(board, 'w').size || cielePremeny(board, 'b').size) return prazdne('visi');   // 30. 9. 2026
     const vsetky = hrozbyStrany(board, state, 'w').concat(hrozbyStrany(board, state, 'b'));
     if (vsetky.length > MAX_PRIAMYCH_HROZIEB) return prazdne('prilis_vela');
     return { riesenia: vsetky.map(r => r.tah), vysvetlenia: vsetky.map(r => r.vysvetlenie),
@@ -1661,7 +1743,9 @@ const VisionCore = (function () {
     hrozby: hrozby,
     hrozbyStrany: hrozbyStrany,
     rozoberHrozbu: rozoberHrozbu,
-    cieleZisku: cieleZisku
+    cieleZisku: cieleZisku,
+    ziskPremeny: ziskPremeny,
+    cielePremeny: cielePremeny
   };
 })();
 
