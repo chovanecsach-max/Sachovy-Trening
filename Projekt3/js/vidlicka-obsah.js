@@ -31,7 +31,7 @@
 //  Figúrky v textoch: K D V S J (slovensky), vo FEN anglicky (K Q R B N P).
 // ============================================================================
 
-(window.VERZIE = window.VERZIE || {})['vidlicka-obsah.js'] = '2026-09-30';
+(window.VERZIE = window.VERZIE || {})['vidlicka-obsah.js'] = '2026-09-30b';
 
 const OBSAH_VIDLICKA = {
   kluc: 'vidlicka-na-trhu',
@@ -41,7 +41,8 @@ const OBSAH_VIDLICKA = {
   podtitul: 'Hra, ktorá vysvetľuje zručnosť Vidlička',
   sprievodca: 'Grošík',
   pozdrav: 'Ahoj, to som zase ja, Grošík! Na trh prišiel šikovný zlodej. Postaví sa tak, že dosiahne na dva ' +
-           'stánky naraz, a majiteľ zachráni len jeden. Naučím ťa, kedy je to naozajstná vidlička. Vyber si kapitolu.',
+           'stánky naraz, a majiteľ zachráni len jeden. Naučím ťa, ako sa počíta vidlička v tejto hre ' +
+           'a v zručnostiach. Vyber si kapitolu.',
 
   // Texty, ktoré sa líšia od Šachového trhu
   texty: {
