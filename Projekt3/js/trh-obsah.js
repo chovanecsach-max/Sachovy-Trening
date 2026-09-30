@@ -22,11 +22,16 @@
 //    odomknePo  — číslo kapitoly, po ktorej sa odomkne (inak po predchádzajúcej)
 //    otazka     — vlastné znenie otázky Áno/Nie ({tah} = názov ťahu)
 //
+//  PRÍPRAVA NA SKÚŠKU (kapitola s poľom `priprava`, 30. 9. 2026): stojí pred
+//  skúškou a skúška sa odomkne až po nej (hráč ju môže kedykoľvek ukončiť).
+//  Úlohy sú ako na skúške (druh úloh, čas), len ich je `pocet` a na každú je
+//  o `casNavyse` sekúnd viac. Pozície sú iné ako na skúške.
+//
 //  Figúrky v textoch: K D V S J (slovensky), vo FEN a v poliach a/b/dal/dostal
 //  anglicky ako vo FEN (K Q R B N P).
 // ============================================================================
 
-(window.VERZIE = window.VERZIE || {})['trh-obsah.js'] = '2026-09-27';
+(window.VERZIE = window.VERZIE || {})['trh-obsah.js'] = '2026-09-30';
 
 const OBSAH_TRH = {
   kluc: 'sachovy-trh',
@@ -353,6 +358,97 @@ const OBSAH_TRH = {
           vysvetlenie: 'Tri stánky, tri obchody: d5 a a3 pre bieleho, b2 pre čierneho. Pri Vd1×d5 nás b2 nezaujíma — ' +
                        'ale je to ďalší stánok, a aj ten treba nájsť.' }
       ]
+    },
+
+    // ── Príprava na skúšku ──────────────────────────────────────────────────
+    //  Na mape stojí pred skúškou. Číslo 20 slúži len na uloženie postupu —
+    //  skúška si tak nechala číslo 11 a uložený postup hráčov sa nemenil.
+    {
+      cislo: 20,
+      nazov: 'Príprava na skúšku',
+      uvod: [
+        'Pred skúškou si to vyskúšaj naostro: <b>20 pozícií z ozajstných partií</b>. V každej nájdi všetky ' +
+        'brania so ziskom za oboch hráčov. Pozície sú iné ako na skúške.',
+        'Na každú pozíciu máš o <b>minútu viac</b> ako na skúške. Keď vyriešiš aspoň 80 % pozícií úplne a bez ' +
+        'chyby, si na skúšku pripravený.',
+        'Tréning môžeš kedykoľvek ukončiť tlačidlom <b>Ukončiť tréning</b>. Vyhodnotím, čo si stihol, a skúška ' +
+        'sa ti odomkne.'
+      ],
+      preTrenerov: 'Príprava je povinná pred skúškou, ale hráč ju môže kedykoľvek ukončiť a ísť na skúšku (kto skúšku ' +
+                   'už skúšal, má ju odomknutú aj bez prípravy). ' +
+                   'Pozície sú zo skutočných partií, z toho istého zdroja ako pozície skúšky, ale ' +
+                   'iné (60 pozícií s 1 až 4 riešeniami, náhodne sa vyberie 20). ' +
+                   'Čas: ako na skúške + 60 s na každú pozíciu. Príprava nedáva hviezdičky ani odznak, nezapisuje sa ' +
+                   'do štatistík tréningu a nemení ELO. Najlepší výsledok a počet pokusov uvidíš v menu Tréner → ' +
+                   'Prehľad hier.',
+      priprava: {
+        pocet: 20,
+        casNavyse: 60,           // sekúnd navyše oproti skúške na každú pozíciu
+        // 60 pozícií zo skutočných partií (Skills.pgn, rovnaký zdroj ako skúška), 1 až 4 riešenia,
+        // 6 až 24 figúrok, rovnaké rozdelenie počtu riešení ako skúška, mimo skúšky a kapitol
+        pozicie: [
+          '6k1/pp2rp2/6pp/3R1n2/8/3Q4/Pq4PP/5R1K w - - 0 1',
+          'r2r4/1p1R3p/2p1p1k1/b1B1Pp2/2P2P2/8/2P4P/2KR4 w - - 0 1',
+          '3r3k/p1p2rb1/3n2pp/2Bq4/1P1pN2P/3P2PB/P2Q1P1K/4R3 w - - 0 1',
+          '4br2/p1q1p1k1/4Q1p1/1pN2n2/1P1b4/8/P3B1PP/4BR1K b - - 0 1',
+          '7k/5prp/6q1/p2pP3/P2P3b/4B2Q/7P/5R1K b - - 0 1',
+          '8/2pp2pp/8/2PP1P2/1p5k/8/PP4p1/6K1 w - - 0 1',
+          '2R1r3/2Q1N1pk/5p2/7K/2P3PP/8/8/5q2 b - - 0 1',
+          '5Bk1/pr2pp1p/2b3pQ/2p1q3/8/P1P4P/1P4P1/1B1Rb1K1 w - - 0 1',
+          '1k6/2R3p1/1K6/R3p2P/8/8/6q1/8 w - - 0 1',
+          '2B1K1k1/4Q2n/7P/5P2/6r1/7q/5P2/8 w - - 0 1',
+          '1R6/8/P3b1p1/k7/8/7n/p5K1/8 w - - 0 1',
+          '8/4R3/1P6/5p2/1k2b2P/4P3/7r/K7 w - - 0 1',
+          '2k5/8/1PpK1p1p/8/1Pp1PP2/8/8/8 w - - 0 1',
+          '2k4b/2P5/8/6N1/8/P7/2K5/8 w - - 0 1',
+          'b2kN3/8/5P2/8/p7/p7/P3K3/8 w - - 0 1',
+          '6kq/4K1pp/p4p2/P3PP1R/6P1/8/8/8 w - - 0 1',
+          '8/7p/8/1Bk4b/2N5/K7/7N/8 w - - 0 1',
+          'rr3nk1/6q1/2p1pRP1/3pP1Qp/6p1/2P3P1/N6P/K1R5 w - - 0 1',
+          '5rk1/pp1rbp1p/5p2/5N1b/2P1p3/2BqQ1P1/PP3R1P/R3K3 b Q - 0 1',
+          'r4rk1/1p2QN1p/4nPp1/1n1p4/4q3/1P6/1NR3PP/2R4K b - - 0 1',
+          '2kr4/pp3ppp/8/4qb2/Q1Pn4/P3PB2/1P3PPP/R1K4R b - - 0 1',
+          'r4rk1/pp2ppbp/6p1/8/Qnq1P3/2N1BPP1/PP4KP/R4R2 b - - 0 1',
+          '3rr1k1/p4ppp/1p3q2/1P2n3/3Rn3/B3P3/B1Q2PPP/5RK1 b - - 0 1',
+          '5r2/4prkp/3q2p1/2pP1n2/N1Q2R2/1P4PP/P5K1/4R3 b - - 0 1',
+          '3q4/p2rRpkp/1p4p1/2p5/3p4/1P1P3P/P1P1QPP1/6K1 w - - 0 1',
+          'r4rk1/5ppp/p2pbb2/3B3Q/qp2p3/4B3/PPP2P1P/2KR2R1 w - - 0 1',
+          '2b1k3/p5p1/1p5p/2p1b3/5P2/2Pp2P1/PP4P1/4R1K1 b - - 0 1',
+          '1r2r3/5B1k/5Q2/7p/7P/8/7K/8 b - - 0 1',
+          '8/3r2p1/pp1Bp1p1/1kP5/1n2K3/6R1/1P3P2/8 w - - 0 1',
+          '2r1k2r/pp1b1ppp/8/2qpP3/6n1/2NB4/PP3PPP/1R1QR1K1 w k - 0 1',
+          '5r1k/pp1n1p1p/1b1qpP2/8/1PrN4/P1N1Q1P1/7P/3R1R1K w - - 0 1',
+          'k7/2K5/8/1b6/B3N3/8/8/6B1 w - - 0 1',
+          'b5r1/2P5/8/7K/2R5/4k3/6Pp/8 w - - 0 1',
+          '4b3/p3b3/PP5R/1N6/K1k5/8/8/8 w - - 0 1',
+          'k3K3/N7/1P6/4P3/3b4/8/8/8 w - - 0 1',
+          '8/6pR/3P4/4P3/8/4rp2/8/k2K4 w - - 0 1',
+          '8/8/6P1/3B2k1/8/2r3P1/8/K7 w - - 0 1',
+          'N7/1p1kqP2/8/3P4/KP6/4B3/8/8 w - - 0 1',
+          '8/8/1p1K4/Pp6/2k1p3/8/1P6/8 w - - 0 1',
+          'K7/8/4P3/6b1/P4n2/1k6/8/8 w - - 0 1',
+          '4k3/2n2p2/4pP2/P2nN2p/4qP2/8/Q5RP/2r3NK b - - 0 1',
+          '2b2rk1/p2q2pp/8/np4QN/8/PP4pP/6P1/2R3BK w - - 0 1',
+          '3knR2/4R3/2br2rp/2N5/1P1pp3/1B2P2P/7K/8 w - - 0 1',
+          '1k5r/pr4p1/QP3pq1/2p3n1/2P5/8/1B1PP3/R3K1R1 w Q - 0 1',
+          '3rkr2/pR2b1pp/2p1qn2/8/8/4B3/P1P1QPPP/4R1K1 w - - 0 1',
+          '1R1K4/k1n5/1p6/1P6/8/8/8/8 w - - 0 1',
+          'r3k3/1b2n2p/p2BBqr1/1pb2N2/8/7P/PP1R3K/4QR2 b q - 0 1',
+          '4rb2/1p1q1ppk/p1n1p2p/2p1Pn2/3PNR2/2P2K2/P2QBP2/6R1 w - - 0 1',
+          'r3n3/pp2q1pk/2p1BnRp/8/2p2P2/1P5P/PB4QK/8 w - - 0 1',
+          '6R1/1p3p2/1K3kNp/2p1p3/4P2P/2P5/2p5/8 w - - 0 1',
+          'q4N1k/1p3p2/6PK/6P1/2p5/p2R4/8/8 w - - 0 1',
+          'K5R1/7p/1B3PP1/1k6/8/8/6r1/7r w - - 0 1',
+          '1k3q2/3r1p2/Kb6/p7/2N1Q3/1P6/8/8 w - - 0 1',
+          '8/1p6/1Pp4B/K1P1qN2/P1k1p3/2p5/2P2P2/8 w - - 0 1',
+          '8/8/8/4N3/8/B1k2p1p/4Pp1P/2K5 w - - 0 1',
+          '6k1/2Qn3p/6r1/3p4/5N1q/5P1P/PP2r1P1/1R3NK1 b - - 0 1',
+          'r3r1k1/3RBpbp/p3p1p1/1pp1P3/2P5/5Q2/P1q2PPP/4R1K1 w - - 0 1',
+          '7R/1rk1bpp1/3p4/6P1/1p1qBQ2/p7/PPP5/1K6 w - - 0 1',
+          '1r1Rr1k1/p4pp1/1np5/2p1P1Q1/4B3/Pq4P1/1B2PP1P/6K1 w - - 0 1',
+          'R7/3p3p/8/3P2P1/3k4/1p5p/1P1NKP1P/7q w - - 0 1'
+        ]
+      }
     },
 
     // ── Kapitola 11 — záverečná skúška ─────────────────────────────────────
