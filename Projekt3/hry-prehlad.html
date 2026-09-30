@@ -139,7 +139,7 @@ tr.nezacal td.meno { color: #64748b; font-weight: normal; }
 <script src="js/hra-postup.js"></script>
 <script>
 // ZNAČKA VERZIE — pri každej úprave tohto súboru prepíš dátum.
-(window.VERZIE = window.VERZIE || {})['hry-prehlad.html'] = '2026-09-30';
+(window.VERZIE = window.VERZIE || {})['hry-prehlad.html'] = '2026-09-30b';
 
 // ─── Hry ─────────────────────────────────────────────────────────────────────
 // Každá hra má svoj obsah (kapitoly, názvy) v samostatnom súbore. Nová hra =
@@ -203,13 +203,14 @@ function aktualnaHra() {
   return HRY.find(h => h.kluc === k) || HRY[0];
 }
 
-// Kapitoly hry rozdelené na bežné, skúšku a bonus
+// Kapitoly hry rozdelené na bežné, prípravu na skúšku, skúšku a bonus
 function castiHry(hra) {
   const kap = hra.obsah.kapitoly;
   return {
-    bezne:  kap.filter(k => !k.skuska && !k.znacka),
-    skuska: kap.find(k => k.skuska) || null,
-    bonus:  kap.filter(k => k.znacka)
+    bezne:    kap.filter(k => !k.skuska && !k.znacka && !k.priprava),
+    priprava: kap.find(k => k.priprava) || null,
+    skuska:   kap.find(k => k.skuska) || null,
+    bonus:    kap.filter(k => k.znacka)
   };
 }
 
@@ -327,6 +328,7 @@ function render() {
   // Hlavička
   let h = '<tr><th class="vlavo">Hráč</th><th>Postup</th>';
   casti.bezne.forEach(k => { h += `<th title="${escapeHtml(k.nazov)}">${k.cislo}</th>`; });
+  if (casti.priprava) h += `<th title="${escapeHtml(casti.priprava.nazov)}">Príprava</th>`;
   if (casti.skuska) h += `<th title="${escapeHtml(casti.skuska.nazov)}">Skúška</th>`;
   casti.bonus.forEach(k => { h += `<th title="${escapeHtml(k.nazov)}">${escapeHtml(k.znacka)}</th>`; });
   h += '<th>Naposledy</th></tr>';
@@ -357,6 +359,17 @@ function render() {
     };
     casti.bezne.forEach(k => { b += bunka(k); });
 
+    // Príprava na skúšku: najlepší výsledok (pozície bez chyby) a počet pokusov
+    if (casti.priprava) {
+      const r = v.moje[casti.priprava.cislo], n = casti.priprava.priprava.pocet;
+      if (!r || !r.pokusy) b += '<td><span class="nic">—</span></td>';
+      else {
+        const tip = `Príprava: najlepšie ${r.najlepsie} z ${n} bez chyby, pokusov ${r.pokusy}, naposledy ${datum(r.naposledy)}`;
+        b += `<td title="${escapeHtml(tip)}"><span class="prog-txt"><b>${r.najlepsie} / ${n}</b></span>` +
+             `<span class="slabo">${r.pokusy}×</span></td>`;
+      }
+    }
+
     // Skúška: zložená (najlepší výsledok) alebo zatiaľ nezložená (najlepší pokus)
     if (casti.skuska) {
       const s = casti.skuska.skuska, r = v.sk;
@@ -381,6 +394,11 @@ function render() {
   // Legenda: čísla kapitol → názvy
   let l = `<b>${escapeHtml(hra.obsah.nazov)}</b> vysvetľuje zručnosť <b>${escapeHtml(hra.zrucnost)}</b>. ` +
           'Kapitoly: ' + casti.bezne.map(k => `<span class="kap"><b>${k.cislo}</b> ${escapeHtml(k.nazov)}</span>`).join('');
+  if (casti.priprava) {
+    const pr = casti.priprava.priprava;
+    l += `<br><b>Príprava</b>: ${pr.pocet} pozícií pred skúškou, na každú o ${pr.casNavyse} s viac ako na skúške ` +
+         '(najlepší výsledok bez chyby · počet pokusov). Skúška sa hráčovi odomkne po príprave — môže ju aj ukončiť skôr.';
+  }
   if (casti.skuska) {
     const s = casti.skuska.skuska;
     l += `<br><b>Skúška</b>: ${s.pocet} pozícií, na zloženie treba ${s.hranica} vyriešiť úplne a bez chyby ` +
