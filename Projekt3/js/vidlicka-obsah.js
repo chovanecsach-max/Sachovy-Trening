@@ -31,7 +31,7 @@
 //  Figúrky v textoch: K D V S J (slovensky), vo FEN anglicky (K Q R B N P).
 // ============================================================================
 
-(window.VERZIE = window.VERZIE || {})['vidlicka-obsah.js'] = '2026-09-29';
+(window.VERZIE = window.VERZIE || {})['vidlicka-obsah.js'] = '2026-09-30';
 
 const OBSAH_VIDLICKA = {
   kluc: 'vidlicka-na-trhu',
@@ -317,8 +317,8 @@ const OBSAH_VIDLICKA = {
           ocakavane: ['f5', 'h3'], vysvetlenie: 'Počíta sa jazdec f5 aj veža h3. Jazdca f5 kryje len strelec d7, a ten je ' +
                                                  'viazaný strelcom b5 na kráľa.' },
         { id: '8.4', typ: 'jeVidlicka', fen: '3qk3/8/5n2/6B1/8/2R5/8/4K3 b - - 0 1', tah: 'f6e4',
-          ocakavane: true, vysvetlenie: 'Jazdec napadne vežu c3 a nestráženého strelca g5. Že je jazdec viazaný na dámu ' +
-                                        'd8, zručnosť nevidí — v partii by biely zobral S×d8.' },
+          ocakavane: true, vysvetlenie: 'Jazdec napadne vežu c3 a nestráženého strelca g5. Že biely môže zobrať dámu ' +
+                                        'ťahom S×d8, nám nevadí — hľadáme vidličky, nie najlepší ťah.' },
         { id: '8.5', typ: 'precoNie', fen: '4r1k1/5ppp/1q6/8/5r2/4N3/5PPP/4K3 w - - 0 1', tah: 'e3d5',
           moznosti: ['dva_terce', 'cena', 'pole', 'vazba'],
           ocakavane: 'vazba', vysvetlenie: 'Jazdec e3 je viazaný vežou e8 na kráľa e1 a nesmie sa pohnúť.' }
