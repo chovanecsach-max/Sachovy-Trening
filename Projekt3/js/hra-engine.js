@@ -34,7 +34,7 @@
 //  Spustenie: HraEngine.spusti({ obsah, koren, rola, userId, testovaci, uloziste })
 // ============================================================================
 
-(window.VERZIE = window.VERZIE || {})['hra-engine.js'] = '2026-09-29c';
+(window.VERZIE = window.VERZIE || {})['hra-engine.js'] = '2026-09-30';
 
 const HraEngine = (function () {
   'use strict';
@@ -2431,9 +2431,10 @@ const HraEngine = (function () {
   //  Či je ťah priama hrozba, počíta VisionCore.rozoberHrozbu presne ako
   //  tréning Priame hrozby. Po odpovedi hra ukáže pozíciu po ťahu: hroziaca
   //  figúrka nazlato, zelená šípka od figúrky, ktorá by brala so ziskom,
-  //  k terču, pole matu nafialovo a červená šípka k tomu, čo by po ťahu
-  //  získal súper. V paneli sú tri podmienky s ✓ / ✗:
-  //  tichý ťah – hrozí zisk alebo mat – súper nič nezíska.
+  //  k terču, pole matu nafialovo, pole premeny s písmenom D a červená
+  //  šípka k tomu, čo by po ťahu získal súper. V paneli sú tri podmienky
+  //  s ✓ / ✗: tichý ťah – hrozí zisk alebo mat – súper nič nezíska.
+  //  Hrozba premeny (30. 9. 2026): premena so ziskom sa počíta ako zisk.
   // ════════════════════════════════════════════════════════════════════
   const PRECO_NIE_H = {
     ticha: 'Nie je to tichý ťah',
@@ -2442,7 +2443,8 @@ const HraEngine = (function () {
     vazba: 'Figúrka je viazaná'
   };
   const PRECO_Z_JADRA_H = {
-    branie: 'ticha', sach: 'ticha', nic_nehrozi: 'nic', super_ziska: 'super', super_mat: 'super', nelegalny: 'vazba'
+    branie: 'ticha', premena: 'ticha', sach: 'ticha', nic_nehrozi: 'nic', super_ziska: 'super', super_mat: 'super',
+    nelegalny: 'vazba'
   };
 
   // Všetky nesplnené podmienky (odpoveď v úlohe „Prečo nie?" platí, keď trafí
@@ -2454,9 +2456,9 @@ const HraEngine = (function () {
     if (r.hrozba) return [];
     if (!r.legalny) return ['vazba'];
     const out = [];
-    if (r.branie || r.sach) out.push('ticha');
-    if (!terceH(r).length && !r.mat.length) out.push('nic');
-    if (r.superCiele.length || r.superMat.length) out.push('super');
+    if (r.branie || r.premena || r.sach) out.push('ticha');
+    if (!terceH(r).length && !r.mat.length && !r.premeny.length) out.push('nic');
+    if (r.superCiele.length || r.superPremeny.length || r.superMat.length) out.push('super');
     return out;
   }
 
@@ -2560,7 +2562,11 @@ const HraEngine = (function () {
       const m = matujuca(r.poTahu, r.strana, p);
       if (m !== null) sipky.push({ z: m, na: p, typ: 'pocita' });
     });
-    if (!terceH(r).length && !r.mat.length) {
+    r.premeny.forEach(pr => {
+      if (!z[pr.na]) z[pr.na] = 'premena-pole';
+      sipky.push({ z: pr.z, na: pr.na, typ: 'pocita' });
+    });
+    if (!terceH(r).length && !r.mat.length && !r.premeny.length) {
       napadnuteBezZisku(r).forEach(x => { z[x.pole] = 'terc-nepocita'; sipky.push({ z: r.na, na: x.pole, typ: 'nepocita' }); });
     }
     if (r.sach) sachujuci(r).forEach(s => { z[s.na] = 'terc-nepocita'; sipky.push({ z: s.z, na: s.na, typ: 'nepocita' }); });
@@ -2572,6 +2578,10 @@ const HraEngine = (function () {
       z[p] = 'mat-pole hrozi';
       const m = matujuca(r.poTahu, superStranyH(r.strana), p);
       if (m !== null) sipky.push({ z: m, na: p, typ: 'hrozba' });
+    });
+    r.superPremeny.forEach(pr => {
+      z[pr.na] = 'premena-pole hrozi';
+      sipky.push({ z: pr.z, na: pr.na, typ: 'hrozba' });
     });
     // Súper môže hroziacu figúrku zobrať, ale nič nezíska (výmena alebo strata) — sivá šípka
     if (!r.superCiele.some(t => t.pole === r.na)) {
@@ -2592,6 +2602,53 @@ const HraEngine = (function () {
     if (t.mech === 'vazba') return ' Ťah zviazal obrancu na kráľa — viazaný strážnik nestráži.';
     if (t.mech === 'ine') return ' Rozhoduje celá výmena na tomto poli.';
     return '';
+  }
+
+  // Ako vznikla hrozba premeny (mech z jadra)
+  function textMechanizmuPremeny(pr) {
+    if (pr.mech === 'cesta') return ' Ťah uvoľnil pešiakovi pole premeny.';
+    if (pr.mech === 'podpora') return ' Túto podporu priniesol práve tento ťah.';
+    if (pr.mech === 'prerusenie') return ' Ťah sa postavil do cesty strážcovi poľa premeny.';
+    if (pr.mech === 'vazba') return ' Ťah zviazal strážcu poľa premeny na kráľa — viazaný strážnik nestráži.';
+    if (pr.mech === 'uvolnenie') return ' Pešiak bol viazaný na kráľa — ťah ho uvoľnil.';
+    if (pr.mech === 'ine') return ' Rozhoduje celá výmena na poli premeny.';
+    return '';
+  }
+
+  // Veta o premene: „Pešiak b7 by sa premenil na dámu na b8 so ziskom +8 — …"
+  function textPremeny(pr) {
+    return 'Pešiak ' + VC.sqName(pr.z) + ' by sa premenil na dámu na ' + VC.sqName(pr.na) + ' so ziskom ' + znak(pr.zisk) +
+           (pr.zisk >= 8 ? ' — súper novú dámu nemôže zobrať so ziskom.'
+                         : ' — súper novú dámu zoberie, ale ty berieš späť.');
+  }
+
+  // Rebrík výmeny pri premene: premena (+8), súper berie dámu, hráč berie späť…
+  function htmlRebrikaPremeny(nb, pr, strana) {
+    const opp = superStranyH(strana);
+    const b = nb.slice(); b[pr.na] = strana === 'w' ? 'Q' : 'q'; b[pr.z] = '';
+    let best = null;
+    VC.legalMoves(b, { active: opp, castling: '-', ep: '-' }).forEach(([z, na]) => {
+      if (na !== pr.na) return;
+      const g = VC.seeWithPins(b, z, na, opp);
+      if (!best || g > best.g) best = { z: z, g: g };
+    });
+    if (!best || best.g <= 0) return '';
+    const rb = VC.rebrikVymeny(b, VC.sqName(best.z) + VC.sqName(pr.na));
+    const bonus = 8;
+    let h = '<table class="rebrik vidl-rebrik"><thead><tr><th>Keby si sa premenil</th><th class="cislo">Pre teba</th></tr></thead><tbody>';
+    h += '<tr><td><span class="bodka ' + strana + '"></span>' + esc(VC.sqName(pr.z) + '–' + VC.sqName(pr.na) + 'D') +
+         ' <span class="slabo">— pešiak sa mení na dámu</span></td><td class="cislo ' + RV.triedaZnamienka(bonus) + '">' +
+         znak(bonus) + '</td></tr>';
+    rb.kroky.forEach(k => {
+      const ucet = bonus - k.ucet;
+      h += '<tr><td><span class="bodka ' + k.strana + '"></span>' + esc(k.tah) + ' <span class="slabo">— ' +
+           (k.strana === strana ? 'beriem ' : 'súper berie ') + esc(k.figurka) + '</span></td><td class="cislo ' +
+           RV.triedaZnamienka(ucet) + '">' + znak(ucet) + '</td></tr>';
+    });
+    const vysledok = bonus - rb.vysledok;
+    h += '<tr class="koniec"><td>' + esc(RV.textKonca(rb.koniec)) + '</td><td class="cislo ' + RV.triedaZnamienka(vysledok) +
+         '"><b>' + znak(vysledok) + '</b></td></tr></tbody></table>';
+    return h;
   }
 
   // Rebrík výmeny, keby hráč na terči naozaj bral (z jeho pohľadu)
@@ -2633,13 +2690,14 @@ const HraEngine = (function () {
     let t1;
     if (r.branie) t1 = 'Ťah berie ' + esc(menoNaPoli4(board[r.na], VC.sqName(r.na))) + '. Branie nie je hrozba — ' +
                        'patrí do zručnosti Branie so ziskom.';
+    else if (r.premena) t1 = 'Pešiak sa premení na dámu. Premena je zisk hneď, rovnako ako branie — nie tichý ťah.';
     else if (r.sach) {
       const s = sachujuci(r);
       const odkryty = s.length && !s.some(x => x.z === r.na);
       t1 = odkryty ? 'Ťah odkryje šach: ' + esc(menoNaPoli(nb, s[0].z)) + ' napadne kráľa. Aj odkrytý šach je šach, nie tichý ťah.'
                    : 'Ťah dáva šach. Šach nie je hrozba — šachy majú vlastnú zručnosť.';
     } else t1 = 'Ťah nič neberie a nedáva šach.';
-    li += riadok(r.branie || r.sach ? 'zle' : 'ok', 'Tichý ťah', t1);
+    li += riadok(r.branie || r.premena || r.sach ? 'zle' : 'ok', 'Tichý ťah', t1);
 
     // 2. Hrozí zisk alebo mat
     let t2 = r.mat.length ? 'Hrozí mat na ' + r.mat.map(VC.sqName).join(', ') + '.' : '';
@@ -2652,7 +2710,11 @@ const HraEngine = (function () {
             (bezObrany ? ' — nikto ' + rod(t.figurka, 'ho', 'ju') + ' nestráži.' : '.') + esc(textMechanizmu(t, kto, nb));
       if (i === 0 && !bezObrany) t2 += htmlRebrikaHrozby(nb, kto, t.pole, r.strana);
     });
-    if (!terce.length && !r.mat.length) {
+    r.premeny.forEach((pr, i) => {
+      t2 += (i || terce.length || r.mat.length ? '<br>' : '') + esc(textPremeny(pr)) + esc(textMechanizmuPremeny(pr));
+      if (i === 0 && pr.zisk < 8) t2 += htmlRebrikaPremeny(nb, pr, r.strana);
+    });
+    if (!terce.length && !r.mat.length && !r.premeny.length) {
       t2 = 'Keby si bol hneď znova na ťahu, nemal by si nič, čo sa oplatí zobrať.';
       napadnuteBezZisku(r).forEach(x => {
         t2 += ' ' + esc(velkePismeno(meno)) + ' napadne ' + esc(menoNaPoli4(x.figurka, VC.sqName(x.pole))) + ', ale branie by ' +
@@ -2660,7 +2722,7 @@ const HraEngine = (function () {
       });
       if (r.matStary.length) t2 += ' Mat na ' + r.matStary.map(VC.sqName).join(', ') + ' hrozil už pred ťahom — tento ťah ho nevytvoril.';
     }
-    li += riadok(terce.length || r.mat.length ? 'ok' : 'zle', 'Hrozí zisk alebo mat', t2);
+    li += riadok(terce.length || r.mat.length || r.premeny.length ? 'ok' : 'zle', 'Hrozí zisk alebo mat', t2);
 
     // 3. Súper nič nezíska
     let t3 = '';
@@ -2669,6 +2731,10 @@ const HraEngine = (function () {
             (t.pole === r.na ? ' — hroziaca figúrka stojí na zlom poli.' : ' — pred ťahom to nešlo, tento ťah ' +
              rod(t.figurka, 'ho', 'ju') + ' odkryl.');
     });
+    r.superPremeny.forEach(pr => {
+      t3 += (t3 ? '<br>' : '') + 'Súperov pešiak ' + VC.sqName(pr.z) + ' by sa premenil na dámu na ' + VC.sqName(pr.na) +
+            ' so ziskom ' + znak(pr.zisk) + ' — pred ťahom to nešlo, tento ťah mu to dovolil.';
+    });
     if (r.superMat.length) t3 += (t3 ? '<br>' : '') + 'Súper by dal mat na ' + r.superMat.map(VC.sqName).join(', ') + '.';
     if (!t3) {
       const v = ziskSuperaNaPohnutej(r);
@@ -2676,14 +2742,14 @@ const HraEngine = (function () {
          : (v < 0 ? 'Súper by ' + rod(kus, 'ho', 'ju') + ' mohol zobrať, ale stratil by ' + minceAku(-v) + '.'
                   : 'Súper ' + rod(kus, 'ho', 'ju') + ' môže len vymeniť — výmena nie je zisk, hrozba platí.');
     }
-    li += riadok(r.superCiele.length || r.superMat.length ? 'zle' : 'ok', 'Súper nič nezíska',
+    li += riadok(r.superCiele.length || r.superPremeny.length || r.superMat.length ? 'zle' : 'ok', 'Súper nič nezíska',
                  esc(velkePismeno(meno)) + ' na ' + VC.sqName(r.na) + ': ' + t3);
 
     h += '<ul class="vidl-podmienky">' + li + '</ul>';
     if (r.hrozba) h += '<div class="straz-veta">V tréningu uvidíš: „' + esc(r.vysvetlenie) + '“</div>';
     h += '<div class="vidl-legenda"><span><i class="lg vidlickar"></i>' + (r.hrozba ? 'hroziaca figúrka' : 'figúrka, ktorá ťahala') + '</span>' +
-         (terce.length ? '<span><i class="lc pocita"></i>čo hrozí</span>' : '') +
-         (r.superCiele.length ? '<span><i class="lc hrozba"></i>čo získa súper</span>' : '') + '</div>' +
+         (terce.length || r.premeny.length ? '<span><i class="lc pocita"></i>čo hrozí</span>' : '') +
+         (r.superCiele.length || r.superPremeny.length ? '<span><i class="lc hrozba"></i>čo získa súper</span>' : '') + '</div>' +
          '<button class="secondary male vidl-prepni" data-akcia="hrozPrepni">' +
          (pred ? 'Ukáž pozíciu po ťahu' : 'Ukáž pozíciu pred ťahom') + '</button></div>';
     return h;
@@ -2995,18 +3061,18 @@ const HraEngine = (function () {
 
   // ── Rozbor chýb v skúške Hrozby na trhu — ktorú kapitolu zopakovať ───
   //  1 Čo je hrozba · 2 Len tichý ťah · 3 Hrozba musí stáť za to · 4 Súper nič nezíska
-  //  5 Hrozí iná figúrka · 6 Pokazená obrana · 7 Hrozba matu · 8 Každá figúrka, obe strany
+  //  5 Hrozí iná figúrka · 6 Pokazená obrana · 7 Hrozba matu a premeny · 8 Každá figúrka, obe strany
   function dovodOmyluHrozby(r) {
     if (!r.legalny) return 6;                        // ťah viazanou figúrkou
     const d = PRECO_Z_JADRA_H[r.dovod];
-    if (d === 'ticha') return 2;
+    if (d === 'ticha') return 2;                     // branie, šach alebo premena
     if (d === 'super') return 4;
     return 3;                                        // nič nehrozí (krytý terč, výmena)
   }
 
   function dovodPrehliadnutejHrozby(r, naTahu) {
     if (!r) return 1;
-    if (!r.terce.length && r.mat.length) return 7;
+    if (!r.terce.length && (r.mat.length || r.premeny.length)) return 7;   // hrozba matu alebo premeny
     const mech = r.terce.map(t => t.mech);
     if (mech.length && !mech.includes('priamy')) {
       return mech.some(m => m === 'prerusenie' || m === 'vazba' || m === 'uvolnenie') ? 6 : 5;
@@ -3158,6 +3224,8 @@ const HraEngine = (function () {
     _dovodOmyluVidlicky: dovodOmyluVidlicky,
     _dovodPrehliadnutejVidlicky: dovodPrehliadnutejVidlicky,
     _vazbaRozhoduje: vazbaRozhoduje,
+    _dovodOmyluHrozby: dovodOmyluHrozby,
+    _dovodPrehliadnutejHrozby: dovodPrehliadnutejHrozby,
     _stav: () => stav
   };
 })();
