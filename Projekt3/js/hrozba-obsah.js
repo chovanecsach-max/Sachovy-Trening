@@ -36,7 +36,7 @@
 //  Figúrky v textoch: K D V S J (slovensky), vo FEN anglicky (K Q R B N P).
 // ============================================================================
 
-(window.VERZIE = window.VERZIE || {})['hrozba-obsah.js'] = '2026-09-30';
+(window.VERZIE = window.VERZIE || {})['hrozba-obsah.js'] = '2026-09-30b';
 
 const OBSAH_HROZBA = {
   kluc: 'hrozba-na-trhu',
@@ -46,7 +46,8 @@ const OBSAH_HROZBA = {
   podtitul: 'Hra, ktorá vysvetľuje zručnosť Priame hrozby',
   sprievodca: 'Grošík',
   pozdrav: 'Ahoj, to som zase ja, Grošík! Na trhu sa objavil opatrný zlodej. Nekradne hneď — najprv sa postaví ' +
-           'tak, aby mohol ukradnúť nabudúce. Naučím ťa, kedy je taký ťah priama hrozba. Vyber si kapitolu.',
+           'tak, aby mohol ukradnúť nabudúce. Naučím ťa, ako sa počíta priama hrozba v tejto hre ' +
+           'a v zručnostiach. Vyber si kapitolu.',
 
   // Texty, ktoré sa líšia od Šachového trhu
   texty: {
