@@ -34,7 +34,7 @@
 //  Spustenie: HraEngine.spusti({ obsah, koren, rola, userId, testovaci, uloziste })
 // ============================================================================
 
-(window.VERZIE = window.VERZIE || {})['hra-engine.js'] = '2026-09-30b';
+(window.VERZIE = window.VERZIE || {})['hra-engine.js'] = '2026-09-30c';
 
 const HraEngine = (function () {
   'use strict';
@@ -1955,6 +1955,20 @@ const HraEngine = (function () {
     kresliSipky(sipky);
   }
 
+  // Má súper legálne branie vidličkára? (kráľ nesmie brať krytú figúrku)
+  function superMozeBratVidlickara(r) {
+    const opp = r.strana === 'w' ? 'b' : 'w', st = { active: opp, castling: '-', ep: '-' };
+    for (let i = 0; i < 64; i++) {
+      const p = r.poTahu[i];
+      if (p && VC.pieceColor(p) === opp && VC.isLegal(r.poTahu, st, i, r.na, '')) return true;
+    }
+    return false;
+  }
+  function lenKralNapada(r) {
+    const u = utocniciNa(r.poTahu, r.na, r.strana === 'w' ? 'b' : 'w');
+    return u.length > 0 && u.every(i => jeKral(r.poTahu[i]));
+  }
+
   // Výmena na poli vidličkára z pohľadu hráča (kto vidličkuje)
   function htmlVymenyVidlickara(r) {
     const superStrana = r.strana === 'w' ? 'b' : 'w';
@@ -2025,9 +2039,14 @@ const HraEngine = (function () {
 
     // 3. Bezpečné pole
     const zs = r.ziskSupera;
+    // Jadro (rovnako ako generátor) započíta do výmeny aj kráľa, ktorý by bral krytú
+    // figúrku. Taký ťah je nelegálny — hráčovi povieme, že súper vidličkára zobrať nemôže.
+    const nemozeBrat = zs !== null && !superMozeBratVidlickara(r);
     // Figúrka, ktorú vidličkár zobral samotným ťahom (do výmeny na jeho poli sa nepočíta)
     const zobral = board[r.na] || null;
     const t3 = zs === null ? 'Súper nemá čím ' + rod(kus, 'ho', 'ju') + ' zobrať.'
+             : nemozeBrat ? 'Súper ' + rod(kus, 'ho', 'ju') + ' zobrať nemôže' +
+                            (lenKralNapada(r) ? ' — kráľ nesmie brať krytú figúrku.' : '.')
              : (zs < 0 ? 'Súper by ' + rod(kus, 'ho', 'ju') + ' mohol zobrať, ale stratil by ' + minceAku(-zs) + '.'
              : (zs === 0 ? 'Súper ' + rod(kus, 'ho', 'ju') + ' zoberie a nastane výmena — ' +
                            (zobral ? 'potom už nič ďalšie nestratí.' : 'nič nestratí.')
@@ -2037,7 +2056,7 @@ const HraEngine = (function () {
                    ' už samotným ťahom. To je branie, nie vidlička.'
                  : '');
     li += riadok(r.bezpecne ? 'ok' : 'zle', 'Bezpečné pole', esc(velkePismeno(meno)) + ' na ' + VC.sqName(r.na) + ': ' + t3 +
-                 (zs !== null ? htmlVymenyVidlickara(r) : ''));
+                 (zs !== null && !nemozeBrat ? htmlVymenyVidlickara(r) : ''));
 
     // 4. Šach
     if (r.kral) {
