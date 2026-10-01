@@ -510,19 +510,19 @@ body {
 
   <!-- Podmenu hier — hry, ktoré vysvetľujú zručnosti (pred tréningom v Zručnostiach) -->
   <div id="hrySubmenu" class="submenu submenu-hry">
-    <button class="sub-btn" onclick="goHra('sachovy-trh')">
+    <button class="sub-btn" data-hra="sachovy-trh" onclick="goHra('sachovy-trh')">
       <div class="sub-icon i-hry">💰</div>Šachový trh
       <span class="sub-pozn">vysvetľuje Branie so ziskom</span>
     </button>
-    <button class="sub-btn" id="hraStrazBtn" onclick="goHra('straz-na-trhu')">
+    <button class="sub-btn" id="hraStrazBtn" data-hra="straz-na-trhu" onclick="goHra('straz-na-trhu')">
       <div class="sub-icon i-hry">🛡️</div>Stráž na trhu
       <span class="sub-pozn" id="hraStrazPozn">vysvetľuje Slabo pokryté figúrky</span>
     </button>
-    <button class="sub-btn" id="hraVidlickaBtn" onclick="goHra('vidlicka-na-trhu')">
+    <button class="sub-btn" id="hraVidlickaBtn" data-hra="vidlicka-na-trhu" onclick="goHra('vidlicka-na-trhu')">
       <div class="sub-icon i-hry">🍴</div>Vidlička na trhu
       <span class="sub-pozn" id="hraVidlickaPozn">vysvetľuje Vidličky</span>
     </button>
-    <button class="sub-btn" id="hraHrozbaBtn" onclick="goHra('hrozba-na-trhu')">
+    <button class="sub-btn" id="hraHrozbaBtn" data-hra="hrozba-na-trhu" onclick="goHra('hrozba-na-trhu')">
       <div class="sub-icon i-hry">🎯</div>Hrozba na trhu
       <span class="sub-pozn" id="hraHrozbaPozn">vysvetľuje Priame hrozby</span>
     </button>
@@ -560,7 +560,7 @@ body {
 <script src="js/hra-postup.js"></script>
 <script>
 // ZNAČKA VERZIE — pri každej úprave tohto súboru prepíš dátum.
-(window.VERZIE = window.VERZIE || {})['index.html'] = '2026-09-30';
+(window.VERZIE = window.VERZIE || {})['index.html'] = '2026-10-01';
 
 // Hlavné menu: všetky tlačidlá v jednom rade; keď ich je viac než 9, v dvoch
 // rovnakých radoch. Tlačidlá sa zobrazujú postupne (Zadania, Súťaže, Hry sa
@@ -596,9 +596,13 @@ async function initPage() {
   if (role === 'hrac') {
     document.getElementById('asgBtn').style.display = 'flex';
   }
-  // Hry — kým sa pripravujú, vidí ich len admin (nastavenie 'hry', pozri hra-postup.js)
-  HraPostup.pristup(role).then(ok => {
+  // Hry — každú hru vidí ten, komu je otvorená (nastavenia 'hry:<hra>' a 'hry',
+  // pozri hra-postup.js). Menu Hry sa ukáže, keď je otvorená aspoň jedna hra.
+  HraPostup.pristup(role).then(async ok => {
     if (!ok) return;
+    for (const b of document.querySelectorAll('#hrySubmenu [data-hra]')) {
+      if (!await HraPostup.pristupKHre(b.dataset.hra, role)) b.style.display = 'none';
+    }
     document.getElementById('btnHry').style.display = 'flex';
     if (role === 'trener' || role === 'hlavny_trener' || role === 'admin') {
       document.getElementById('hryPrehladSubBtn').style.display = 'flex';
