@@ -139,7 +139,7 @@ tr.nezacal td.meno { color: #64748b; font-weight: normal; }
 <script src="js/hra-postup.js"></script>
 <script>
 // ZNAČKA VERZIE — pri každej úprave tohto súboru prepíš dátum.
-(window.VERZIE = window.VERZIE || {})['hry-prehlad.html'] = '2026-09-30b';
+(window.VERZIE = window.VERZIE || {})['hry-prehlad.html'] = '2026-10-01';
 
 // ─── Hry ─────────────────────────────────────────────────────────────────────
 // Každá hra má svoj obsah (kapitoly, názvy) v samostatnom súbore. Nová hra =
@@ -426,7 +426,7 @@ async function init() {
     goHome();
     return;
   }
-  if (!await HraPostup.vyzadujPristup()) return;   // kým sa hry pripravujú, len admin
+  if (!await HraPostup.vyzadujPristup()) return;   // aspoň jedna hra musí byť otvorená
 
   const b = document.getElementById('roleBanner');
   if (IS_TRENER) {
@@ -440,6 +440,13 @@ async function init() {
     b.className = 'role-banner admin';
   }
   b.style.display = '';
+
+  // Vo výbere sú len hry, ktoré tréner vidí (admin všetky). Ostatné sa pripravujú.
+  const dostupne = [];
+  for (const h of HRY) {
+    if (await HraPostup.pristupKHre(h.kluc)) dostupne.push(h);
+  }
+  HRY.splice(0, HRY.length, ...dostupne);
 
   const fHra = document.getElementById('fHra');
   HRY.forEach(h => {
