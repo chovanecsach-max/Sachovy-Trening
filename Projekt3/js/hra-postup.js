@@ -22,17 +22,21 @@
 //  sa pre výpadok siete neodoslal), zostal v prehliadači. Pri načítaní sa
 //  porovná s databázou a čo je v prehliadači lepšie, pošle sa hore.
 //
-//  PRÍSTUP K HRÁM: kým sa hry pripravujú, vidí ich len admin. Kto ich vidí,
-//  určuje riadok 'hry' v tabuľke nastavenia (rovnako ako režim údržby):
-//      'admin'    — len admin (platí aj vtedy, keď riadok chýba)
+//  PRÍSTUP K HRÁM: kto hru vidí, určuje tabuľka nastavenia (rovnako ako režim
+//  údržby). Každá hra môže mať vlastný riadok 'hry:<kľúč hry>', napr.
+//  'hry:sachovy-trh'. Hra bez vlastného riadku sa riadi spoločným riadkom 'hry'
+//  a keď chýba aj ten, vidí ju len admin. Hodnoty:
+//      'admin'    — len admin
 //      'personal' — admin, hlavný tréner a tréneri (na vyskúšanie pred spustením)
 //      'vsetci'   — všetci vrátane hráčov
-//  Zmena v SQL editore (netreba nič nahrávať na GitHub):
-//      insert into nastavenia (kluc, hodnota) values ('hry', 'vsetci')
+//  Zmena v SQL editore (netreba nič nahrávať na GitHub), pozri hry-pristup.sql:
+//      insert into nastavenia (kluc, hodnota) values ('hry:sachovy-trh', 'vsetci')
 //      on conflict (kluc) do update set hodnota = excluded.hodnota, zmenene = now();
-//  Okrem toho vidia hry vybraní TESTERI (tabuľka hry_testeri, pozri hry-testeri.sql).
-//  Vyberá ich admin v admin paneli políčkom „Testuje hry“. Tester ostáva hráčom:
-//  hry sa mu odomykajú postupne ako ostatným hráčom.
+//  Okrem toho vidia všetky hry vybraní TESTERI (tabuľka hry_testeri, pozri
+//  hry-testeri.sql). Vyberá ich admin v admin paneli políčkom „Testuje hry“.
+//  Tester ostáva hráčom: hry sa mu odomykajú postupne ako ostatným hráčom.
+//  Menu Hry na úvodnej stránke sa ukáže, keď používateľ vidí aspoň jednu hru,
+//  a sú v ňom len hry, ktoré vidí.
 //
 //  ODOMYKANIE HIER: hra s `odomknePo` (zoznam HRY nižšie) sa hráčovi odomkne,
 //  až keď zloží záverečnú skúšku inej hry. Stráž na trhu sa odomkne po skúške
@@ -42,7 +46,7 @@
 //  Potrebuje: js/player.js (sbFetch) — pre úložisko databaza a pre prístup.
 // ============================================================================
 
-(window.VERZIE = window.VERZIE || {})['hra-postup.js'] = '2026-09-30';
+(window.VERZIE = window.VERZIE || {})['hra-postup.js'] = '2026-10-01';
 
 const HraPostup = (function () {
   'use strict';
@@ -51,9 +55,11 @@ const HraPostup = (function () {
   //  kluc → názov, číslo kapitoly záverečnej skúšky a verzia číslovania kapitol
   //  (musia sa zhodovať s obsahom hry: trh-obsah.js, straz-obsah.js, vidlicka-obsah.js,
   //  hrozba-obsah.js).
+  //  pomocne = ďalšie stránky, ktoré k hre patria a otvoria sa, keď je otvorená hra.
   //  POZOR: keď sa v niektorej hre prečíslujú kapitoly, uprav aj tento zoznam.
   const HRY = {
-    'sachovy-trh':   { nazov: 'Šachový trh',   stranka: 'sachovy-trh.html',   skuska: 11, verzia: 2 },
+    'sachovy-trh':   { nazov: 'Šachový trh',   stranka: 'sachovy-trh.html',   skuska: 11, verzia: 2,
+                       pomocne: ['laboratorium.html'] },
     'straz-na-trhu': { nazov: 'Stráž na trhu', stranka: 'straz-na-trhu.html', skuska: 9,  verzia: 1,
                        odomknePo: 'sachovy-trh' },
     'vidlicka-na-trhu': { nazov: 'Vidlička na trhu', stranka: 'vidlicka-na-trhu.html', skuska: 10, verzia: 1,
@@ -183,7 +189,7 @@ const HraPostup = (function () {
 
   // ── Prístup k hrám ──────────────────────────────────────────────────────
   const PERSONAL = ['admin', 'hlavny_trener', 'trener'];
-  let _pristupCache = null;
+  let _nastaveniaHier = null;
   let _testerCache = null;
 
   // Je prihlásený používateľ medzi vybranými testermi hier? Databáza mu povie
@@ -202,34 +208,75 @@ const HraPostup = (function () {
     return _testerCache;
   }
 
-  // Smie prihlásený používateľ hry vidieť? Admin vždy, vybraní testeri tiež.
-  async function pristup(rola) {
-    rola = rola || sessionStorage.getItem('user_role') || '';
-    if (rola === 'admin') return true;
-    if (_pristupCache === null) {
+  // Riadky nastavení hier: { 'hry': 'admin', 'hry:sachovy-trh': 'vsetci', ... }
+  // Načítajú sa raz za otvorenie stránky.
+  async function nastaveniaHier() {
+    if (_nastaveniaHier === null) {
       try {
-        const rows = await sbFetch('nastavenia?kluc=eq.hry&select=hodnota&limit=1');
-        _pristupCache = (rows && rows[0] && rows[0].hodnota) || 'admin';
+        const rows = await sbFetch('nastavenia?kluc=like.hry*&select=kluc,hodnota') || [];
+        const n = {};
+        rows.forEach(r => { n[r.kluc] = r.hodnota; });
+        _nastaveniaHier = n;
       } catch (e) {
-        _pristupCache = 'admin';      // pri chybe radšej zatvorené
+        _nastaveniaHier = {};         // pri chybe radšej zatvorené (vidí len admin)
       }
     }
-    if (_pristupCache === 'vsetci') return true;
-    if (_pristupCache === 'personal' && PERSONAL.includes(rola)) return true;
+    return _nastaveniaHier;
+  }
+
+  // Komu je hra otvorená: 'admin' | 'personal' | 'vsetci'
+  async function urovenHry(hra) {
+    const n = await nastaveniaHier();
+    return n['hry:' + hra] || n['hry'] || 'admin';
+  }
+
+  // Smie prihlásený používateľ túto hru vidieť? Admin vždy, vybraní testeri tiež.
+  async function pristupKHre(hra, rola) {
+    rola = rola || sessionStorage.getItem('user_role') || '';
+    if (rola === 'admin') return true;
+    const u = await urovenHry(hra);
+    if (u === 'vsetci') return true;
+    if (u === 'personal' && PERSONAL.includes(rola)) return true;
     return jeTester();
   }
 
-  // Na stránke hry: ak hry ešte nie sú sprístupnené, ukáže oznam a vráti false
-  async function vyzadujPristup() {
-    if (await pristup()) return true;
+  // Vidí prihlásený používateľ aspoň jednu hru? (menu Hry, Prehľad hier)
+  async function pristup(rola) {
+    for (const k of Object.keys(HRY)) {
+      if (await pristupKHre(k, rola)) return true;
+    }
+    return false;
+  }
+
+  // Ktorej hry je otvorená stránka? Stránka hry alebo jej pomocná stránka
+  // (Laboratórium výmeny patrí k Šachovému trhu). Iná stránka → null.
+  function hraStranky() {
+    const bez = x => String(x || '').toLowerCase().replace(/\.html$/, '');
+    const subor = bez(decodeURIComponent(location.pathname.split('/').pop() || ''));
+    for (const k of Object.keys(HRY)) {
+      const h = HRY[k];
+      if (bez(h.stranka) === subor || (h.pomocne || []).some(p => bez(p) === subor)) return k;
+    }
+    return null;
+  }
+
+  // Na stránke hry: ak hra ešte nie je sprístupnená, ukáže oznam a vráti false.
+  // Bez kľúča hry sa hra určí podľa stránky; na inej stránke (Prehľad hier)
+  // stačí, keď používateľ vidí aspoň jednu hru.
+  async function vyzadujPristup(hra) {
+    hra = (hra && HRY[hra]) ? hra : hraStranky();
+    if (hra ? await pristupKHre(hra) : await pristup()) return true;
+    const h = hra ? HRY[hra] : null;
     document.body.innerHTML =
       '<div style="max-width:520px;margin:60px auto;padding:26px;background:#fff;' +
       'border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,.08);' +
       'font-family:Arial,sans-serif;text-align:center;color:#111827;">' +
       '<div style="font-size:40px;margin-bottom:10px;">🎲</div>' +
-      '<h2 style="margin:0 0 10px;color:#b45309;">Hry sa pripravujú</h2>' +
+      '<h2 style="margin:0 0 10px;color:#b45309;">' +
+      (h ? h.nazov + ' sa pripravuje' : 'Hry sa pripravujú') + '</h2>' +
       '<p style="color:#475569;font-size:15px;line-height:1.5;">' +
-      'Na hrách ešte pracujeme. Čoskoro ich nájdeš v menu Hry.</p>' +
+      (h ? 'Na tejto hre ešte pracujeme. Čoskoro ju nájdeš v menu Hry.'
+         : 'Na hrách ešte pracujeme. Čoskoro ich nájdeš v menu Hry.') + '</p>' +
       '<button onclick="location.href=\'index.html\'" style="margin-top:14px;padding:11px 20px;' +
       'border:none;border-radius:10px;background:#1e3a5f;color:#fff;font-size:14px;' +
       'font-weight:bold;cursor:pointer;">Späť na úvod</button></div>';
@@ -292,6 +339,7 @@ const HraPostup = (function () {
     databaza: databaza,
     klucLokalne: klucLokalne,
     pristup: pristup,
+    pristupKHre: pristupKHre,
     jeTester: jeTester,
     vyzadujPristup: vyzadujPristup,
     zlozilSkusku: zlozilSkusku,
