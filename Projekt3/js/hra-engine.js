@@ -34,7 +34,7 @@
 //  Spustenie: HraEngine.spusti({ obsah, koren, rola, userId, testovaci, uloziste })
 // ============================================================================
 
-(window.VERZIE = window.VERZIE || {})['hra-engine.js'] = '2026-09-30c';
+(window.VERZIE = window.VERZIE || {})['hra-engine.js'] = '2026-10-02';
 
 const HraEngine = (function () {
   'use strict';
@@ -579,6 +579,7 @@ const HraEngine = (function () {
       spravnych: 0,
       chyb: 0,
       bonusy: 0,
+      bonusySerie: 0,       // bonusy za sériu — idú nad maximum kapitoly
       max: ulohy.reduce((s, u) => s + maxBodovUlohy(u), 0)
     };
     ukazUlohu();
@@ -598,6 +599,7 @@ const HraEngine = (function () {
     if (stav.seria >= DLZKA_SERIE) {
       pripocitaj(BONUS_SERIA);
       stav.bonusy += BONUS_SERIA;
+      stav.bonusySerie += BONUS_SERIA;
       stav.seria = 0;
       bonus = ' <b>Séria ' + DLZKA_SERIE + ' správnych: bonus +' + BONUS_SERIA + '!</b>';
     }
@@ -3194,8 +3196,9 @@ const HraEngine = (function () {
       '<div><span class="koniec-hodnota">' + stav.skore + '</span><span class="koniec-popis">bodov</span></div>' +
       '<div><span class="koniec-hodnota plus">' + stav.spravnych + '</span><span class="koniec-popis">správne</span></div>' +
       '<div><span class="koniec-hodnota minus">' + stav.chyb + '</span><span class="koniec-popis">chyby</span></div></div>' +
+      // Maximum už obsahuje bonusy za úlohy Nájdi všetky bez chyby; navyše je len séria
       '<div class="koniec-pozn">Za odpovede sa dalo získať ' + stav.max + ' bodov' +
-      (stav.bonusy ? ', bonusy ti pridali ďalších ' + stav.bonusy : '') + '.</div>' +
+      (stav.bonusySerie ? ', za sériu správnych odpovedí si dostal ďalších ' + stav.bonusySerie : '') + '.</div>' +
       '<div class="zapamataj"><div class="zapamataj-nadpis">Zapamätaj si</div>' + esc(k.zapamataj) +
       '<div class="zapamataj-pozn">Pravidlo je teraz v tvojom zošite.</div></div>' +
       '<div class="koniec-tlacidla">' +
