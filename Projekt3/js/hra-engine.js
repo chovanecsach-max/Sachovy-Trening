@@ -34,7 +34,7 @@
 //  Spustenie: HraEngine.spusti({ obsah, koren, rola, userId, testovaci, uloziste })
 // ============================================================================
 
-(window.VERZIE = window.VERZIE || {})['hra-engine.js'] = '2026-10-02c';
+(window.VERZIE = window.VERZIE || {})['hra-engine.js'] = '2026-10-02d';
 
 const HraEngine = (function () {
   'use strict';
@@ -93,6 +93,12 @@ const HraEngine = (function () {
       cestaObrazkov: moznosti.cestaObrazkov || 'img/Pieces/'
     };
     uloziste = moznosti.uloziste || lokalneUloziste();
+    // Pravé tlačidlo myši neotvorí ponuku prehliadača — pri hre sa naň ľahko
+    // klikne omylom (rovnako ako na úvodnej stránke)
+    if (!spusti.bezPonuky) {
+      document.addEventListener('contextmenu', e => e.preventDefault());
+      spusti.bezPonuky = true;
+    }
     skontrolujObsah();
     koren.innerHTML = '<div class="nacitavam-postup" style="text-align:center;padding:40px 10px;color:#64748b;">' +
                       'Načítavam tvoj postup…</div>';
