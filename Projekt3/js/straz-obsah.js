@@ -32,7 +32,7 @@
 //  Figúrky v textoch: K D V S J (slovensky), vo FEN anglicky (K Q R B N P).
 // ============================================================================
 
-(window.VERZIE = window.VERZIE || {})['straz-obsah.js'] = '2026-09-30';
+(window.VERZIE = window.VERZIE || {})['straz-obsah.js'] = '2026-10-02';
 
 const OBSAH_STRAZ = {
   kluc: 'straz-na-trhu',
@@ -78,8 +78,8 @@ const OBSAH_STRAZ = {
       ulohy: [
         { id: '1.1', typ: 'pocet', fen: '3r2k1/8/4p3/3N4/4P3/8/8/3R2K1 w - - 0 1', pole: 'd5', co: 'utocnici',
           ocakavane: 2, vysvetlenie: 'Zlodeji sú pešiak e6 a veža d8.' },
-        { id: '1.2', typ: 'pocet', fen: '3r2k1/8/4p3/3N4/4P3/8/8/3R2K1 w - - 0 1', pole: 'd5', co: 'obrancovia',
-          ocakavane: 2, vysvetlenie: 'Strážnici sú pešiak e4 a veža d1.' },
+        { id: '1.2', typ: 'pocet', fen: '6k1/8/5p2/4B3/3P4/5N2/8/4R1K1 w - - 0 1', pole: 'e5', co: 'obrancovia',
+          ocakavane: 3, vysvetlenie: 'Strážnici sú pešiak d4, jazdec f3 a veža e1.' },
         { id: '1.3', typ: 'pocet', fen: '6k1/8/8/2b5/8/8/5P2/6K1 w - - 0 1', pole: 'f2', co: 'obrancovia',
           ocakavane: 1, vysvetlenie: 'Pešiaka stráži kráľ g1 — stojí hneď vedľa.' },
         { id: '1.4', typ: 'pocet', fen: '6k1/8/8/4p3/2N5/5N2/8/6K1 w - - 0 1', pole: 'e5', co: 'utocnici',
