@@ -34,7 +34,7 @@
 //  Spustenie: HraEngine.spusti({ obsah, koren, rola, userId, testovaci, uloziste })
 // ============================================================================
 
-(window.VERZIE = window.VERZIE || {})['hra-engine.js'] = '2026-10-02d';
+(window.VERZIE = window.VERZIE || {})['hra-engine.js'] = '2026-10-02e';
 
 const HraEngine = (function () {
   'use strict';
@@ -375,6 +375,21 @@ const HraEngine = (function () {
     return n + ' mincí';
   }
 
+  function bodov(n) {
+    const a = Math.abs(n);
+    if (a === 1) return n + ' bod';
+    if (a >= 2 && a <= 4) return n + ' body';
+    return n + ' bodov';
+  }
+
+  // Výsledok obchodu v minciach: „Zisk 2 mince“, „Strata 8 mincí“. Mince patria
+  // k cenám figúrok a obchodom, body k skóre hráča — aby sa nepomiešali.
+  function textObchodu(zisk) {
+    if (zisk > 0) return 'Zisk ' + mince(zisk);
+    if (zisk < 0) return 'Strata ' + mince(-zisk);
+    return 'Výmena — zisk 0 mincí';
+  }
+
   function formatCas(s) {
     s = Math.max(0, Math.ceil(s));
     return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
@@ -636,7 +651,7 @@ const HraEngine = (function () {
            (u && u.limit ? '<span class="cas" id="hraCas">⏱ ' + formatCas(u.limit) + '</span>'
                          : '<span class="seria" title="Séria správnych odpovedí — každých ' + DLZKA_SERIE +
                            ' = bonus">' + seria + '</span>') +
-           '<span class="skore"><span class="minca mala"></span> <span id="hraSkore">' + stav.skore + '</span> b.</span>' +
+           '<span class="skore" id="hraSkore">' + bodov(stav.skore) + '</span>' +
            (k.priprava ? '<button class="secondary male" id="hraUkoncit">Ukončiť tréning</button>' : '');
   }
 
@@ -1019,11 +1034,11 @@ const HraEngine = (function () {
     if (dobre) {
       const bonus = zapisSpravne();
       grosikHovori('nadseny', pochvala() + ' ' + esc(u.vysvetlenie) + veta + bonus);
-      ukazPokracovanie(true, '+' + BODY_SPRAVNE + ' bodov · ' + RV.textVerdiktu(zisk));
+      ukazPokracovanie(true, '+' + BODY_SPRAVNE + ' bodov · ' + textObchodu(zisk));
     } else {
       zapisChybu();
       grosikHovori('smutny', textChyby + ' ' + esc(u.vysvetlenie) + ' Pozri si rebrík výmeny.' + veta);
-      ukazPokracovanie(false, znak(BODY_CHYBA) + ' bodov · ' + RV.textVerdiktu(zisk));
+      ukazPokracovanie(false, znak(BODY_CHYBA) + ' bodov · ' + textObchodu(zisk));
     }
   }
 
@@ -1090,7 +1105,7 @@ const HraEngine = (function () {
           sachovnica.naKlik = null;
           panelRebrika(u.tah);
           spustiRebrik(u.tah);
-          const naStanku = ' Na stánku ' + spravne + ': ' + RV.textVerdiktu(zisk).toLowerCase() + '.';
+          const naStanku = ' Na stánku ' + spravne + ': ' + textObchodu(zisk).toLowerCase() + '.';
           if (dobre) {
             const bonus = zapisSpravne();
             grosikHovori('nadseny', pochvala() + ' ' + esc(u.vysvetlenie) + naStanku + bonus);
@@ -1143,12 +1158,12 @@ const HraEngine = (function () {
           if (dobre) {
             const bonus = zapisSpravne();
             grosikHovori('nadseny', pochvala() + ' ' + esc(u.vysvetlenie) + bonus);
-            ukazPokracovanie(true, '+' + BODY_SPRAVNE + ' bodov · ' + RV.textVerdiktu(zisky[volba]));
+            ukazPokracovanie(true, '+' + BODY_SPRAVNE + ' bodov · ' + textObchodu(zisky[volba]));
           } else {
             zapisChybu();
-            grosikHovori('smutny', esc(nazov(u, volba)) + ' je pasca: ' + RV.textVerdiktu(zisky[volba]).toLowerCase() +
+            grosikHovori('smutny', esc(nazov(u, volba)) + ' je pasca: ' + textObchodu(zisky[volba]).toLowerCase() +
                          '. ' + esc(u.vysvetlenie) + ' Rebrík iného brania si pozrieš tlačidlom nad tabuľkou.');
-            ukazPokracovanie(false, znak(BODY_CHYBA) + ' bodov · ' + RV.textVerdiktu(zisky[volba]));
+            ukazPokracovanie(false, znak(BODY_CHYBA) + ' bodov · ' + textObchodu(zisky[volba]));
           }
         }));
       grosikHovori('rozmysla', 'Pri každom braní si spočítaj celú výmenu. Jedno z nich je pasca.');
@@ -1200,7 +1215,7 @@ const HraEngine = (function () {
           h += '<div class="zaznam dobre"><b>' + esc(nazov(u, x)) + '</b> ' + esc(vysvetlenieRiesenia[x]) + '</div>';
         });
         ul.chybne.forEach(x => {
-          h += '<div class="zaznam zle"><b>' + esc(nazov(u, x)) + '</b> ' + RV.textVerdiktu(ziskTahu(u, x)) + '</div>';
+          h += '<div class="zaznam zle"><b>' + esc(nazov(u, x)) + '</b> ' + textObchodu(ziskTahu(u, x)) + '</div>';
         });
         if (ul.hotovo) {
           riesenia.filter(x => !ul.najdene.includes(x)).forEach(x => {
@@ -1273,7 +1288,7 @@ const HraEngine = (function () {
               zapisChybu();
               zapisDiagnozu(dovodChyby(branie.zisk));
               grosikHovori('smutny', esc(branie.nazov) + ' nie je branie so ziskom: ' +
-                           RV.textVerdiktu(branie.zisk).toLowerCase() + '. Pozri rebrík vpravo. ' + znak(BODY_CHYBA) + ' bodov.');
+                           textObchodu(branie.zisk).toLowerCase() + '. Pozri rebrík vpravo. ' + znak(BODY_CHYBA) + ' bodov.');
             } else {
               ul.poslednyRebrik = uci;
               grosikHovori('rozmysla', 'Toto branie si už skúšal — nie je so ziskom.');
