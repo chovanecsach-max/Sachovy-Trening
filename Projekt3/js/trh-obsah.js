@@ -31,7 +31,7 @@
 //  anglicky ako vo FEN (K Q R B N P).
 // ============================================================================
 
-(window.VERZIE = window.VERZIE || {})['trh-obsah.js'] = '2026-09-30';
+(window.VERZIE = window.VERZIE || {})['trh-obsah.js'] = '2026-10-02';
 
 const OBSAH_TRH = {
   kluc: 'sachovy-trh',
@@ -141,9 +141,8 @@ const OBSAH_TRH = {
         'Aj krytú figúrku sa oplatí zobrať, keď ju berieš <b>lacnejšou</b> figúrkou.'
       ],
       zapamataj: 'Lacnejšou figúrkou beriem drahšiu, aj krytú.',
-      prePokrocilych: 'Zisk je vtedy aspoň rozdiel cien: cena obete mínus cena mojej figúrky. Môže byť aj väčší, ' +
-                      'keď súper späť nezoberie. Pozor na úlohu 4.3: veža berie dámu (+4), ale zároveň čierna dáma ' +
-                      'môže zobrať nekrytú vežu (+5).',
+      prePokrocilych: 'Zisk je vtedy, keď je rozdiel cien v môj prospech: zobratá figúrka je drahšia ako tá, ' +
+                      'ktorou beriem. Pešiak berie jazdca: 3\u00a0−\u00a01\u00a0=\u00a0+2. Veža berie dámu: 9\u00a0−\u00a05\u00a0=\u00a0+4.',
       preTrenerov: 'Pri krytej figúrke tréning napíše len výsledok, napríklad „Berie jazdca na d5 (zisk +2).“ Celý ' +
                    'priebeh výmeny ukazuje v hre rebrík výmeny — hodí sa, keď hráč nechápe, prečo je branie so ' +
                    'ziskom.',
@@ -206,7 +205,7 @@ const OBSAH_TRH = {
       ],
       zapamataj: 'Nepočítaj figúrky, počítaj mince.',
       prePokrocilych: 'Každá strana berie svojou najlacnejšou figúrkou a môže kedykoľvek prestať. Keď súper späť ' +
-                      'nezoberie (6.2, 6.3), zisk je celá cena obete.',
+                      'nezoberie (6.2, 6.3), zisk je celá cena zobratej figúrky.',
       preTrenerov: 'Zisk = cena zobratej figúrky mínus to, čo súper získa braním späť — ale len ak sa mu braním ' +
                    'späť oplatí. Pozor na rozdiel oproti zručnosti Slabo pokryté figúrky (obrancov je rovnako alebo ' +
                    'menej ako útočníkov): v pozícii 6.1 je pešiak d5 slabo pokrytý, a predsa naň nie je žiadne ' +
