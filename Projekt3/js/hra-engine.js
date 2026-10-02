@@ -34,7 +34,7 @@
 //  Spustenie: HraEngine.spusti({ obsah, koren, rola, userId, testovaci, uloziste })
 // ============================================================================
 
-(window.VERZIE = window.VERZIE || {})['hra-engine.js'] = '2026-10-02';
+(window.VERZIE = window.VERZIE || {})['hra-engine.js'] = '2026-10-02c';
 
 const HraEngine = (function () {
   'use strict';
@@ -60,7 +60,7 @@ const HraEngine = (function () {
 
   // Texty, ktoré si hra môže prepísať v obsahu (O.texty). Predvolené sú zo Šachového trhu.
   const TEXTY_PREDVOLENE = {
-    pochvaly: ['Výborne! Dobrý obchod.', 'Presne tak!', 'Máš oko obchodníka.', 'Správne!', 'Tak sa to robí!'],
+    pochvaly: ['Výborne! Správna odpoveď.', 'Presne tak!', 'Máš oko obchodníka.', 'Správne!', 'Dobre spočítané!'],
     odznak: 'Obchodník',
     zosit: 'Toto sú pravidlá, ktoré si už získal. Obchodník ich má vždy po ruke.',
     bublinaUlohy: 'Rozmýšľaj ako obchodník: čo dostanem a čo zaplatím?',
