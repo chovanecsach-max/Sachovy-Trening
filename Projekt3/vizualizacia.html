@@ -137,7 +137,20 @@
   .answers.na-sachovnici{display:block}
   .answers.styri{grid-template-columns:repeat(4,1fr);margin-top:12px}
   .ans.a-pole{font-family:Consolas,"SF Mono",Menlo,monospace;font-size:22px}
-  .answers .board{width:min(100%,400px)}
+  /* Šachovnica sa prispôsobí aj výške okna, aby sa pod ňu zmestili tlačidlá s možnosťami
+     (rezerva = výška všetkého ostatného na obrazovke: hlavička, lišty, otázka, tlačidlá) */
+  .answers.na-sachovnici .board{width:min(100%,420px,max(200px,calc(100vh - var(--rezerva,465px))))}
+  .answers.na-sachovnici.bez-tlacidiel{--rezerva:385px}
+  .qcard.kompakt{padding:12px 14px}
+  .qcard.kompakt .qtype{margin-bottom:4px}
+  #q-fb .fbhead{margin:0;justify-content:center;flex-wrap:nowrap}
+  #q-fb .verdict{flex:0 1 auto}
+  #q-fb .next{flex:0 0 auto;padding:9px 22px}
+  /* počas úloh menšia hlavička – viac miesta na úlohu */
+  body.v-hre .head{margin:0 0 10px;align-items:center}
+  body.v-hre .kicker{display:none}
+  body.v-hre h1{font-size:20px}
+  body.v-hre .hbtn{padding:5px 12px;font-size:14px}
   .board.klik .c{cursor:pointer}
   @media (hover:hover){.board.klik .c:hover{box-shadow:inset 0 0 0 3px rgba(10,79,214,.55)}}
   .strana{font-size:13px;color:var(--muted);text-align:center;margin:4px 0;font-weight:600}
@@ -200,6 +213,9 @@
     .seg b{font-size:14.5px}
     .seg small{font-size:12px}
     .tog button{padding:7px 10px;font-size:13px}
+    .lv-popis{display:none}                        /* lišta stupňa v jednom riadku */
+    .qcard.kompakt .qtext{font-size:17px}
+    .strana{margin:2px 0;font-size:12px}
   }
 </style>
 </head>
@@ -241,9 +257,10 @@
       <span id="lv-text"></span>
       <span class="dots" id="lv-dots"></span>
     </div>
-    <div class="qcard">
+    <div class="qcard" id="qcard">
       <div class="qtype" id="q-type"></div>
       <div class="qtext" id="q-text"></div>
+      <div id="q-fb" hidden></div>
     </div>
     <div class="answers" id="answers"></div>
     <div class="feedback" id="feedback" hidden></div>
@@ -294,7 +311,7 @@
 
 <script>
 // ZNAČKA VERZIE — pri každej úprave tohto súboru prepíš dátum.
-(window.VERZIE = window.VERZIE || {})['vizualizacia.html'] = '2026-10-05b';
+(window.VERZIE = window.VERZIE || {})['vizualizacia.html'] = '2026-10-05c';
 
 /* =========================================================
    NASTAVENIA – dajú sa ľahko meniť
@@ -655,6 +672,7 @@ function show(name) {
   $('scr-game').hidden  = name !== 'game';
   $('scr-end').hidden   = name !== 'end';
   $('scr-lb').hidden    = name !== 'lb';
+  document.body.classList.toggle('v-hre', name === 'game');   // počas úloh menšia hlavička
   $('btn-lb').hidden    = name === 'lb' || name === 'game';
   window.scrollTo(0, 0);
 }
@@ -721,7 +739,7 @@ function updateLevelbar() {
   if (!st) return;
   const { level, streak } = state[st.kluc];
   const top = level === st.stupne.length - 1;
-  $('lv-text').innerHTML = `${st.nazov}: <b>stupeň ${level + 1}/${st.stupne.length}</b> · ${st.popis(level)}`;
+  $('lv-text').innerHTML = `${st.nazov}: <b>stupeň ${level + 1}/${st.stupne.length}</b><span class="lv-popis"> · ${st.popis(level)}</span>`;
   $('lv-dots').innerHTML = top ? 'najvyšší stupeň'
     : Array.from({ length: st.postup }, (_, i) => `<i class="${i < streak ? 'on' : ''}"></i>`).join('');
 }
@@ -768,7 +786,7 @@ function nextQ() {
   if (q.type === 'polia') {
     // Nájdi pole: šachovnica bez súradníc. Pri „klikni“ bez označeného poľa,
     // pri „ktoré pole“ s označeným poľom a štyrmi možnosťami pod ňou.
-    ans.className = 'answers na-sachovnici';
+    ans.className = 'answers na-sachovnici' + (q.klik ? ' bez-tlacidiel' : '');
     const bq = q.klik ? Object.assign(newBoard(), { flip: q.flip }) : q.board;
     ans.innerHTML = `<div id="q-board">${renderBoard(bq, { suradnice: false, klik: q.klik, strany: true })}</div>` +
                     (q.klik ? '' : `<div class="answers styri">${tlacidla}</div>`);
@@ -778,6 +796,10 @@ function nextQ() {
   }
   $('feedback').hidden = true;
   $('feedback').innerHTML = '';
+  $('q-fb').hidden = true;
+  $('q-fb').innerHTML = '';
+  $('q-text').hidden = false;
+  $('qcard').classList.toggle('kompakt', q.type === 'polia');
   updateStat();
   if (document.activeElement) document.activeElement.blur();
   if (window.scrollY > 0) window.scrollTo({ top: 0, behavior: 'smooth' });   // nová otázka vždy na očiach
@@ -823,18 +845,28 @@ function answer(v) {
     const label = (q.answers.find(a => a.v === q.correct) || { label: q.correct }).label;
     // Nájdi pole: tá istá šachovnica dostane súradnice, aby hráč videl, kde pole leží;
     // ostatné typy ukážu šachovnicu až v spätnej väzbe
-    if (q.type === 'polia') $('q-board').innerHTML = renderBoard(q.board, { strany: true });
-    $('feedback').innerHTML =
+    const riadok =
       `<div class="fbhead">` +
         `<div class="verdict ${right ? 'ok' : 'bad'}">${right ? '✔ Správne' : '✘ Nesprávne – správna odpoveď: ' + label}</div>` +
         `<button class="primary next" id="btn-next">Ďalej →</button>` +
-      `</div>` +
-      (q.type === 'polia' ? '' : renderBoard(q.board));
-    $('feedback').hidden = false;
+      `</div>`;
+    if (q.type === 'polia') {
+      // Nájdi pole: verdikt a Ďalej v karte s otázkou NAD šachovnicou (pod ňou by
+      // sa na menších obrazovkách nezmestili) a tá istá šachovnica dostane súradnice
+      $('q-fb').innerHTML = riadok.replace(/✘ Nesprávne – správna odpoveď: /, '✘ Správne je ');
+      $('q-fb').hidden = false;
+      $('q-text').hidden = true;                   // verdikt nahradí text otázky – nič sa neposunie
+      $('q-board').innerHTML = renderBoard(q.board, { strany: true });
+    } else {
+      $('feedback').innerHTML = riadok + renderBoard(q.board);
+      $('feedback').hidden = false;
+    }
     $('btn-next').addEventListener('click', nextQ);
     // ak by bol riadok s tlačidlom pod okrajom obrazovky, posuň stránku
-    const top = $('feedback').getBoundingClientRect().top;
-    if (top + 90 > window.innerHeight) $('feedback').scrollIntoView({ block: 'start', behavior: 'smooth' });
+    if (q.type !== 'polia') {
+      const top = $('feedback').getBoundingClientRect().top;
+      if (top + 90 > window.innerHeight) $('feedback').scrollIntoView({ block: 'start', behavior: 'smooth' });
+    }
   }
 }
 
