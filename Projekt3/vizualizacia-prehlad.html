@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Prehľad vizualizácie</title>
+<style>
+[hidden] { display: none !important; }
+body { font-family: Arial, sans-serif; background: #f4f4f6; margin: 0; padding: 12px; color: #111827; }
+.app { max-width: 1150px; margin: 0 auto; background: white; border-radius: 14px;
+       box-shadow: 0 10px 30px rgba(0,0,0,0.08); padding: 20px; }
+h1 { margin: 0 0 6px 0; text-align: center; font-size: 26px; }
+h2 { margin: 0; font-size: 20px; }
+h3 { margin: 18px 0 8px; font-size: 16px; color: #1e3a5f; }
+.subtitle { text-align: center; color: #475569; margin: 0 0 18px 0; }
+
+.role-banner { padding: 10px 14px; border-radius: 10px; margin-bottom: 16px; font-size: 14px; text-align: center; }
+.role-banner.trener        { background: #f0fdf4; border: 1px solid #86efac; color: #166534; }
+.role-banner.hlavny_trener { background: #faf5ff; border: 1px solid #d8b4fe; color: #6b21a8; }
+.role-banner.admin         { background: #fff7ed; border: 1px solid #fdba74; color: #c2410c; }
+
+.filter-card { border: 1px solid #d1d5db; border-radius: 12px; padding: 14px; margin-bottom: 16px; background: #f8fafc; }
+.filter-row { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; }
+.filter-field { display: flex; flex-direction: column; gap: 4px; }
+.filter-field label { font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: bold; }
+select { padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px; background: white; min-width: 150px; }
+button { padding: 10px 16px; border: none; border-radius: 10px; cursor: pointer; font-size: 14px; font-family: inherit; }
+.secondary { background: #e5e7eb; color: #111827; }
+
+.status { margin: 12px 0; padding: 10px; border-radius: 10px; border: 1px solid #d1d5db;
+          background: #f8fafc; color: #334155; font-size: 14px; }
+.status.error { background: #fef2f2; border-color: #fca5a5; color: #b91c1c; }
+
+/* Súhrn */
+.tiles { display: flex; gap: 10px; flex-wrap: wrap; margin: 4px 0 14px; }
+.tile { flex: 1; min-width: 120px; border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px 14px; background: #fff; }
+.tile .n { font-size: 22px; font-weight: bold; line-height: 1.1; }
+.tile .l { font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: bold; margin-top: 3px; }
+.tile.ok .n { color: #166534; }
+
+/* Tabuľka */
+.table-wrapper { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th { background: #1e3a5f; color: white; padding: 9px 6px; text-align: center; font-size: 12px; white-space: nowrap; }
+th.vlavo, td.vlavo { text-align: left; }
+td { padding: 7px 6px; border-bottom: 1px solid #e5e7eb; vertical-align: middle; text-align: center;
+     font-variant-numeric: tabular-nums; }
+#tbody tr { cursor: pointer; }
+#tbody tr:hover td { background: #f1f5f9; }
+tr.nehral td { color: #94a3b8; }
+td.meno { white-space: nowrap; font-weight: bold; color: #111827; }
+td.meno .skupina { display: block; font-weight: normal; font-size: 11px; color: #94a3b8; }
+tr.nehral td.meno { color: #64748b; font-weight: normal; }
+.naj { font-size: 15px; font-weight: bold; color: #1e3a5f; }
+.slabo { display: block; font-size: 11px; color: #94a3b8; font-weight: normal; white-space: nowrap; }
+.hore { color: #166534; font-weight: bold; }
+.dole { color: #94a3b8; }
+.nove { color: #1d4ed8; }
+.nic { color: #cbd5e1; }
+.empty { text-align: center; color: #64748b; font-style: italic; padding: 30px; }
+
+.legenda { margin-top: 16px; padding: 12px 14px; border: 1px solid #e2e8f0; border-radius: 10px;
+           background: #f8fafc; font-size: 13px; color: #475569; line-height: 1.6; }
+.legenda b { color: #111827; }
+
+/* Detail hráča */
+.detail-hlava { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+                padding-bottom: 10px; border-bottom: 1px solid #e5e7eb; }
+.detail-hlava .slabo { display: block; font-size: 13px; margin-top: 3px; }
+.grafy { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; }
+.graf-karta { border: 1px solid #e2e8f0; border-radius: 12px; padding: 10px 12px 6px; position: relative; }
+.graf-nadpis { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-weight: bold; font-size: 14px; }
+.graf-nadpis span { font-weight: normal; color: #64748b; font-size: 12px; }
+.graf-karta svg { display: block; width: 100%; height: auto; touch-action: none; }
+.tip { position: absolute; pointer-events: none; background: #fff; border: 1px solid #cbd5e1; border-radius: 8px;
+       box-shadow: 0 4px 14px rgba(0,0,0,.12); padding: 6px 9px; font-size: 12px; color: #475569; white-space: nowrap; z-index: 2; }
+.tip b { color: #111827; font-size: 14px; }
+
+@media (max-width: 640px) {
+  body { padding: 6px; }
+  .app { padding: 12px; }
+  h1 { font-size: 21px; }
+  select { min-width: 130px; }
+  td, th { padding: 6px 4px; }
+  .grafy { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body oncontextmenu="return false;">
+<div class="app">
+  <h1>👁️ Prehľad vizualizácie</h1>
+  <p class="subtitle">Šprinty hráčov v Geometrii šachovnice — najlepší výsledok, počet šprintov a zlepšenie.</p>
+
+  <div id="roleBanner" class="role-banner" hidden></div>
+
+  <div class="filter-card">
+    <div class="filter-row">
+      <div class="filter-field" id="groupField">
+        <label>Skupina</label>
+        <select id="fSkupina"></select>
+      </div>
+      <div class="filter-field">
+        <label>Šprint</label>
+        <select id="fDlzka">
+          <option value="60">60 sekúnd</option>
+          <option value="120">120 sekúnd</option>
+        </select>
+      </div>
+      <div class="filter-field">
+        <label>Obdobie</label>
+        <select id="fObdobie">
+          <option value="7">Posledných 7 dní</option>
+          <option value="30" selected>Posledných 30 dní</option>
+          <option value="90">Posledných 90 dní</option>
+          <option value="0">Celkovo</option>
+        </select>
+      </div>
+      <div class="filter-field" id="sortField">
+        <label>Zoradiť</label>
+        <select id="fZoradit">
+          <option value="meno">Podľa mena</option>
+          <option value="pocet">Podľa počtu šprintov</option>
+          <option value="zlepsenie">Podľa zlepšenia</option>
+          <option value="aktivita">Podľa poslednej aktivity</option>
+        </select>
+      </div>
+      <button class="secondary" onclick="goHome()">Späť do menu</button>
+    </div>
+  </div>
+
+  <div id="status" class="status">Načítavam...</div>
+
+  <!-- ===== TABUĽKA HRÁČOV ===== -->
+  <section id="vPrehlad">
+    <div class="tiles" id="tiles" hidden>
+      <div class="tile"><div class="n" id="tHraci">0</div><div class="l">Hráčov</div></div>
+      <div class="tile"><div class="n" id="tHrali">0</div><div class="l">Hrali v období</div></div>
+      <div class="tile"><div class="n" id="tSprintov">0</div><div class="l">Šprintov v období</div></div>
+      <div class="tile ok" id="tileZlepsili"><div class="n" id="tZlepsili">0</div><div class="l">Zlepšili sa</div></div>
+    </div>
+    <div class="table-wrapper">
+      <table id="tbl" hidden>
+        <thead id="thead"></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+      <div id="empty" class="empty" hidden></div>
+    </div>
+    <div id="legenda" class="legenda" hidden></div>
+  </section>
+
+  <!-- ===== DETAIL HRÁČA ===== -->
+  <section id="vDetail" hidden>
+    <div class="detail-hlava">
+      <h2><span id="dMeno"></span><span class="slabo" id="dPopis"></span></h2>
+      <button class="secondary" id="dSpat">← Všetci hráči</button>
+    </div>
+    <h3>Vývoj najlepšieho výsledku po dňoch</h3>
+    <div class="grafy" id="dGrafy"></div>
+    <h3 id="dPosledneNadpis">Posledné šprinty</h3>
+    <div class="table-wrapper">
+      <table id="dTabulka">
+        <thead><tr><th class="vlavo">Kedy</th><th class="vlavo">Úlohy</th><th>Správne</th><th>Čas poslednej správnej</th><th>Koniec</th></tr></thead>
+        <tbody id="dTbody"></tbody>
+      </table>
+    </div>
+  </section>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/auth.js"></script>
+<script src="js/player.js"></script>
+<script src="js/vizualizacia-pristup.js"></script>
+<script>
+// ZNAČKA VERZIE — pri každej úprave tohto súboru prepíš dátum.
+(window.VERZIE = window.VERZIE || {})['vizualizacia-prehlad.html'] = '2026-10-05';
+
+// Údaje pripravujú funkcie vizualizacia_prehlad a vizualizacia_hrac
+// (pozri vizualizacia-prehlad.sql). Tréner vidí len hráčov zo skupín,
+// ku ktorým má prístup — stráži to databáza, nie táto stránka.
+
+const TYPY = [
+  { kluc: 'farba',     nazov: 'Farba poľa',       ikona: '◩' },
+  { kluc: 'diagonala', nazov: 'Diagonála',        ikona: '⟋' },
+  { kluc: 'jazdec',    nazov: 'Cesta jazdca',     ikona: '♘︎' },
+  { kluc: 'stvorec',   nazov: 'Pravidlo štvorca', ikona: '♙︎' },
+  { kluc: 'mix',       nazov: 'Mix',              ikona: '✦' }
+];
+const KONIEC = { chyba: 'chyba', cas: 'čas vypršal', ukoncil: 'ukončil' };
+
+const USER_ROLE = sessionStorage.getItem('user_role') || '';
+const USER_NICK = sessionStorage.getItem('user_nick') || sessionStorage.getItem('user_name') || '';
+const STAFF     = ['trener', 'hlavny_trener', 'admin'];
+
+let hraci = [];          // riadky z vizualizacia_prehlad
+let viacSkupin = false;  // ukazovať pri hráčovi aj skupinu
+let nacitanie = 0;       // starší pomalší dotaz neprepíše novší
+
+const $ = id => document.getElementById(id);
+function goHome() { location.href = 'index.html'; }
+
+function setStatus(text, type = '') {
+  const el = $('status');
+  el.textContent = text;
+  el.className = 'status' + (type ? ' ' + type : '');
+  el.hidden = !text;
+}
+
+const mmss = ms => { const s = Math.round((ms || 0) / 1000); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
+const datum = ts => { if (!ts) return ''; const d = new Date(ts); return isNaN(d) ? '' : d.toLocaleDateString('sk-SK'); };
+const datumCas = ts => {
+  const d = new Date(ts);
+  return isNaN(d) ? '' : d.toLocaleString('sk-SK', { day: 'numeric', month: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+};
+const pl = (n, one, few, many) => n === 1 ? one : (n >= 2 && n <= 4 ? few : many);
+
+// Začiatok obdobia (null = celkovo)
+function zaciatokObdobia() {
+  const dni = Number($('fObdobie').value);
+  return dni ? new Date(Date.now() - dni * 86400000).toISOString() : null;
+}
+function popisObdobia() {
+  const o = $('fObdobie');
+  return o.options[o.selectedIndex].textContent.toLowerCase();
+}
+
+// Zlepšenie v jednom type úloh: o koľko je najlepší výsledok v období vyšší
+// ako najlepší výsledok pred obdobím. null = nedá sa porovnať.
+function zlepsenie(t) {
+  if (!t || t.predtym === null || t.predtym === undefined) return null;
+  return t.najlepsie - t.predtym;
+}
+
+// ─── Načítanie prehľadu ──────────────────────────────────────────────────────
+async function load() {
+  const moje = ++nacitanie;
+  ukazPrehlad();
+  setStatus('Načítavam...');
+  $('tbl').hidden = true; $('tiles').hidden = true; $('empty').hidden = true; $('legenda').hidden = true;
+
+  const tf = $('fSkupina').value;
+  try {
+    const r = await sbFetch('rpc/vizualizacia_prehlad', {
+      method: 'POST',
+      body: JSON.stringify({
+        p_dlzka: Number($('fDlzka').value),
+        p_od: zaciatokObdobia(),
+        p_skupina: (tf && tf !== 'all') ? tf : null
+      })
+    });
+    if (moje !== nacitanie) return;
+    hraci = r || [];
+  } catch (e) {
+    if (moje !== nacitanie) return;
+    console.error(e);
+    const t = String(e.message || e);
+    if (t.includes('vizualizacia_prehlad') && (t.includes('PGRST202') || t.includes('does not exist') || t.includes('schema cache'))) {
+      setStatus('Funkcia vizualizacia_prehlad v databáze ešte neexistuje — treba spustiť skript vizualizacia-prehlad.sql.', 'error');
+    } else {
+      setStatus('Chyba pri načítaní: ' + t, 'error');
+    }
+    return;
+  }
+  const skupiny = new Set(hraci.map(h => h.skupina));
+  viacSkupin = skupiny.size > 1;
+
+  if (!hraci.length) {
+    setStatus('');
+    $('empty').textContent = 'V tejto skupine nie sú žiadni hráči.';
+    $('empty').hidden = false;
+    return;
+  }
+  setStatus('');
+  render();
+}
+
+// ─── Tabuľka ─────────────────────────────────────────────────────────────────
+function render() {
+  const celkovo = !Number($('fObdobie').value);
+  const zoradit = $('fZoradit').value;
+  const sucetZlepseni = h => Object.values(h.typy || {}).reduce((s, t) => s + Math.max(0, zlepsenie(t) || 0), 0);
+
+  const riadky = [...hraci];
+  const meno = h => h.meno || '';
+  if (zoradit === 'pocet') riadky.sort((a, b) => (b.pocet - a.pocet) || meno(a).localeCompare(meno(b), 'sk'));
+  else if (zoradit === 'zlepsenie') riadky.sort((a, b) => (sucetZlepseni(b) - sucetZlepseni(a)) || (b.pocet - a.pocet));
+  else if (zoradit === 'aktivita') riadky.sort((a, b) => String(b.naposledy || '').localeCompare(String(a.naposledy || '')));
+  // podľa mena: poradie z databázy (priezvisko, meno)
+
+  // Súhrn
+  $('tHraci').textContent    = riadky.length;
+  $('tHrali').textContent    = riadky.filter(h => h.pocet > 0).length;
+  $('tSprintov').textContent = riadky.reduce((s, h) => s + Number(h.pocet || 0), 0);
+  $('tZlepsili').textContent = riadky.filter(h => sucetZlepseni(h) > 0).length;
+  $('tileZlepsili').hidden = celkovo;
+  $('tiles').hidden = false;
+
+  // Hlavička
+  $('thead').innerHTML = '<tr><th class="vlavo">Hráč</th>' +
+    TYPY.map(t => `<th>${t.ikona} ${escapeHtml(t.nazov)}</th>`).join('') +
+    '<th>Šprintov</th><th>Naposledy</th></tr>';
+
+  // Riadky
+  $('tbody').innerHTML = riadky.map(h => {
+    const skupina = viacSkupin && h.skupina_meno ? `<span class="skupina">${escapeHtml(h.skupina_meno)}</span>` : '';
+    let r = `<tr class="${h.pocet ? '' : 'nehral'}" data-user="${escapeHtml(h.user_id)}">` +
+            `<td class="meno vlavo">${escapeHtml(h.meno)}${skupina}</td>`;
+    TYPY.forEach(typ => {
+      const t = (h.typy || {})[typ.kluc];
+      if (!t) { r += '<td><span class="nic">·</span></td>'; return; }
+      const z = zlepsenie(t);
+      let zm = '';
+      if (!celkovo) {
+        if (z === null)  zm = ' · <span class="nove">nové</span>';
+        else if (z > 0)  zm = ` · <span class="hore">▲ +${z}</span>`;
+        else if (z < 0)  zm = ` · <span class="dole">▼ ${z}</span>`;
+        else             zm = ' · <span class="dole">=</span>';
+      }
+      const tip = `${typ.nazov}: najlepšie ${t.najlepsie} (za ${mmss(t.cas_ms)}), ${t.pocet} ${pl(t.pocet, 'šprint', 'šprinty', 'šprintov')}` +
+                  (celkovo ? '' : (t.predtym == null ? ', predtým nehral' : `, predtým najviac ${t.predtym}`));
+      r += `<td title="${escapeHtml(tip)}"><span class="naj">${t.najlepsie}</span>` +
+           `<span class="slabo">${t.pocet}×${zm}</span></td>`;
+    });
+    r += `<td>${h.pocet || '<span class="nic">0</span>'}</td>` +
+         `<td><span class="slabo" style="display:inline">${h.naposledy ? datum(h.naposledy) : 'nikdy'}</span></td></tr>`;
+    return r;
+  }).join('');
+  $('tbl').hidden = false;
+
+  $('legenda').innerHTML =
+    `V každej bunke je <b>najlepší výsledok</b> (počet správnych odpovedí bez chyby) v šprinte ${$('fDlzka').value} s ` +
+    `za obdobie <b>${escapeHtml(popisObdobia())}</b> a pod ním počet šprintov. ` +
+    (celkovo ? '' :
+      '<span class="hore">▲ +3</span> znamená, že najlepší výsledok je o 3 vyšší než pred týmto obdobím; ' +
+      '<span class="nove">nové</span> = tento typ úloh predtým nehral. ') +
+    '<span class="nic">·</span> = v období nehral. Stĺpec <b>Naposledy</b> ukazuje posledný šprint vôbec. ' +
+    'Kliknutím na hráča sa otvorí jeho vývoj po dňoch. Vizualizácia sa nezapisuje do tréningu a nemení ELO.';
+  $('legenda').hidden = false;
+}
+
+$('tbody').addEventListener('click', e => {
+  const tr = e.target.closest('tr[data-user]');
+  if (tr) otvorDetail(tr.dataset.user);
+});
+
+// ─── Detail hráča ────────────────────────────────────────────────────────────
+let detailUser = null;
+
+function ukazPrehlad() {
+  detailUser = null;
+  $('vDetail').hidden = true;
+  $('vPrehlad').hidden = false;
+  $('sortField').hidden = false;
+}
+
+async function otvorDetail(userId) {
+  detailUser = userId;
+  const moje = ++nacitanie;
+  const h = hraci.find(x => x.user_id === userId);
+  $('vPrehlad').hidden = true;
+  $('vDetail').hidden = false;
+  $('sortField').hidden = true;
+  $('dMeno').textContent = h ? h.meno : '';
+  $('dPopis').textContent = `Šprint ${$('fDlzka').value} s · ${popisObdobia()}` +
+                            (h && h.skupina_meno ? ` · skupina ${h.skupina_meno}` : '');
+  $('dGrafy').innerHTML = '<div class="empty">Načítavam...</div>';
+  $('dTbody').innerHTML = '';
+  window.scrollTo(0, 0);
+  try {
+    const d = await sbFetch('rpc/vizualizacia_hrac', {
+      method: 'POST',
+      body: JSON.stringify({ p_user: userId, p_dlzka: Number($('fDlzka').value), p_od: zaciatokObdobia() })
+    });
+    if (moje !== nacitanie) return;
+    vykresliDetail(d || {});
+  } catch (e) {
+    if (moje !== nacitanie) return;
+    console.error(e);
+    $('dGrafy').innerHTML = `<div class="status error">Detail sa nepodarilo načítať: ${escapeHtml(e.message || e)}</div>`;
+  }
+}
+
+function vykresliDetail(d) {
+  const dni = d.dni || [];
+  const grafy = TYPY.map(typ => ({ typ, body: dni.filter(x => x.typ === typ.kluc) }))
+                    .filter(g => g.body.length);
+  $('dGrafy').innerHTML = grafy.length ? '' : '<div class="empty">V tomto období nehral žiadny šprint tejto dĺžky.</div>';
+  grafy.forEach(g => $('dGrafy').appendChild(grafKarta(g.typ, g.body)));
+
+  const posledne = d.posledne || [];
+  $('dPosledneNadpis').textContent = posledne.length >= 30 ? 'Posledných 30 šprintov' : 'Posledné šprinty';
+  $('dTabulka').hidden = !posledne.length;
+  $('dTbody').innerHTML = posledne.map(s => {
+    const typ = TYPY.find(t => t.kluc === s.typ) || { nazov: s.typ, ikona: '' };
+    return `<tr><td class="vlavo">${datumCas(s.kedy)}</td><td class="vlavo">${typ.ikona} ${escapeHtml(typ.nazov)}</td>` +
+           `<td><b>${s.skore}</b></td><td>${s.skore ? mmss(s.cas_ms) : '—'}</td><td>${KONIEC[s.koniec] || escapeHtml(s.koniec)}</td></tr>`;
+  }).join('');
+}
+
+// Malý čiarový graf: najlepší výsledok v jednotlivých dňoch (jeden typ úloh).
+// Na osi x je skutočný čas (dni bez šprintu ostanú medzerou), na osi y skóre od nuly.
+function grafKarta(typ, body) {
+  const W = 340, H = 178, L = 34, R = 14, T = 24, B = 26;   // T: miesto na hodnotu pri poslednom bode
+  const pw = W - L - R, ph = H - T - B;
+  const den = s => new Date(s + 'T12:00:00');
+  const x0 = den(body[0].den).getTime(), x1 = den(body[body.length - 1].den).getTime();
+  const naj = Math.max(...body.map(b => b.najlepsie));
+  const krok = [1, 2, 5, 10, 20, 25, 50].find(k => naj / k <= 4) || 100;
+  const ymax = Math.max(krok, Math.ceil(naj / krok) * krok);
+  const sx = t => x1 === x0 ? L + pw / 2 : L + (t - x0) / (x1 - x0) * pw;
+  const sy = v => T + ph - v / ymax * ph;
+  const pts = body.map(b => ({ x: sx(den(b.den).getTime()), y: sy(b.najlepsie), b }));
+  const kratko = s => { const d = den(s); return `${d.getDate()}. ${d.getMonth() + 1}.`; };
+
+  let svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${escapeHtml(typ.nazov)}: vývoj najlepšieho výsledku">`;
+  for (let v = 0; v <= ymax; v += krok) {         // jemná mriežka a hodnoty osi y
+    svg += `<line x1="${L}" x2="${W - R}" y1="${sy(v)}" y2="${sy(v)}" stroke="#e5e7eb" stroke-width="1"/>` +
+           `<text x="${L - 6}" y="${sy(v) + 4}" text-anchor="end" font-size="11" fill="#64748b">${v}</text>`;
+  }
+  svg += `<text x="${L}" y="${H - 6}" font-size="11" fill="#64748b">${kratko(body[0].den)}</text>`;
+  if (body.length > 1)
+    svg += `<text x="${W - R}" y="${H - 6}" text-anchor="end" font-size="11" fill="#64748b">${kratko(body[body.length - 1].den)}</text>`;
+  svg += `<line class="kriz" x1="0" x2="0" y1="${T}" y2="${T + ph}" stroke="#94a3b8" stroke-width="1" visibility="hidden"/>`;
+  if (pts.length > 1)
+    svg += `<polyline points="${pts.map(p => `${p.x},${p.y}`).join(' ')}" fill="none" stroke="#2E75B6" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
+  pts.forEach((p, i) => {
+    svg += `<circle class="bod" data-i="${i}" cx="${p.x}" cy="${p.y}" r="4" fill="#2E75B6" stroke="#fff" stroke-width="2"/>`;
+  });
+  const p = pts[pts.length - 1];                  // hodnota pri poslednom bode
+  svg += `<text x="${Math.min(p.x, W - R - 4)}" y="${p.y - 9}" text-anchor="middle" font-size="12" font-weight="bold" fill="#111827">${p.b.najlepsie}</text>`;
+  svg += `<rect class="zasah" x="${L}" y="${T}" width="${pw}" height="${ph}" fill="transparent"/></svg>`;
+
+  const karta = document.createElement('div');
+  karta.className = 'graf-karta';
+  const pocet = body.reduce((s, b) => s + b.pocet, 0);
+  karta.innerHTML = `<div class="graf-nadpis">${typ.ikona} ${escapeHtml(typ.nazov)}` +
+    `<span>najviac ${naj} · ${pocet} ${pl(pocet, 'šprint', 'šprinty', 'šprintov')}</span></div>` + svg +
+    '<div class="tip" hidden></div>';
+
+  // Bublina pri prechode myšou alebo dotyku: pritiahne sa k najbližšiemu dňu
+  const el = karta.querySelector('svg'), tip = karta.querySelector('.tip'), kriz = karta.querySelector('.kriz');
+  const bodyEl = karta.querySelectorAll('.bod');
+  function ukaz(ev) {
+    const r = el.getBoundingClientRect();
+    const mx = (ev.clientX - r.left) / r.width * W;
+    let najb = 0;
+    pts.forEach((q, i) => { if (Math.abs(q.x - mx) < Math.abs(pts[najb].x - mx)) najb = i; });
+    const q = pts[najb];
+    kriz.setAttribute('x1', q.x); kriz.setAttribute('x2', q.x); kriz.setAttribute('visibility', 'visible');
+    bodyEl.forEach((c, i) => c.setAttribute('r', i === najb ? 6 : 4));
+    tip.textContent = '';
+    const b = document.createElement('b'); b.textContent = q.b.najlepsie;
+    tip.appendChild(b);
+    tip.appendChild(document.createTextNode(` najlepšie · ${datum(den(q.b.den))} · ${q.b.pocet} ${pl(q.b.pocet, 'šprint', 'šprinty', 'šprintov')}`));
+    tip.hidden = false;
+    const kx = q.x / W * r.width + (r.left - karta.getBoundingClientRect().left);
+    const ky = q.y / H * r.height + (r.top - karta.getBoundingClientRect().top);
+    const sirka = tip.offsetWidth;
+    tip.style.left = Math.max(4, Math.min(karta.clientWidth - sirka - 4, kx - sirka / 2)) + 'px';
+    tip.style.top = Math.max(2, ky - 44) + 'px';
+  }
+  function skry() {
+    tip.hidden = true; kriz.setAttribute('visibility', 'hidden');
+    bodyEl.forEach(c => c.setAttribute('r', 4));
+  }
+  el.addEventListener('pointermove', ukaz);
+  el.addEventListener('pointerdown', ukaz);
+  el.addEventListener('pointerleave', skry);
+  return karta;
+}
+
+// Späť na tabuľku — načíta sa nanovo, lebo v detaile sa mohla zmeniť dĺžka alebo obdobie
+$('dSpat').addEventListener('click', () => { load(); window.scrollTo(0, 0); });
+
+// ─── Inicializácia ───────────────────────────────────────────────────────────
+async function init() {
+  const ok = await refreshSession();
+  if (!ok) { location.href = 'login.html'; return; }
+  if (!STAFF.includes(sessionStorage.getItem('user_role') || '')) {
+    alert('Prehľad vizualizácie je dostupný len pre trénerov a administrátorov.');
+    goHome();
+    return;
+  }
+  if (!await VizPristup.vyzaduj()) return;         // kým sa vizualizácia pripravuje, len admin
+
+  const b = $('roleBanner');
+  if (USER_ROLE === 'trener') {
+    b.textContent = `🧑‍🏫 Tréner ${USER_NICK} — moji hráči`;
+    b.className = 'role-banner trener';
+  } else if (USER_ROLE === 'hlavny_trener') {
+    b.textContent = `👑 Hlavný tréner ${USER_NICK} — všetci hráči`;
+    b.className = 'role-banner hlavny_trener';
+  } else {
+    b.textContent = '🔧 Admin — všetci hráči';
+    b.className = 'role-banner admin';
+  }
+  b.hidden = false;
+
+  // Výber skupiny sa zobrazí každému, kto má prístup k viac než jednej
+  if (!await naplnVyberSkupin($('fSkupina'))) $('groupField').hidden = true;
+
+  $('fSkupina').addEventListener('change', load);
+  $('fDlzka').addEventListener('change', () => detailUser ? otvorDetail(detailUser) : load());
+  $('fObdobie').addEventListener('change', () => detailUser ? otvorDetail(detailUser) : load());
+  $('fZoradit').addEventListener('change', () => { if (hraci.length) render(); });
+
+  await load();
+}
+
+init();
+</script>
+</body>
+</html>
