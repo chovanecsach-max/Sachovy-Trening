@@ -172,13 +172,14 @@ tr.nehral td.meno { color: #64748b; font-weight: normal; }
 <script src="js/vizualizacia-pristup.js"></script>
 <script>
 // ZNAČKA VERZIE — pri každej úprave tohto súboru prepíš dátum.
-(window.VERZIE = window.VERZIE || {})['vizualizacia-prehlad.html'] = '2026-10-05';
+(window.VERZIE = window.VERZIE || {})['vizualizacia-prehlad.html'] = '2026-10-05b';
 
 // Údaje pripravujú funkcie vizualizacia_prehlad a vizualizacia_hrac
 // (pozri vizualizacia-prehlad.sql). Tréner vidí len hráčov zo skupín,
 // ku ktorým má prístup — stráži to databáza, nie táto stránka.
 
 const TYPY = [
+  { kluc: 'polia',     nazov: 'Nájdi pole',       ikona: '▦' },
   { kluc: 'farba',     nazov: 'Farba poľa',       ikona: '◩' },
   { kluc: 'diagonala', nazov: 'Diagonála',        ikona: '⟋' },
   { kluc: 'jazdec',    nazov: 'Cesta jazdca',     ikona: '♘︎' },
