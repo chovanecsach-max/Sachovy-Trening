@@ -130,6 +130,17 @@
           background:var(--qa);color:#fff;font-weight:700;font-size:12px;font-size:4.2cqw;line-height:1;
           display:flex;align-items:center;justify-content:center}
   .legend{font-size:13px;color:var(--muted);text-align:center;margin-top:6px}
+  /* zle kliknuté pole: stmavené s krížikom */
+  .c.m-zle::after{content:"✕";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+                  background:rgba(17,24,39,.45);color:#fff;font-weight:700;font-size:18px;font-size:7cqw;pointer-events:none}
+  /* Nájdi pole: šachovnica na klikanie (bez súradníc) */
+  .answers.na-sachovnici{display:block}
+  .answers.styri{grid-template-columns:repeat(4,1fr);margin-top:12px}
+  .ans.a-pole{font-family:Consolas,"SF Mono",Menlo,monospace;font-size:22px}
+  .answers .board{width:min(100%,400px)}
+  .board.klik .c{cursor:pointer}
+  @media (hover:hover){.board.klik .c:hover{box-shadow:inset 0 0 0 3px rgba(10,79,214,.55)}}
+  .strana{font-size:13px;color:var(--muted);text-align:center;margin:4px 0;font-weight:600}
 
   /* --- koniec --- */
   .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}
@@ -164,7 +175,7 @@
   .lb-card{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden}
   .lb-head{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:9px 14px;color:#fff;font-weight:700;font-size:15px}
   .lb-head small{font-weight:600;opacity:.85;font-size:12px}
-  .lb-farba{background:#475569} .lb-diagonala{background:#2563eb} .lb-jazdec{background:#7c3aed}
+  .lb-polia{background:#0e7490} .lb-farba{background:#475569} .lb-diagonala{background:#2563eb} .lb-jazdec{background:#7c3aed}
   .lb-stvorec{background:#16a34a} .lb-mix{background:#e11d48}
   .lb-body{padding:6px 10px 8px}
   .lb-row{display:flex;align-items:center;gap:8px;padding:5px 4px;border-bottom:1px solid #f1f3f9;font-size:14px;border-radius:6px}
@@ -208,7 +219,7 @@
 
   <!-- ===== VÝBER ===== -->
   <section id="scr-start">
-    <p class="lead">Šachovnicu počas úlohy neuvidíš – všetko si predstav v hlave. V tréningu ti ju ukážeme až po odpovedi, aby si si overil, čo si videl.</p>
+    <p class="lead">Pri väčšine úloh šachovnicu neuvidíš – všetko si predstav v hlave. V tréningu ti ju ukážeme až po odpovedi, aby si si overil, čo si videl. Pri úlohe Nájdi pole šachovnicu vidíš, ale bez súradníc.</p>
     <div class="mode">
       <button class="seg active" data-mode="trening"><b>Tréning</b><small>bez času</small></button>
       <button class="seg" data-mode="sprint60"><b>Šprint 60 s</b><small>do prvej chyby</small></button>
@@ -283,7 +294,7 @@
 
 <script>
 // ZNAČKA VERZIE — pri každej úprave tohto súboru prepíš dátum.
-(window.VERZIE = window.VERZIE || {})['vizualizacia.html'] = '2026-10-05';
+(window.VERZIE = window.VERZIE || {})['vizualizacia.html'] = '2026-10-05b';
 
 /* =========================================================
    NASTAVENIA – dajú sa ľahko meniť
@@ -298,6 +309,14 @@ const JAZDEC_STUPNE = [
 ];
 // Koľko správnych odpovedí za sebou treba na postup na vyšší stupeň
 const JAZDEC_POSTUP = 5;
+// Nájdi pole: stupne obťažnosti. smery: 'klik' = klikni na pole, 'nazov' = ktoré pole je
+// označené; cierny = aký podiel úloh je z pohľadu čierneho (otočená šachovnica)
+const POLIA_STUPNE = [
+  { popis: 'klikni na pole · pohľad bieleho',               smery: ['klik'],          cierny: 0   },
+  { popis: 'klikni aj pomenuj pole · pohľad bieleho',       smery: ['klik', 'nazov'], cierny: 0   },
+  { popis: 'klikni aj pomenuj pole · biely aj čierny pohľad', smery: ['klik', 'nazov'], cierny: 0.5 }
+];
+const POLIA_POSTUP = 8;
 // Šprint: končí pri prvej chybe alebo po uplynutí času (60 s alebo 120 s).
 // Výsledok každého šprintu sa ukladá do databázy (tabuľka vizualizacia_sprint,
 // funkcia vizualizacia_zapis — pozri vizualizacia.sql). Do training_log sa
@@ -489,34 +508,79 @@ function genStvorec() {
 }
 
 /* =========================================================
+   0. Nájdi pole – šachovnica je viditeľná, ale bez súradníc
+   'klik'  – zadané je meno poľa, hráč naň klikne
+   'nazov' – pole je označené, hráč vyberie jeho meno zo štyroch možností
+   Pri pohľade čierneho je šachovnica otočená (h8 vľavo dole).
+   ========================================================= */
+function genPolia(level) {
+  const st = POLIA_STUPNE[level];
+  const smer = pick(st.smery);
+  const flip = Math.random() < st.cierny;
+  const t = randSq(), s = S(t);
+  const b = newBoard();
+  b.flip = flip;
+  mark(b, t, 'm-to');
+  const pohlad = flip ? ' · pohľad čierneho' : '';
+  if (smer === 'klik') {
+    return { type: 'polia', klik: true, flip, pohlad,
+             html: `Klikni na pole ${chip(s, 'qb')}`, answers: [], correct: s, board: b, data: { t, flip, smer } };
+  }
+  // Mylné možnosti: zrkadlové polia (typická chyba pri otočenej šachovnici) a susedné polia
+  const kand = [{ f: 7 - t.f, r: t.r }, { f: t.f, r: 7 - t.r }, { f: 7 - t.f, r: 7 - t.r },
+                { f: t.f + 1, r: t.r }, { f: t.f - 1, r: t.r }, { f: t.f, r: t.r + 1 }, { f: t.f, r: t.r - 1 }]
+    .filter(o => o.f >= 0 && o.f < 8 && o.r >= 0 && o.r < 8).map(S).filter(x => x !== s);
+  const zrkadla = [...new Set(kand.slice(0, 3))], susedia = [...new Set(kand.slice(3))];
+  const zle = [];
+  for (const x of zrkadla.sort(() => Math.random() - .5)) if (zle.length < 2 && !zle.includes(x)) zle.push(x);
+  for (const x of susedia.sort(() => Math.random() - .5)) if (zle.length < 3 && !zle.includes(x)) zle.push(x);
+  const moznosti = [s, ...zle].sort(() => Math.random() - .5);
+  return { type: 'polia', klik: false, flip, pohlad,
+           html: 'Ktoré pole je označené?',
+           answers: moznosti.map((m, i) => ({ label: m, v: m, keys: [String(i + 1)], cls: 'a-pole' })),
+           correct: s, board: b, data: { t, flip, smer } };
+}
+const polieZMena = s => ({ f: FILES.indexOf(s[0]), r: Number(s[1]) - 1 });
+
+/* =========================================================
    Typy úloh
    ========================================================= */
 const TYPES = {
+  polia:     { name: 'Nájdi pole',       icon: '▦', desc: 'Klikni na pole na šachovnici bez súradníc, neskôr aj urči označené pole a pohľad čierneho.',
+               gen: () => genPolia(state ? state.pl.level : 0) },
   farba:     { name: 'Farba poľa',       icon: '◩', desc: 'Je pole biele alebo čierne?', gen: genFarba },
   diagonala: { name: 'Diagonála',        icon: '⟋', desc: 'Ležia dve polia na jednej diagonále?', gen: genDiag },
   jazdec:    { name: 'Cesta jazdca',     icon: '♘︎', desc: 'Koľkými ťahmi sa jazdec dostane z poľa na pole? Od krátkych ciest k dlhším.',
                gen: () => genJazdec(state ? state.jz.level : 0) },
   stvorec:   { name: 'Pravidlo štvorca', icon: '♙︎', desc: 'Dobehne kráľ pešiaka?', gen: genStvorec },
-  mix:       { name: 'Mix',              icon: '✦', desc: 'Všetky štyri typy úloh náhodne.', gen: null }
+  mix:       { name: 'Mix',              icon: '✦', desc: 'Farba poľa, diagonála, cesta jazdca a pravidlo štvorca náhodne.', gen: null }
 };
 const BASE_TYPES = ['farba', 'diagonala', 'jazdec', 'stvorec'];
 
 /* =========================================================
    Šachovnica
    ========================================================= */
-function renderBoard(b) {
-  let h = '<div class="board">';
-  for (let r = 7; r >= 0; r--) for (let f = 0; f < 8; f++) {
+// opt.suradnice = false → bez súradníc (Nájdi pole); opt.klik = true → polia sa dajú klikať
+// b.flip = true → pohľad čierneho (h8 vľavo dole)
+function renderBoard(b, opt = {}) {
+  const sur = opt.suradnice !== false, flip = !!b.flip;
+  const rady = flip ? [0, 1, 2, 3, 4, 5, 6, 7] : [7, 6, 5, 4, 3, 2, 1, 0];
+  const stlpce = flip ? [7, 6, 5, 4, 3, 2, 1, 0] : [0, 1, 2, 3, 4, 5, 6, 7];
+  let h = '';
+  if (flip || opt.strany) h += `<div class="strana">${flip ? '♔︎ strana bieleho' : '♚︎ strana čierneho'}</div>`;
+  h += `<div class="board${opt.klik ? ' klik' : ''}">`;
+  rady.forEach((r, ri) => stlpce.forEach((f, fi) => {
     const i = r * 8 + f;
     const cls = ['c', isDark(f, r) ? 'd' : 'l'].concat(b.marks[i] || []).join(' ');
     let inner = '';
-    if (f === 0) inner += `<span class="cr">${r + 1}</span>`;
-    if (r === 0) inner += `<span class="cf">${FILES[f]}</span>`;
+    if (sur && fi === 0) inner += `<span class="cr">${r + 1}</span>`;
+    if (sur && ri === 7) inner += `<span class="cf">${FILES[f]}</span>`;
     if (b.pieces[i]) inner += `<span class="pc">${b.pieces[i]}</span>`;
     else if (b.labels[i]) inner += `<span class="num">${b.labels[i]}</span>`;
-    h += `<div class="${cls}">${inner}</div>`;
-  }
+    h += `<div class="${cls}" data-sq="${sq(f, r)}">${inner}</div>`;
+  }));
   h += '</div>';
+  if (flip || opt.strany) h += `<div class="strana">${flip ? '♚︎ strana čierneho – pohľad čierneho' : '♔︎ strana bieleho'}</div>`;
   if (b.legend) h += `<div class="legend">${b.legend}</div>`;
   return h;
 }
@@ -632,10 +696,11 @@ function startGame(typeKey, modeKey) {
             ok: 0, bad: 0, mistakes: [], q: null, prev: '', locked: false,
             startAt: now, endAt: now + sec * 1000, elapsed: 0, lastOkMs: 0,
             timer: null, nextTimer: null, over: false,
-            jz: { level: 0, streak: 0 } };
+            jz: { level: 0, streak: 0 },           // stupeň v ceste jazdca
+            pl: { level: 0, streak: 0 } };         // stupeň v Nájdi pole
   const m = state.mode;
   $('timebar').hidden = m !== 'sprint';
-  $('levelbar').hidden = !(typeKey === 'jazdec' || typeKey === 'mix');
+  $('levelbar').hidden = !STUPNE_TYPU[typeKey];
   $('g-time').textContent = '';
   $('toast').hidden = true;
   show('game');
@@ -644,19 +709,43 @@ function startGame(typeKey, modeKey) {
   nextQ();
 }
 
+// Typy úloh so stupňami: kde je postup uložený, koľko správnych za sebou treba na postup
+const STUPNE_TYPU = {
+  jazdec: { kluc: 'jz', nazov: 'Cesta jazdca', stupne: JAZDEC_STUPNE, postup: JAZDEC_POSTUP, popis: l => rozsah(l), typ: 'jazdec' },
+  mix:    { kluc: 'jz', nazov: 'Cesta jazdca', stupne: JAZDEC_STUPNE, postup: JAZDEC_POSTUP, popis: l => rozsah(l), typ: 'jazdec' },
+  polia:  { kluc: 'pl', nazov: 'Nájdi pole',   stupne: POLIA_STUPNE,  postup: POLIA_POSTUP,  popis: l => POLIA_STUPNE[l].popis, typ: 'polia' }
+};
+
 function updateLevelbar() {
-  const { level, streak } = state.jz;
-  const top = level === JAZDEC_STUPNE.length - 1;
-  $('lv-text').innerHTML = `Cesta jazdca: <b>stupeň ${level + 1}/${JAZDEC_STUPNE.length}</b> · ${rozsah(level)}`;
+  const st = STUPNE_TYPU[state.typeKey];
+  if (!st) return;
+  const { level, streak } = state[st.kluc];
+  const top = level === st.stupne.length - 1;
+  $('lv-text').innerHTML = `${st.nazov}: <b>stupeň ${level + 1}/${st.stupne.length}</b> · ${st.popis(level)}`;
   $('lv-dots').innerHTML = top ? 'najvyšší stupeň'
-    : Array.from({ length: JAZDEC_POSTUP }, (_, i) => `<i class="${i < streak ? 'on' : ''}"></i>`).join('');
+    : Array.from({ length: st.postup }, (_, i) => `<i class="${i < streak ? 'on' : ''}"></i>`).join('');
+}
+
+// Po odpovedi: séria správnych a prípadný postup na vyšší stupeň
+function posunStupen(typ, right) {
+  const st = Object.values(STUPNE_TYPU).find(s => s.typ === typ);
+  if (!st) return;
+  const p = state[st.kluc];
+  if (right) {
+    p.streak++;
+    if (p.streak >= st.postup && p.level < st.stupne.length - 1) {
+      p.level++; p.streak = 0;
+      toast(`${st.nazov} – postup na stupeň ${p.level + 1}: ${st.popis(p.level)}`);
+    }
+  } else p.streak = 0;
+  updateLevelbar();
 }
 
 function genQ() {
   for (let i = 0; i < 20; i++) {
     const k = state.typeKey === 'mix' ? pick(BASE_TYPES) : state.typeKey;
     const q = TYPES[k].gen();
-    if (q.html !== state.prev) return q;
+    if (q.html + '|' + q.correct !== state.prev) return q;   // nie dvakrát po sebe tá istá úloha
   }
   return genFarba();
 }
@@ -670,13 +759,23 @@ function updateStat() {
 function nextQ() {
   if (state.over) return;
   const q = genQ();
-  state.q = q; state.prev = q.html; state.locked = false;
-  $('q-type').textContent = TYPES[q.type].name;
+  state.q = q; state.prev = q.html + '|' + q.correct; state.locked = false;
+  $('q-type').textContent = TYPES[q.type].name + (q.pohlad || '');
   $('q-text').innerHTML = q.html;
   const ans = $('answers');
-  ans.className = 'answers' + (q.answers.length > 2 ? ' nums' : '');
-  ans.innerHTML = q.answers.map(a =>
+  const tlacidla = q.answers.map(a =>
     `<button class="ans ${a.cls}" data-v="${a.v}">${a.label}<kbd>${a.keys[0].toUpperCase()}</kbd></button>`).join('');
+  if (q.type === 'polia') {
+    // Nájdi pole: šachovnica bez súradníc. Pri „klikni“ bez označeného poľa,
+    // pri „ktoré pole“ s označeným poľom a štyrmi možnosťami pod ňou.
+    ans.className = 'answers na-sachovnici';
+    const bq = q.klik ? Object.assign(newBoard(), { flip: q.flip }) : q.board;
+    ans.innerHTML = `<div id="q-board">${renderBoard(bq, { suradnice: false, klik: q.klik, strany: true })}</div>` +
+                    (q.klik ? '' : `<div class="answers styri">${tlacidla}</div>`);
+  } else {
+    ans.className = 'answers' + (q.answers.length > 2 ? ' nums' : '');
+    ans.innerHTML = tlacidla;
+  }
   $('feedback').hidden = true;
   $('feedback').innerHTML = '';
   updateStat();
@@ -686,7 +785,9 @@ function nextQ() {
 
 $('answers').addEventListener('click', e => {
   const b = e.target.closest('.ans');
-  if (b) answer(b.dataset.v);
+  if (b) { answer(b.dataset.v); return; }
+  const c = e.target.closest('.board.klik .c');    // Nájdi pole: klik na pole šachovnice
+  if (c) answer(c.dataset.sq);
 });
 
 function answer(v) {
@@ -700,19 +801,15 @@ function answer(v) {
     if (b.dataset.v === q.correct) b.classList.add('ok');
     else if (b.dataset.v === v) b.classList.add('bad');
   });
-
-  // postup v ceste jazdca
-  if (q.type === 'jazdec') {
-    const jz = state.jz;
-    if (right) {
-      jz.streak++;
-      if (jz.streak >= JAZDEC_POSTUP && jz.level < JAZDEC_STUPNE.length - 1) {
-        jz.level++; jz.streak = 0;
-        toast(`Postup na stupeň ${jz.level + 1}: ${rozsah(jz.level)}`);
-      }
-    } else jz.streak = 0;
-    updateLevelbar();
+  if (q.klik) {
+    // Nájdi pole: ukáž hľadané pole (červený rámik) a zle kliknuté pole (krížik)
+    const pole = x => document.querySelector(`#answers .c[data-sq="${x}"]`);
+    pole(q.correct)?.classList.add('m-to');
+    if (!right) { pole(v)?.classList.add('m-zle'); mark(q.board, polieZMena(v), 'm-zle'); }
   }
+
+  // postup v stupňoch (cesta jazdca, Nájdi pole)
+  posunStupen(q.type, right);
   updateStat();
 
   if (state.mode === 'sprint') {
@@ -723,13 +820,16 @@ function answer(v) {
       state.nextTimer = setTimeout(() => finish('chyba'), 900);
     }
   } else {
-    const label = q.answers.find(a => a.v === q.correct).label;
+    const label = (q.answers.find(a => a.v === q.correct) || { label: q.correct }).label;
+    // Nájdi pole: tá istá šachovnica dostane súradnice, aby hráč videl, kde pole leží;
+    // ostatné typy ukážu šachovnicu až v spätnej väzbe
+    if (q.type === 'polia') $('q-board').innerHTML = renderBoard(q.board, { strany: true });
     $('feedback').innerHTML =
       `<div class="fbhead">` +
         `<div class="verdict ${right ? 'ok' : 'bad'}">${right ? '✔ Správne' : '✘ Nesprávne – správna odpoveď: ' + label}</div>` +
         `<button class="primary next" id="btn-next">Ďalej →</button>` +
       `</div>` +
-      renderBoard(q.board);
+      (q.type === 'polia' ? '' : renderBoard(q.board));
     $('feedback').hidden = false;
     $('btn-next').addEventListener('click', nextQ);
     // ak by bol riadok s tlačidlom pod okrajom obrazovky, posuň stránku
@@ -808,8 +908,11 @@ function finish(reason = 'koniec') {
       `<div class="stat-tile"><div class="v">${state.bad}</div><div class="k">chyby</div></div>` +
       `<div class="stat-tile"><div class="v">${pct} %</div><div class="k">úspešnosť</div></div>`;
   }
-  if (state.typeKey === 'jazdec' || state.typeKey === 'mix')
-    recHtml += `<div class="note">Cesta jazdca: dosiahnutý stupeň ${state.jz.level + 1} z ${JAZDEC_STUPNE.length} (${rozsah(state.jz.level)})</div>`;
+  const stTyp = STUPNE_TYPU[state.typeKey];
+  if (stTyp) {
+    const lv = state[stTyp.kluc].level;
+    recHtml += `<div class="note">${stTyp.nazov}: dosiahnutý stupeň ${lv + 1} z ${stTyp.stupne.length} (${stTyp.popis(lv)})</div>`;
+  }
   $('e-record').innerHTML = recHtml;
 
   const sprint = state.mode === 'sprint';
@@ -817,8 +920,8 @@ function finish(reason = 'koniec') {
   $('e-mist-title').hidden = !state.mistakes.length;
   $('e-mist').innerHTML = state.mistakes.length
     ? state.mistakes.map(({ q, given }) => {
-        const g = q.answers.find(a => a.v === given).label;
-        const c = q.answers.find(a => a.v === q.correct).label;
+        const lab = x => (q.answers.find(a => a.v === x) || { label: x }).label;   // Nájdi pole: odpoveďou je pole
+        const g = lab(given), c = lab(q.correct);
         return `<div class="mist">
           <div class="q">${q.html}</div>
           <div class="a">Tvoja odpoveď: ${g} · Správne: <b>${c}</b></div>
@@ -850,7 +953,7 @@ document.addEventListener('keydown', e => {
    medzi nimi nie som. Údaje pripravuje funkcia vizualizacia_rebricek —
    vydá len meno, skóre a čas.
    ========================================================= */
-const LB_TYPY = ['farba', 'diagonala', 'jazdec', 'stvorec', 'mix'];
+const LB_TYPY = ['polia', 'farba', 'diagonala', 'jazdec', 'stvorec', 'mix'];
 const MEDAILY = ['🥇', '🥈', '🥉'];
 const lb = { dlzka: 60, skupina: false, mesiac: false };
 let lbPoradie = 0;               // aby starší pomalší dotaz neprepísal novší
