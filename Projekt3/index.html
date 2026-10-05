@@ -165,6 +165,7 @@ body {
 .i-stat      { background: #eff6ff; color: #2563eb; }
 .i-admin     { background: rgba(212,168,67,0.15); color: #a07828; }
 .i-hry       { background: #fef3c7; color: #b45309; }
+.i-viz       { background: #ecfeff; color: #0e7490; }
 
 .nav-btn.nav-admin {
   background: #0f1117; color: #d4a843; border-color: #0f1117;
@@ -396,6 +397,10 @@ body {
       <div class="nav-icon i-hry">🎲</div>
       Hry
     </button>
+    <button class="nav-btn" id="btnViz" onclick="goVizualizacia()" style="display:none;">
+      <div class="nav-icon i-viz">👁️</div>
+      Vizualizácia
+    </button>
     <button class="nav-btn" onclick="goTraining('taktika')">
       <div class="nav-icon i-taktika">⚔</div>
       Taktika
@@ -558,9 +563,10 @@ body {
 <script src="js/auth.js"></script>
 <script src="js/player.js"></script>
 <script src="js/hra-postup.js"></script>
+<script src="js/vizualizacia-pristup.js"></script>
 <script>
 // ZNAČKA VERZIE — pri každej úprave tohto súboru prepíš dátum.
-(window.VERZIE = window.VERZIE || {})['index.html'] = '2026-10-01';
+(window.VERZIE = window.VERZIE || {})['index.html'] = '2026-10-05';
 
 // Hlavné menu: všetky tlačidlá v jednom rade; keď ich je viac než 9, v dvoch
 // rovnakých radoch. Tlačidlá sa zobrazujú postupne (Zadania, Súťaže, Hry sa
@@ -625,6 +631,11 @@ async function initPage() {
       document.getElementById('hraHrozbaBtn').classList.add('zamknuta');
       document.getElementById('hraHrozbaPozn').textContent = '🔒 odomkne sa po skúške Vidličky na trhu';
     });
+  });
+  // Vizualizácia — kto ju vidí, určuje riadok 'vizualizacia' v tabuľke nastavenia
+  // (a vybraní testeri hier), pozri js/vizualizacia-pristup.js
+  VizPristup.ma(role).then(ok => {
+    if (ok) document.getElementById('btnViz').style.display = 'flex';
   });
   if (role === 'admin') {
     document.getElementById('adminSubBtn').style.display = 'flex';
@@ -815,6 +826,7 @@ function goSutaze()       { location.href = 'sutaze.html'; }
 function goMojeSutaze()   { location.href = 'moje-sutaze.html'; }
 function goHra(kluc)      { location.href = kluc + '.html'; }
 function goHryPrehlad()   { location.href = 'hry-prehlad.html'; }
+function goVizualizacia() { location.href = 'vizualizacia.html'; }
 
 // Odznak s počtom nesplnených zadaní. Splnenie sa vyhodnocuje rovnako ako na
 // stránke zadania.html: pri cieli na ELO podľa aktuálneho elo_<zručnosť>,
