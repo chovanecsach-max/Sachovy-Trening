@@ -464,6 +464,9 @@ body {
     <button class="sub-btn" id="hryPrehladSubBtn" onclick="goHryPrehlad()" style="display:none;">
       <div class="sub-icon i-hry">🎲</div>Prehľad hier
     </button>
+    <button class="sub-btn" id="vizPrehladSubBtn" onclick="goVizPrehlad()" style="display:none;">
+      <div class="sub-icon i-viz">👁️</div>Prehľad vizualizácie
+    </button>
     <button class="sub-btn" id="koncovkySubBtn" onclick="goKoncovky()" style="display:none;">
       <div class="sub-icon i-strategia">🔍</div>Analýza koncoviek
     </button>
@@ -635,7 +638,11 @@ async function initPage() {
   // Vizualizácia — kto ju vidí, určuje riadok 'vizualizacia' v tabuľke nastavenia
   // (a vybraní testeri hier), pozri js/vizualizacia-pristup.js
   VizPristup.ma(role).then(ok => {
-    if (ok) document.getElementById('btnViz').style.display = 'flex';
+    if (!ok) return;
+    document.getElementById('btnViz').style.display = 'flex';
+    if (role === 'trener' || role === 'hlavny_trener' || role === 'admin') {
+      document.getElementById('vizPrehladSubBtn').style.display = 'flex';
+    }
   });
   if (role === 'admin') {
     document.getElementById('adminSubBtn').style.display = 'flex';
@@ -827,6 +834,7 @@ function goMojeSutaze()   { location.href = 'moje-sutaze.html'; }
 function goHra(kluc)      { location.href = kluc + '.html'; }
 function goHryPrehlad()   { location.href = 'hry-prehlad.html'; }
 function goVizualizacia() { location.href = 'vizualizacia.html'; }
+function goVizPrehlad()   { location.href = 'vizualizacia-prehlad.html'; }
 
 // Odznak s počtom nesplnených zadaní. Splnenie sa vyhodnocuje rovnako ako na
 // stránke zadania.html: pri cieli na ELO podľa aktuálneho elo_<zručnosť>,
