@@ -1,0 +1,990 @@
+<!doctype html>
+<html lang="sk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vizualizácia – geometria šachovnice</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0f1117">
+<link rel="apple-touch-icon" href="ikona-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Šach tréning">
+<style>
+  :root{
+    --bg:#f3f5f8; --card:#ffffff; --ink:#1c2633; --muted:#5d6b7b; --line:#dbe2ea;
+    --accent:#1F4E79; --accent2:#2E75B6; --accent-soft:#e6eff8;
+    --ok:#23824f; --ok-soft:#e3f4ea; --bad:#c0392b; --bad-soft:#fbe9e7;
+    --qa:#0a4fd6; --qa-soft:#dce7fb;          /* prvé pole z otázky – modré */
+    --qb:#e0001b; --qb-soft:#fde1e4;          /* druhé (cieľové) pole – červené */
+    --light:#f0d9b5; --dark:#b58863;
+  }
+  *{box-sizing:border-box}
+  [hidden]{display:none !important}
+  body{margin:0;background:var(--bg);color:var(--ink);
+       font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;font-size:16px;line-height:1.45}
+  .wrap{max-width:720px;margin:0 auto;padding:16px 16px 40px}
+  .head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin:8px 0 18px;flex-wrap:wrap}
+  .head-btns{display:flex;gap:8px;flex-wrap:wrap}
+  .kicker{font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--accent2);font-weight:600}
+  h1{margin:2px 0 0;font-size:28px;color:var(--accent)}
+  h2{color:var(--accent);margin:0 0 12px}
+  .lead{color:var(--muted);margin:0 0 18px}
+  button{font:inherit;cursor:pointer}
+  .hbtn{display:inline-flex;align-items:center;gap:6px;border:2px solid var(--line);background:var(--card);
+        color:var(--accent);border-radius:12px;padding:8px 14px;font-weight:700;font-size:15px;text-decoration:none}
+  .hbtn:hover{border-color:var(--accent2)}
+  .hbtn.gold{border-color:#e9c46a;background:#fff8e6;color:#8a5a00}
+  .hbtn.gold:hover{border-color:#d4a843}
+  .test-pas{margin:-6px 0 14px;padding:8px 12px;border-radius:10px;background:#fffbeb;border:1px solid #fde68a;
+            color:#92400e;font-size:14px}
+
+  /* --- výber režimu --- */
+  .mode{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
+  .rules{background:var(--accent-soft);color:var(--accent);border-radius:10px;padding:9px 12px;font-size:14px;margin:0 0 14px}
+  .seg{border:2px solid var(--line);background:var(--card);border-radius:12px;padding:10px 12px;text-align:left;color:var(--ink)}
+  .seg b{display:block;font-size:17px;white-space:nowrap}
+  .seg small{color:var(--muted)}
+  .seg.active{border-color:var(--accent2);background:var(--accent-soft)}
+
+  .types{display:grid;gap:10px}
+  .tcard{display:flex;align-items:center;gap:14px;border:1px solid var(--line);background:var(--card);
+         border-radius:14px;padding:14px 16px;text-align:left;color:var(--ink);transition:border-color .15s, transform .05s}
+  .tcard:hover{border-color:var(--accent2)}
+  .tcard:active{transform:scale(.99)}
+  .ticon{flex:0 0 46px;height:46px;border-radius:10px;background:var(--accent-soft);color:var(--accent);
+         display:flex;align-items:center;justify-content:center;font-size:26px}
+  .tbody{flex:1}
+  .tname{font-weight:700;font-size:17px}
+  .tdesc{color:var(--muted);font-size:14px}
+  .trec{font-size:13px;color:var(--accent2);font-weight:600;white-space:nowrap}
+
+  /* --- úloha --- */
+  .topbar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;font-size:15px}
+  .topbar .stat{font-weight:600}
+  .link{background:none;border:none;color:var(--accent2);text-decoration:underline;padding:4px}
+  .timebar{height:8px;background:var(--line);border-radius:6px;overflow:hidden;margin-bottom:12px}
+  .timefill{height:100%;width:100%;background:var(--accent2);transition:width .1s linear}
+  .timefill.low{background:var(--bad)}
+  .levelbar{display:flex;justify-content:space-between;align-items:center;gap:10px;background:var(--card);
+            border:1px solid var(--line);border-radius:10px;padding:7px 12px;font-size:14px;margin-bottom:12px}
+  .levelbar b{color:var(--accent)}
+  .dots{white-space:nowrap}
+  .dots i{display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--line);margin-left:4px}
+  .dots i.on{background:var(--ok)}
+  .qcard{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:22px 18px;text-align:center;margin-bottom:14px}
+  .qtype{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:8px}
+  .qtext{font-size:22px;line-height:1.6}
+  .sq{display:inline-block;font-family:Consolas,"SF Mono",Menlo,monospace;font-weight:700;background:var(--accent-soft);
+      color:var(--accent);border-radius:6px;padding:0 6px;margin:0 1px;line-height:1.35}
+  .sq.qa{background:var(--qa-soft);color:var(--qa);box-shadow:inset 0 0 0 2px var(--qa)}
+  .sq.qb{background:var(--qb-soft);color:#a50014;box-shadow:inset 0 0 0 2px var(--qb)}
+  .answers{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .answers.nums{grid-template-columns:repeat(6,1fr)}
+  .ans{position:relative;border:2px solid var(--line);background:var(--card);border-radius:14px;padding:16px 8px;
+       font-size:20px;font-weight:700;color:var(--ink);min-height:62px}
+  .ans:hover{border-color:var(--accent2)}
+  .ans.a-white{background:#fbf8f1;border-color:#cdbf9f}
+  .ans.a-black{background:#3b3632;border-color:#3b3632;color:#fff}
+  .ans.ok{border-color:var(--ok);box-shadow:0 0 0 3px var(--ok) inset}
+  .ans.bad{border-color:var(--bad);box-shadow:0 0 0 3px var(--bad) inset}
+  .ans kbd{position:absolute;top:5px;right:8px;font-size:11px;font-weight:600;opacity:.45;font-family:inherit}
+  @media (hover:none){.ans kbd{display:none}}
+
+  .feedback{margin-top:14px;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px}
+  /* verdikt a tlačidlo Ďalej v jednom riadku hneď pod odpoveďami – vždy na očiach */
+  .fbhead{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;flex-wrap:wrap}
+  .verdict{font-weight:700;font-size:18px;flex:1 1 200px}
+  .verdict.ok{color:var(--ok)} .verdict.bad{color:var(--bad)}
+  .next{flex:0 0 auto;padding:11px 26px}
+  .primary{background:var(--accent);color:#fff;border:none;border-radius:12px;padding:13px 18px;font-weight:700;font-size:17px}
+  .primary:hover{background:var(--accent2)}
+  .secondary{background:var(--card);color:var(--accent);border:2px solid var(--line);border-radius:12px;padding:11px 18px;font-weight:700;font-size:17px}
+
+  .toast{position:fixed;left:50%;top:16px;transform:translateX(-50%);z-index:10;background:var(--ok);color:#fff;
+         font-weight:700;padding:10px 18px;border-radius:12px;box-shadow:0 6px 20px rgba(0,0,0,.18);
+         max-width:calc(100% - 32px);text-align:center}
+
+  /* --- šachovnica: všetky polia vždy rovnako veľké --- */
+  .board{display:grid;
+         grid-template-columns:repeat(8,minmax(0,1fr));
+         grid-template-rows:repeat(8,minmax(0,1fr));
+         width:min(100%,320px);aspect-ratio:1/1;margin:0 auto;
+         border:2px solid #7d6248;border-radius:4px;overflow:hidden;user-select:none;
+         container-type:inline-size}
+  .c{position:relative;display:flex;align-items:center;justify-content:center;min-width:0;min-height:0;overflow:hidden}
+  .c.l{background:var(--light)} .c.d{background:var(--dark)}
+  .c.m-line::after{content:"";position:absolute;left:35%;top:35%;width:30%;height:30%;border-radius:50%;
+                   background:var(--qa);box-shadow:0 0 0 2px rgba(255,255,255,.8);pointer-events:none}
+  .c.m-zone::after{content:"";position:absolute;inset:0;background:rgba(35,130,79,.26);pointer-events:none}
+  /* rámik poľa z otázky: hrubý farebný okraj + tenká biela linka, nad zeleným štvorcom aj figúrkou */
+  .c.m-from::before,.c.m-to::before{content:"";position:absolute;inset:0;z-index:2;pointer-events:none}
+  .c.m-from::before{box-shadow:inset 0 0 0 5px var(--qa), inset 0 0 0 7px #fff}
+  .c.m-to::before{box-shadow:inset 0 0 0 5px var(--qb), inset 0 0 0 7px #fff}
+  .c .cr,.c .cf{position:absolute;z-index:3;font-size:9px;font-size:2.8cqw;font-weight:700;opacity:.75;line-height:1}
+  .c .cr{top:2px;left:3px} .c .cf{bottom:2px;right:3px}
+  .c.l .cr,.c.l .cf{color:var(--dark)} .c.d .cr,.c.d .cf{color:var(--light)}
+  .c .pc{position:relative;z-index:1;font-size:26px;font-size:9.5cqw;line-height:1;color:#111;
+         text-shadow:0 0 2px #fff,0 0 2px #fff}
+  .c .num{position:relative;z-index:1;width:20px;height:20px;width:7.5cqw;height:7.5cqw;border-radius:50%;
+          background:var(--qa);color:#fff;font-weight:700;font-size:12px;font-size:4.2cqw;line-height:1;
+          display:flex;align-items:center;justify-content:center}
+  .legend{font-size:13px;color:var(--muted);text-align:center;margin-top:6px}
+
+  /* --- koniec --- */
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}
+  .stat-tile{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px;text-align:center}
+  .stat-tile .v{font-size:28px;font-weight:800;color:var(--accent)}
+  .stat-tile .k{font-size:13px;color:var(--muted)}
+  .record{background:var(--ok-soft);color:var(--ok);border-radius:12px;padding:10px 14px;font-weight:700;margin-bottom:12px;text-align:center}
+  .note{color:var(--muted);margin-bottom:12px;text-align:center}
+  .chyba-box{background:var(--bad-soft);color:var(--bad);border-radius:12px;padding:10px 14px;margin-bottom:12px;
+             text-align:center;font-weight:600}
+  .chyba-box button{margin-left:8px;border:none;border-radius:8px;background:var(--bad);color:#fff;padding:6px 12px;font-weight:700}
+  .mist{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--bad);border-radius:12px;padding:12px 14px;margin-bottom:10px}
+  .mist .q{font-weight:600;margin-bottom:4px;line-height:1.6}
+  .mist .a{font-size:14px;color:var(--muted)}
+  .mist details summary{cursor:pointer;color:var(--accent2);font-size:14px;margin:6px 0}
+  .mist .board{width:min(100%,260px)}
+  .row{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
+  .row button{flex:1 1 160px}
+  .empty{color:var(--muted)}
+
+  /* --- rebríček --- */
+  .lb-top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;flex-wrap:wrap}
+  .lb-top h2{margin:0}
+  .toggles{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+  .tog{display:inline-flex;border:2px solid var(--line);border-radius:12px;overflow:hidden;background:var(--card)}
+  .tog button{border:none;background:none;padding:8px 14px;font-weight:700;font-size:14px;color:var(--muted)}
+  .tog button + button{border-left:2px solid var(--line)}
+  .tog button.active{background:var(--accent);color:#fff}
+  .tog button:disabled{opacity:.45;cursor:not-allowed}
+  .lb-popis{color:var(--muted);font-size:14px;margin:0 0 12px}
+  .lb-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
+  .lb-card{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+  .lb-head{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:9px 14px;color:#fff;font-weight:700;font-size:15px}
+  .lb-head small{font-weight:600;opacity:.85;font-size:12px}
+  .lb-farba{background:#475569} .lb-diagonala{background:#2563eb} .lb-jazdec{background:#7c3aed}
+  .lb-stvorec{background:#16a34a} .lb-mix{background:#e11d48}
+  .lb-body{padding:6px 10px 8px}
+  .lb-row{display:flex;align-items:center;gap:8px;padding:5px 4px;border-bottom:1px solid #f1f3f9;font-size:14px;border-radius:6px}
+  .lb-row:last-child{border-bottom:none}
+  .lb-row.me{background:#eff6ff;color:#1d4ed8;font-weight:700}
+  .lb-rank{width:30px;text-align:center;flex-shrink:0}
+  .lb-name{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .lb-score{font-weight:800;color:var(--accent);min-width:26px;text-align:right}
+  .lb-row.me .lb-score{color:#1d4ed8}
+  .lb-time{color:var(--muted);font-size:12px;min-width:34px;text-align:right}
+  .lb-sep{text-align:center;color:var(--muted);line-height:1;padding:2px 0}
+  .lb-info{color:var(--muted);font-size:13px;font-style:italic;padding:8px 4px;text-align:center}
+
+  @media (max-width:480px){
+    h1{font-size:24px}
+    .qtext{font-size:19px}
+    .answers.nums{grid-template-columns:repeat(3,1fr)}
+    .stat-tile .v{font-size:24px}
+    .fbhead .next{flex:1 1 100%}
+    .mode{gap:6px}
+    .seg{padding:8px 8px}
+    .seg b{font-size:14.5px}
+    .seg small{font-size:12px}
+    .tog button{padding:7px 10px;font-size:13px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="head">
+    <div>
+      <div class="kicker">Vizualizácia · 1. stupeň</div>
+      <h1>Geometria šachovnice</h1>
+    </div>
+    <div class="head-btns">
+      <button class="hbtn gold" id="btn-lb">🏆 Rebríček</button>
+      <a class="hbtn" href="index.html" id="btn-home">← Úvod</a>
+    </div>
+  </header>
+  <div class="test-pas" id="test-pas" hidden>Testovací režim (súbor z disku): výsledky sa ukladajú len do tohto prehliadača a rebríček nie je dostupný.</div>
+
+  <!-- ===== VÝBER ===== -->
+  <section id="scr-start">
+    <p class="lead">Šachovnicu počas úlohy neuvidíš – všetko si predstav v hlave. V tréningu ti ju ukážeme až po odpovedi, aby si si overil, čo si videl.</p>
+    <div class="mode">
+      <button class="seg active" data-mode="trening"><b>Tréning</b><small>bez času</small></button>
+      <button class="seg" data-mode="sprint60"><b>Šprint 60 s</b><small>do prvej chyby</small></button>
+      <button class="seg" data-mode="sprint120"><b>Šprint 120 s</b><small>do prvej chyby</small></button>
+    </div>
+    <p class="rules" id="rules" hidden>Šprint sa končí pri prvej chybe alebo po uplynutí času. Rekord je počet správnych odpovedí bez chyby.</p>
+    <div class="types" id="types"></div>
+  </section>
+
+  <!-- ===== ÚLOHA ===== -->
+  <section id="scr-game" hidden>
+    <div class="topbar">
+      <span class="stat" id="g-stat"></span>
+      <span class="stat" id="g-time"></span>
+      <button class="link" id="g-quit">Ukončiť</button>
+    </div>
+    <div class="timebar" id="timebar"><div class="timefill" id="timefill"></div></div>
+    <div class="levelbar" id="levelbar" hidden>
+      <span id="lv-text"></span>
+      <span class="dots" id="lv-dots"></span>
+    </div>
+    <div class="qcard">
+      <div class="qtype" id="q-type"></div>
+      <div class="qtext" id="q-text"></div>
+    </div>
+    <div class="answers" id="answers"></div>
+    <div class="feedback" id="feedback" hidden></div>
+  </section>
+
+  <!-- ===== KONIEC ===== -->
+  <section id="scr-end" hidden>
+    <h2 id="e-title"></h2>
+    <div id="e-save"></div>
+    <div id="e-record"></div>
+    <div class="stats" id="e-stats"></div>
+    <h2 style="font-size:19px" id="e-mist-title">Chyby na prezretie</h2>
+    <div id="e-mist"></div>
+    <div class="row">
+      <button class="primary" id="e-again">Znova</button>
+      <button class="secondary" id="e-back">Späť na výber</button>
+    </div>
+  </section>
+
+  <!-- ===== REBRÍČEK ===== -->
+  <section id="scr-lb" hidden>
+    <div class="lb-top">
+      <h2>🏆 Rebríček šprintov</h2>
+      <button class="hbtn" id="lb-back">← Späť</button>
+    </div>
+    <div class="toggles">
+      <div class="tog" id="tog-dlzka">
+        <button data-v="60" class="active">Šprint 60 s</button><button data-v="120">Šprint 120 s</button>
+      </div>
+      <div class="tog" id="tog-skupina">
+        <button data-v="0" class="active">Všetci</button><button data-v="1">Moja skupina</button>
+      </div>
+      <div class="tog" id="tog-mesiac">
+        <button data-v="0" class="active">Celkovo</button><button data-v="1">Tento mesiac</button>
+      </div>
+    </div>
+    <p class="lb-popis" id="lb-popis"></p>
+    <div class="lb-grid" id="lb-grid"></div>
+  </section>
+</div>
+
+<div class="toast" id="toast" hidden></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/auth.js"></script>
+<script src="js/player.js"></script>
+<script src="js/vizualizacia-pristup.js"></script>
+
+<script>
+// ZNAČKA VERZIE — pri každej úprave tohto súboru prepíš dátum.
+(window.VERZIE = window.VERZIE || {})['vizualizacia.html'] = '2026-10-05';
+
+/* =========================================================
+   NASTAVENIA – dajú sa ľahko meniť
+   ========================================================= */
+// Cesta jazdca: stupne obťažnosti (najmenší a najväčší počet ťahov)
+const JAZDEC_STUPNE = [
+  [1, 2],
+  [2, 3],
+  [2, 4],
+  [3, 5],
+  [3, 6]
+];
+// Koľko správnych odpovedí za sebou treba na postup na vyšší stupeň
+const JAZDEC_POSTUP = 5;
+// Šprint: končí pri prvej chybe alebo po uplynutí času (60 s alebo 120 s).
+// Výsledok každého šprintu sa ukladá do databázy (tabuľka vizualizacia_sprint,
+// funkcia vizualizacia_zapis — pozri vizualizacia.sql). Do training_log sa
+// NEZAPISUJE a ELO sa nemení.
+
+/* =========================================================
+   Základné pomôcky
+   ========================================================= */
+const FILES = 'abcdefgh';
+const sq   = (f, r) => FILES[f] + (r + 1);
+const S    = o => sq(o.f, o.r);
+const idx  = o => o.r * 8 + o.f;
+const isDark = (f, r) => (f + r) % 2 === 0;          // a1 je čierne pole
+const dk   = o => isDark(o.f, o.r);
+const rnd  = n => Math.floor(Math.random() * n);
+const pick = a => a[rnd(a.length)];
+const randSq = () => ({ f: rnd(8), r: rnd(8) });
+const cheb = (a, b) => Math.max(Math.abs(a.f - b.f), Math.abs(a.r - b.r));
+const pl   = (n, one, few, many) => n === 1 ? one : (n >= 2 && n <= 4 ? few : many);
+const chip = (s, cls = '') => `<span class="sq ${cls}">${s}</span>`;
+const esc  = v => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                                 .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+
+function wpick(list) {                                   // [[hodnota, váha], ...]
+  const tot = list.reduce((s, x) => s + x[1], 0);
+  let t = Math.random() * tot;
+  for (const [v, w] of list) { if ((t -= w) < 0) return v; }
+  return list[list.length - 1][0];
+}
+
+function newBoard() { return { marks: {}, labels: {}, pieces: {}, legend: '' }; }
+function mark(b, o, cls) { const i = idx(o); (b.marks[i] = b.marks[i] || []).push(cls); }
+
+const G = {                                              // figúry (bez emoji vzhľadu)
+  wK: '♔︎', wN: '♘︎', wP: '♙︎',
+  bK: '♚︎', bP: '♟︎'
+};
+
+const ANS_FARBA = [
+  { label: 'Biele',  v: 'B', keys: ['b'],      cls: 'a-white' },
+  { label: 'Čierne', v: 'C', keys: ['c', 'č'], cls: 'a-black' }
+];
+const ANS_AN = [
+  { label: 'Áno', v: 'A', keys: ['a', 'á'], cls: '' },
+  { label: 'Nie', v: 'N', keys: ['n'],      cls: '' }
+];
+const ANS_J = [1, 2, 3, 4, 5, 6].map(n => ({ label: String(n), v: String(n), keys: [String(n)], cls: '' }));
+
+/* =========================================================
+   1. Farba poľa
+   ========================================================= */
+function genFarba() {
+  const t = randSq(), b = newBoard();
+  mark(b, t, 'm-to');
+  return { type: 'farba', html: `Aké je pole ${chip(S(t), 'qb')}?`, answers: ANS_FARBA,
+           correct: dk(t) ? 'C' : 'B', board: b, data: { t } };
+}
+
+/* =========================================================
+   2. Diagonála
+   ========================================================= */
+function genDiag() {
+  const yes = Math.random() < 0.5;
+  let a, c;
+  if (yes) {
+    for (;;) {
+      a = randSq();
+      const cand = [];
+      for (const [df, dr] of [[1, 1], [1, -1], [-1, 1], [-1, -1]])
+        for (let k = 2; k < 8; k++) {
+          const f = a.f + df * k, r = a.r + dr * k;
+          if (f < 0 || f > 7 || r < 0 || r > 7) break;
+          cand.push({ f, r });
+        }
+      if (cand.length) { c = pick(cand); break; }
+    }
+  } else {
+    const diff = Math.random() < 0.25;          // 1/4 rôzne farby, 3/4 rovnaká farba (ťažšie)
+    do { a = randSq(); c = randSq(); }
+    while (cheb(a, c) < 2 || Math.abs(a.f - c.f) === Math.abs(a.r - c.r) ||
+           (diff ? dk(a) === dk(c) : dk(a) !== dk(c)));
+  }
+  if (Math.random() < 0.5) [a, c] = [c, a];
+
+  const b = newBoard();
+  mark(b, a, 'm-from'); mark(b, c, 'm-to');
+  if (yes) {                                     // bodky na poliach diagonály medzi nimi
+    const n = Math.abs(a.f - c.f), sf = Math.sign(c.f - a.f), sr = Math.sign(c.r - a.r);
+    for (let k = 1; k < n; k++) mark(b, { f: a.f + sf * k, r: a.r + sr * k }, 'm-line');
+  }
+  return { type: 'diagonala', html: `Ležia polia ${chip(S(a), 'qa')} a ${chip(S(c), 'qb')} na jednej diagonále?`,
+           answers: ANS_AN, correct: yes ? 'A' : 'N', board: b, data: { a, c } };
+}
+
+/* =========================================================
+   3. Cesta jazdca (najkratšie cesty – prehľadávanie do šírky)
+   ========================================================= */
+const KN = [[1, 2], [2, 1], [2, -1], [1, -2], [-1, -2], [-2, -1], [-2, 1], [-1, 2]];
+const KD = [], KP = [];
+for (let s = 0; s < 64; s++) {
+  const d = new Array(64).fill(-1), p = new Array(64).fill(-1);
+  d[s] = 0; const q = [s];
+  while (q.length) {
+    const u = q.shift(), uf = u % 8, ur = u >> 3;
+    for (const [x, y] of KN) {
+      const f = uf + x, r = ur + y;
+      if (f < 0 || f > 7 || r < 0 || r > 7) continue;
+      const v = r * 8 + f;
+      if (d[v] < 0) { d[v] = d[u] + 1; p[v] = u; q.push(v); }
+    }
+  }
+  KD.push(d); KP.push(p);
+}
+const KBY = {};
+for (let a = 0; a < 64; a++) for (let c = 0; c < 64; c++) {
+  const d = KD[a][c]; if (d > 0) (KBY[d] = KBY[d] || []).push([a, c]);
+}
+const rozsah = l => {
+  const [lo, hi] = JAZDEC_STUPNE[l];
+  return `${lo}–${hi} ${pl(hi, 'ťah', 'ťahy', 'ťahov')}`;
+};
+
+function genJazdec(level) {
+  const [lo, hi] = JAZDEC_STUPNE[level];
+  const d = lo + rnd(hi - lo + 1);
+  const [ai, ci] = pick(KBY[d]);
+  const a = { f: ai % 8, r: ai >> 3 }, c = { f: ci % 8, r: ci >> 3 };
+  const path = [];
+  for (let v = ci; v !== -1; v = KP[ai][v]) path.unshift(v);
+  const b = newBoard();
+  b.pieces[ai] = G.wN;
+  mark(b, a, 'm-from');
+  path.forEach((v, k) => { if (k > 0) b.labels[v] = String(k); });
+  mark(b, c, 'm-to');
+  return { type: 'jazdec', html: `Koľkými ťahmi sa jazdec dostane z ${chip(S(a), 'qa')} na ${chip(S(c), 'qb')}?`,
+           answers: ANS_J, correct: String(d), board: b, data: { a, c, d, level } };
+}
+
+/* =========================================================
+   4. Pravidlo štvorca
+   Pravidlo overené úplným prepočtom všetkých pozícií kráľ proti pešiakovi:
+   kráľ dobehne pešiaka, ak počet jeho ťahov na pole premeny je
+   ≤ n + 1 (na ťahu je kráľ) alebo ≤ n (na ťahu je pešiak),
+   kde n je počet ťahov pešiaka do premeny (z 2. radu ide o dve polia).
+   ========================================================= */
+const PRW = [[1, 1], [2, 2], [3, 3], [4, 3], [5, 2]];   // rad pešiaka (0 = 1. rad): 2. až 6. rad
+
+function genStvorec() {
+  const want = Math.random() < 0.5;
+  let P, K, kingMove, n, dist, lim;
+  for (;;) {
+    const pr = wpick(PRW);
+    P = { f: rnd(8), r: pr };
+    K = randSq();
+    kingMove = Math.random() < 0.5;
+    if (cheb(K, P) <= 1) continue;                      // kráľ nesmie stáť pri pešiakovi
+    n = pr === 1 ? 5 : 7 - pr;
+    dist = cheb(K, { f: P.f, r: 7 });
+    lim = kingMove ? n + 1 : n;
+    if ((dist <= lim) !== want) continue;
+    if (Math.random() < 0.85 && (dist < lim - 1 || dist > lim + 2)) continue;  // väčšinou tesné prípady
+    break;
+  }
+  const yes = dist <= lim;
+  const blackPawn = Math.random() < 0.5;
+  const m = o => blackPawn ? { f: o.f, r: 7 - o.r } : o;  // zrkadlenie pre čierneho pešiaka
+  const Pm = m(P), Km = m(K), Qm = m({ f: P.f, r: 7 });
+
+  const pawnWord = blackPawn ? 'Čierny' : 'Biely';
+  const kingWord = blackPawn ? 'biely' : 'čierny';
+  const side = kingMove ? (blackPawn ? 'biely' : 'čierny') : (blackPawn ? 'čierny' : 'biely');
+
+  const b = newBoard();
+  for (let r = 0; r < 8; r++) for (let f = 0; f < 8; f++) {
+    const o = { f, r };
+    if (cheb(o, { f: P.f, r: 7 }) <= n) mark(b, m(o), 'm-zone');
+  }
+  mark(b, Qm, 'm-to');
+  b.pieces[idx(Pm)] = blackPawn ? G.bP : G.wP;
+  b.pieces[idx(Km)] = blackPawn ? G.wK : G.bK;
+  b.legend = 'Zelené: štvorec pešiaka · červený rámik: pole premeny';
+
+  return {
+    type: 'stvorec',
+    html: `${pawnWord} pešiak ${chip(S(Pm))}, ${kingWord} kráľ ${chip(S(Km))}.<br>Na ťahu je <b>${side}</b>. Dobehne kráľ pešiaka?`,
+    answers: ANS_AN, correct: yes ? 'A' : 'N', board: b,
+    data: { P: Pm, K: Km, blackPawn, kingMove, n, dist }
+  };
+}
+
+/* =========================================================
+   Typy úloh
+   ========================================================= */
+const TYPES = {
+  farba:     { name: 'Farba poľa',       icon: '◩', desc: 'Je pole biele alebo čierne?', gen: genFarba },
+  diagonala: { name: 'Diagonála',        icon: '⟋', desc: 'Ležia dve polia na jednej diagonále?', gen: genDiag },
+  jazdec:    { name: 'Cesta jazdca',     icon: '♘︎', desc: 'Koľkými ťahmi sa jazdec dostane z poľa na pole? Od krátkych ciest k dlhším.',
+               gen: () => genJazdec(state ? state.jz.level : 0) },
+  stvorec:   { name: 'Pravidlo štvorca', icon: '♙︎', desc: 'Dobehne kráľ pešiaka?', gen: genStvorec },
+  mix:       { name: 'Mix',              icon: '✦', desc: 'Všetky štyri typy úloh náhodne.', gen: null }
+};
+const BASE_TYPES = ['farba', 'diagonala', 'jazdec', 'stvorec'];
+
+/* =========================================================
+   Šachovnica
+   ========================================================= */
+function renderBoard(b) {
+  let h = '<div class="board">';
+  for (let r = 7; r >= 0; r--) for (let f = 0; f < 8; f++) {
+    const i = r * 8 + f;
+    const cls = ['c', isDark(f, r) ? 'd' : 'l'].concat(b.marks[i] || []).join(' ');
+    let inner = '';
+    if (f === 0) inner += `<span class="cr">${r + 1}</span>`;
+    if (r === 0) inner += `<span class="cf">${FILES[f]}</span>`;
+    if (b.pieces[i]) inner += `<span class="pc">${b.pieces[i]}</span>`;
+    else if (b.labels[i]) inner += `<span class="num">${b.labels[i]}</span>`;
+    h += `<div class="${cls}">${inner}</div>`;
+  }
+  h += '</div>';
+  if (b.legend) h += `<div class="legend">${b.legend}</div>`;
+  return h;
+}
+
+/* =========================================================
+   Režim stránky a rekordy
+   Na webe (prihlásený hráč) sa výsledky šprintov ukladajú do databázy a
+   rekordy sa čítajú odtiaľ — platia na mobile aj na počítači.
+   Pri otvorení súboru priamo z disku (adresa file://) sa prihlásenie
+   preskočí a rekordy sa držia len v tomto prehliadači (na vyskúšanie).
+   ========================================================= */
+const LOKALNE = location.protocol === 'file:';
+const modeSec = m => m === 'sprint60' ? 60 : m === 'sprint120' ? 120 : 0;
+const mmss = ms => { const s = Math.round(ms / 1000); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
+
+let REKORDY = { '60': {}, '120': {} };            // { '60': { farba: 14, ... }, '120': { ... } }
+
+const recKey = (t, sec) => `vizualizacia-geometria-sprint${sec}-${t}`;
+function getRec(t, sec) { return Number((REKORDY[String(sec)] || {})[t]) || 0; }
+function setRecLocal(t, sec, v) {
+  REKORDY[String(sec)] = REKORDY[String(sec)] || {};
+  REKORDY[String(sec)][t] = v;
+  if (LOKALNE) { try { localStorage.setItem(recKey(t, sec), String(v)); } catch (e) {} }
+}
+
+function nacitajRekordyLokalne() {
+  for (const sec of [60, 120]) for (const t of Object.keys(TYPES)) {
+    let v = 0;
+    try { v = parseInt(localStorage.getItem(recKey(t, sec)) || '0', 10) || 0; } catch (e) {}
+    if (v) setRecLocal(t, sec, v);
+  }
+}
+
+async function nacitajRekordyZDatabazy() {
+  try {
+    const r = await sbFetch('rpc/vizualizacia_moje_rekordy', { method: 'POST', body: '{}' });
+    REKORDY = { '60': {}, '120': {}, ...(r || {}) };
+  } catch (e) {
+    console.warn('Rekordy sa nenačítali:', e);   // stránka funguje aj bez nich
+  }
+}
+
+// Uloží výsledok šprintu. Vracia odpoveď servera { rekord, predtym, novy_rekord }
+// alebo vyhodí chybu.
+async function ulozVysledok(v) {
+  if (LOKALNE) {
+    const old = getRec(v.typ, v.dlzka);
+    if (v.skore > old) setRecLocal(v.typ, v.dlzka, v.skore);
+    return { rekord: Math.max(old, v.skore), predtym: old, novy_rekord: v.skore > old };
+  }
+  const r = await sbFetch('rpc/vizualizacia_zapis', {
+    method: 'POST',
+    body: JSON.stringify({ p_typ: v.typ, p_dlzka: v.dlzka, p_skore: v.skore,
+                           p_cas_ms: v.cas_ms, p_koniec: v.koniec })
+  });
+  if (r && Number.isFinite(Number(r.rekord))) setRecLocal(v.typ, v.dlzka, Number(r.rekord));
+  return r;
+}
+
+/* =========================================================
+   Obrazovky
+   ========================================================= */
+const $ = id => document.getElementById(id);
+let mode = 'trening';
+let state = null;
+let screen = 'start';
+let toastTimer = null;
+
+function show(name) {
+  screen = name;
+  $('scr-start').hidden = name !== 'start';
+  $('scr-game').hidden  = name !== 'game';
+  $('scr-end').hidden   = name !== 'end';
+  $('scr-lb').hidden    = name !== 'lb';
+  $('btn-lb').hidden    = name === 'lb' || name === 'game';
+  window.scrollTo(0, 0);
+}
+
+function toast(text) {
+  const t = $('toast');
+  t.textContent = text; t.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { t.hidden = true; }, 2000);
+}
+
+function renderTypes() {
+  const sec = modeSec(mode);
+  $('rules').hidden = !sec;
+  $('types').innerHTML = Object.entries(TYPES).map(([k, t]) => {
+    const rec = sec ? getRec(k, sec) : 0;
+    return `<button class="tcard" data-type="${k}">
+      <span class="ticon">${t.icon}</span>
+      <span class="tbody"><span class="tname">${t.name}</span><br><span class="tdesc">${t.desc}</span></span>
+      ${rec ? `<span class="trec">rekord ${rec}</span>` : ''}
+    </button>`;
+  }).join('');
+}
+
+document.querySelectorAll('.seg').forEach(btn => btn.addEventListener('click', () => {
+  mode = btn.dataset.mode;
+  document.querySelectorAll('.seg').forEach(b => b.classList.toggle('active', b === btn));
+  renderTypes();
+}));
+$('types').addEventListener('click', e => {
+  const c = e.target.closest('.tcard');
+  if (c) startGame(c.dataset.type, mode);
+});
+
+function startGame(typeKey, modeKey) {
+  const sec = modeSec(modeKey);
+  const now = Date.now();
+  state = { typeKey, modeKey, mode: sec ? 'sprint' : 'trening', sec,
+            ok: 0, bad: 0, mistakes: [], q: null, prev: '', locked: false,
+            startAt: now, endAt: now + sec * 1000, elapsed: 0, lastOkMs: 0,
+            timer: null, nextTimer: null, over: false,
+            jz: { level: 0, streak: 0 } };
+  const m = state.mode;
+  $('timebar').hidden = m !== 'sprint';
+  $('levelbar').hidden = !(typeKey === 'jazdec' || typeKey === 'mix');
+  $('g-time').textContent = '';
+  $('toast').hidden = true;
+  show('game');
+  updateLevelbar();
+  if (m === 'sprint') { state.timer = setInterval(tick, 100); tick(); }
+  nextQ();
+}
+
+function updateLevelbar() {
+  const { level, streak } = state.jz;
+  const top = level === JAZDEC_STUPNE.length - 1;
+  $('lv-text').innerHTML = `Cesta jazdca: <b>stupeň ${level + 1}/${JAZDEC_STUPNE.length}</b> · ${rozsah(level)}`;
+  $('lv-dots').innerHTML = top ? 'najvyšší stupeň'
+    : Array.from({ length: JAZDEC_POSTUP }, (_, i) => `<i class="${i < streak ? 'on' : ''}"></i>`).join('');
+}
+
+function genQ() {
+  for (let i = 0; i < 20; i++) {
+    const k = state.typeKey === 'mix' ? pick(BASE_TYPES) : state.typeKey;
+    const q = TYPES[k].gen();
+    if (q.html !== state.prev) return q;
+  }
+  return genFarba();
+}
+
+function updateStat() {
+  $('g-stat').textContent = state.mode === 'sprint'
+    ? `Správne: ${state.ok}`
+    : `Správne ${state.ok} · Chyby ${state.bad}`;
+}
+
+function nextQ() {
+  if (state.over) return;
+  const q = genQ();
+  state.q = q; state.prev = q.html; state.locked = false;
+  $('q-type').textContent = TYPES[q.type].name;
+  $('q-text').innerHTML = q.html;
+  const ans = $('answers');
+  ans.className = 'answers' + (q.answers.length > 2 ? ' nums' : '');
+  ans.innerHTML = q.answers.map(a =>
+    `<button class="ans ${a.cls}" data-v="${a.v}">${a.label}<kbd>${a.keys[0].toUpperCase()}</kbd></button>`).join('');
+  $('feedback').hidden = true;
+  $('feedback').innerHTML = '';
+  updateStat();
+  if (document.activeElement) document.activeElement.blur();
+  if (window.scrollY > 0) window.scrollTo({ top: 0, behavior: 'smooth' });   // nová otázka vždy na očiach
+}
+
+$('answers').addEventListener('click', e => {
+  const b = e.target.closest('.ans');
+  if (b) answer(b.dataset.v);
+});
+
+function answer(v) {
+  if (!state || state.locked || state.over) return;
+  state.locked = true;
+  const q = state.q, right = v === q.correct;
+  if (right) state.ok++; else { state.bad++; state.mistakes.push({ q, given: v }); }
+  if (right && state.mode === 'sprint')            // čas poslednej správnej odpovede rozhoduje pri rovnosti
+    state.lastOkMs = Math.min(Date.now() - state.startAt, state.sec * 1000);
+  document.querySelectorAll('#answers .ans').forEach(b => {
+    if (b.dataset.v === q.correct) b.classList.add('ok');
+    else if (b.dataset.v === v) b.classList.add('bad');
+  });
+
+  // postup v ceste jazdca
+  if (q.type === 'jazdec') {
+    const jz = state.jz;
+    if (right) {
+      jz.streak++;
+      if (jz.streak >= JAZDEC_POSTUP && jz.level < JAZDEC_STUPNE.length - 1) {
+        jz.level++; jz.streak = 0;
+        toast(`Postup na stupeň ${jz.level + 1}: ${rozsah(jz.level)}`);
+      }
+    } else jz.streak = 0;
+    updateLevelbar();
+  }
+  updateStat();
+
+  if (state.mode === 'sprint') {
+    if (right) state.nextTimer = setTimeout(nextQ, 250);
+    else {                                         // prvá chyba končí šprint
+      state.elapsed = Math.min(Date.now() - state.startAt, state.sec * 1000);
+      clearInterval(state.timer);
+      state.nextTimer = setTimeout(() => finish('chyba'), 900);
+    }
+  } else {
+    const label = q.answers.find(a => a.v === q.correct).label;
+    $('feedback').innerHTML =
+      `<div class="fbhead">` +
+        `<div class="verdict ${right ? 'ok' : 'bad'}">${right ? '✔ Správne' : '✘ Nesprávne – správna odpoveď: ' + label}</div>` +
+        `<button class="primary next" id="btn-next">Ďalej →</button>` +
+      `</div>` +
+      renderBoard(q.board);
+    $('feedback').hidden = false;
+    $('btn-next').addEventListener('click', nextQ);
+    // ak by bol riadok s tlačidlom pod okrajom obrazovky, posuň stránku
+    const top = $('feedback').getBoundingClientRect().top;
+    if (top + 90 > window.innerHeight) $('feedback').scrollIntoView({ block: 'start', behavior: 'smooth' });
+  }
+}
+
+function tick() {
+  const left = Math.max(0, state.endAt - Date.now());
+  const s = Math.ceil(left / 1000);
+  $('g-time').textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+  const fill = $('timefill');
+  fill.style.width = (100 * left / (state.sec * 1000)) + '%';
+  fill.classList.toggle('low', left < 10000);
+  if (left <= 0) { state.elapsed = state.sec * 1000; finish('cas'); }
+}
+
+// Uloženie výsledku šprintu a správa o rekorde. Pri chybe spojenia sa dá
+// uloženie zopakovať tlačidlom (výsledok sa medzitým drží v pamäti stránky).
+async function ulozAOznam(v) {
+  const box = $('e-save');
+  box.innerHTML = `<div class="note">Ukladám výsledok…</div>`;
+  try {
+    const r = await ulozVysledok(v);
+    if (!state || state.vysledok !== v) return;     // medzitým sa začal ďalší šprint
+    const rek = Number(r && r.rekord) || v.skore;
+    const pred = Number(r && r.predtym) || 0;
+    box.innerHTML = (r && r.novy_rekord)
+      ? `<div class="record">Nový rekord: ${v.skore}${pred ? ` (predtým ${pred})` : ''}</div>`
+      : '';
+    const t = $('e-best'); if (t) t.textContent = rek;
+    renderTypes();
+  } catch (e) {
+    if (!state || state.vysledok !== v) return;
+    console.error('Výsledok šprintu sa neuložil:', e);
+    box.innerHTML = `<div class="chyba-box">Výsledok sa nepodarilo uložiť.<button id="e-retry">Skúsiť znova</button></div>`;
+    $('e-retry').addEventListener('click', () => ulozAOznam(v));
+  }
+}
+
+// reason: 'chyba' (prvá chyba v šprinte), 'cas' (uplynul čas), 'koniec' (tlačidlo Ukončiť)
+function finish(reason = 'koniec') {
+  if (!state || state.over) return;
+  state.over = true;
+  clearInterval(state.timer);
+  clearTimeout(state.nextTimer);
+  $('toast').hidden = true;
+  $('e-save').innerHTML = '';
+  const total = state.ok + state.bad;
+  if (state.mode === 'trening' && total === 0) { renderTypes(); show('start'); return; }
+  const name = TYPES[state.typeKey].name;
+  let recHtml = '';
+
+  if (state.mode === 'sprint') {
+    if (reason === 'koniec') state.elapsed = Math.min(Date.now() - state.startAt, state.sec * 1000);
+    $('e-title').textContent =
+      (reason === 'chyba' ? 'Šprint skončil chybou' : reason === 'cas' ? 'Čas vypršal bez chyby' : 'Šprint ukončený') +
+      ` – ${name} (${state.sec} s)`;
+    const best = Math.max(getRec(state.typeKey, state.sec), state.ok);
+    $('e-stats').innerHTML =
+      `<div class="stat-tile"><div class="v">${state.ok}</div><div class="k">správne bez chyby</div></div>` +
+      `<div class="stat-tile"><div class="v">${mmss(state.ok ? state.lastOkMs : 0)}</div><div class="k">čas poslednej správnej</div></div>` +
+      `<div class="stat-tile"><div class="v" id="e-best">${best}</div><div class="k">rekord ${state.sec} s</div></div>`;
+    state.vysledok = {
+      typ: state.typeKey, dlzka: state.sec, skore: state.ok,
+      cas_ms: state.ok ? Math.round(state.lastOkMs) : 0,
+      koniec: reason === 'koniec' ? 'ukoncil' : reason
+    };
+    ulozAOznam(state.vysledok);
+  } else {
+    const pct = total ? Math.round(100 * state.ok / total) : 0;
+    $('e-title').textContent = `Tréning ukončený – ${name}`;
+    $('e-stats').innerHTML =
+      `<div class="stat-tile"><div class="v">${state.ok}</div><div class="k">správne</div></div>` +
+      `<div class="stat-tile"><div class="v">${state.bad}</div><div class="k">chyby</div></div>` +
+      `<div class="stat-tile"><div class="v">${pct} %</div><div class="k">úspešnosť</div></div>`;
+  }
+  if (state.typeKey === 'jazdec' || state.typeKey === 'mix')
+    recHtml += `<div class="note">Cesta jazdca: dosiahnutý stupeň ${state.jz.level + 1} z ${JAZDEC_STUPNE.length} (${rozsah(state.jz.level)})</div>`;
+  $('e-record').innerHTML = recHtml;
+
+  const sprint = state.mode === 'sprint';
+  $('e-mist-title').textContent = sprint ? 'Chyba, ktorá šprint ukončila' : 'Chyby na prezretie';
+  $('e-mist-title').hidden = !state.mistakes.length;
+  $('e-mist').innerHTML = state.mistakes.length
+    ? state.mistakes.map(({ q, given }) => {
+        const g = q.answers.find(a => a.v === given).label;
+        const c = q.answers.find(a => a.v === q.correct).label;
+        return `<div class="mist">
+          <div class="q">${q.html}</div>
+          <div class="a">Tvoja odpoveď: ${g} · Správne: <b>${c}</b></div>
+          <details${sprint ? ' open' : ''}><summary>Ukáž na šachovnici</summary>${renderBoard(q.board)}</details>
+        </div>`;
+      }).join('')
+    : `<p class="empty">${sprint ? 'Bez jedinej chyby – výborne!' : 'Žiadne chyby – výborne!'}</p>`;
+  show('end');
+}
+
+$('g-quit').addEventListener('click', () => finish('koniec'));
+$('e-again').addEventListener('click', () => startGame(state.typeKey, state.modeKey));
+$('e-back').addEventListener('click', () => { renderTypes(); show('start'); });
+
+document.addEventListener('keydown', e => {
+  if (screen !== 'game' || !state || state.over) return;
+  const key = e.key.toLowerCase();
+  if (!state.locked) {
+    const a = state.q.answers.find(x => x.keys.includes(key));
+    if (a) { e.preventDefault(); answer(a.v); }
+  } else if (state.mode === 'trening' && (e.key === 'Enter' || e.key === ' ')) {
+    e.preventDefault(); nextQ();
+  }
+});
+
+/* =========================================================
+   Rebríček
+   Prvých 10 hráčov v každom type úloh a pod nimi moje umiestnenie, ak
+   medzi nimi nie som. Údaje pripravuje funkcia vizualizacia_rebricek —
+   vydá len meno, skóre a čas.
+   ========================================================= */
+const LB_TYPY = ['farba', 'diagonala', 'jazdec', 'stvorec', 'mix'];
+const MEDAILY = ['🥇', '🥈', '🥉'];
+const lb = { dlzka: 60, skupina: false, mesiac: false };
+let lbPoradie = 0;               // aby starší pomalší dotaz neprepísal novší
+
+function nastavTog(id, hodnota) {
+  document.querySelectorAll(`#${id} button`).forEach(b => b.classList.toggle('active', b.dataset.v === String(hodnota)));
+}
+
+function otvorRebricek() {
+  const sec = modeSec(mode);
+  if (sec) lb.dlzka = sec;                         // otvor rebríček práve zvoleného šprintu
+  nastavTog('tog-dlzka', lb.dlzka);
+  nastavTog('tog-skupina', lb.skupina ? 1 : 0);
+  nastavTog('tog-mesiac', lb.mesiac ? 1 : 0);
+  show('lb');
+  nacitajRebricek();
+}
+
+function popisRebricka(maSkupinu) {
+  const mesiac = new Date().toLocaleDateString('sk-SK', { month: 'long', year: 'numeric' });
+  const kto = lb.skupina ? (maSkupinu === false ? 'všetci hráči (nemáš pridelenú skupinu)' : 'moja skupina') : 'všetci hráči';
+  return `Šprint ${lb.dlzka} s · ${kto} · ${lb.mesiac ? mesiac : 'celkovo'}. ` +
+         `Poradie podľa najlepšieho výsledku; pri rovnakom počte rozhoduje čas poslednej správnej odpovede.`;
+}
+
+const hracov = n => `${n} ${pl(n, 'hráč', 'hráči', 'hráčov')}`;
+
+function riadokLb(poradie, meno, skore, casMs, ja) {
+  return `<div class="lb-row${ja ? ' me' : ''}">
+    <span class="lb-rank">${MEDAILY[poradie - 1] || poradie + '.'}</span>
+    <span class="lb-name" title="${esc(meno)}">${esc(meno)}</span>
+    <span class="lb-score">${skore}</span>
+    <span class="lb-time">${mmss(casMs)}</span>
+  </div>`;
+}
+
+function kartaLb(typ, d) {
+  d = d || { pocet: 0, top: [], ja: null };
+  const top = d.top || [];
+  let telo = top.length
+    ? top.map(r => riadokLb(r.poradie, r.meno, r.skore, r.cas_ms, r.ja)).join('')
+    : `<div class="lb-info">Zatiaľ bez výsledkov</div>`;
+  if (d.ja && d.ja.poradie > 10) {
+    telo += `<div class="lb-sep">⋯</div>` + riadokLb(d.ja.poradie, 'Ty', d.ja.skore, d.ja.cas_ms, true);
+  } else if (!d.ja && top.length) {
+    telo += `<div class="lb-info">Ty: zatiaľ bez výsledku</div>`;
+  }
+  return `<div class="lb-card">
+    <div class="lb-head lb-${typ}"><span>${TYPES[typ].icon} ${TYPES[typ].name}</span>
+      <small>${d.pocet ? hracov(d.pocet) : ''}</small></div>
+    <div class="lb-body">${telo}</div>
+  </div>`;
+}
+
+async function nacitajRebricek() {
+  const moje = ++lbPoradie;
+  $('lb-popis').textContent = popisRebricka();
+  if (LOKALNE) {
+    $('lb-grid').innerHTML = `<div class="lb-info" style="grid-column:1/-1">Rebríček je dostupný na webe po prihlásení. ` +
+      `Pri teste zo súboru sa výsledky ukladajú len do tohto prehliadača.</div>`;
+    return;
+  }
+  $('lb-grid').innerHTML = `<div class="lb-info" style="grid-column:1/-1">Načítavam…</div>`;
+  try {
+    const r = await sbFetch('rpc/vizualizacia_rebricek', {
+      method: 'POST',
+      body: JSON.stringify({ p_dlzka: lb.dlzka, p_skupina: lb.skupina, p_mesiac: lb.mesiac })
+    });
+    if (moje !== lbPoradie) return;
+    const maSkupinu = !!(r && r.skupina);
+    const btnSk = document.querySelector('#tog-skupina button[data-v="1"]');
+    btnSk.disabled = !maSkupinu;
+    btnSk.title = maSkupinu ? '' : 'Nemáš pridelenú skupinu';
+    $('lb-popis').textContent = popisRebricka(maSkupinu);
+    const typy = (r && r.typy) || {};
+    $('lb-grid').innerHTML = LB_TYPY.map(t => kartaLb(t, typy[t])).join('');
+  } catch (e) {
+    if (moje !== lbPoradie) return;
+    console.error('Rebríček sa nenačítal:', e);
+    $('lb-grid').innerHTML = `<div class="chyba-box" style="grid-column:1/-1">Rebríček sa nepodarilo načítať.` +
+      `<button id="lb-retry">Skúsiť znova</button></div>`;
+    $('lb-retry').addEventListener('click', nacitajRebricek);
+  }
+}
+
+function prepinac(id, nastav) {
+  $(id).addEventListener('click', e => {
+    const b = e.target.closest('button');
+    if (!b || b.disabled || b.classList.contains('active')) return;
+    nastav(b.dataset.v);
+    nastavTog(id, b.dataset.v);
+    nacitajRebricek();
+  });
+}
+prepinac('tog-dlzka',   v => { lb.dlzka = Number(v); });
+prepinac('tog-skupina', v => { lb.skupina = v === '1'; });
+prepinac('tog-mesiac',  v => { lb.mesiac = v === '1'; });
+
+$('btn-lb').addEventListener('click', otvorRebricek);
+$('lb-back').addEventListener('click', () => { renderTypes(); show('start'); });
+
+/* =========================================================
+   Spustenie
+   ========================================================= */
+async function init() {
+  if (LOKALNE) {                                   // súbor z disku: bez prihlásenia
+    $('test-pas').hidden = false;
+    nacitajRekordyLokalne();
+    renderTypes();
+    return;
+  }
+  // Kým neprebehnú kontroly (prihlásenie, údržba, platnosť, prístup), úlohy sa
+  // nedajú spustiť
+  $('types').innerHTML = '<div class="lb-info">Načítavam…</div>';
+  $('btn-lb').hidden = true;
+  const ok = await refreshSession();
+  if (!ok) { location.href = 'login.html'; return; }
+  if (!await vyzadujBezUdrzby()) return;
+  if (!await vyzadujPlatnost()) return;
+  if (!await VizPristup.vyzaduj()) return;         // kým sa pripravuje, len admin a testeri
+  hlasPritomnost();
+  await nacitajRekordyZDatabazy();
+  $('btn-lb').hidden = false;
+  renderTypes();
+}
+init();
+</script>
+<script>
+if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(e =>
+      console.warn('Service worker sa nezaregistroval:', e));
+  });
+}
+</script>
+</body>
+</html>
