@@ -154,6 +154,15 @@
   .board.klik .c{cursor:pointer}
   @media (hover:hover){.board.klik .c:hover{box-shadow:inset 0 0 0 3px rgba(10,79,214,.55)}}
   .strana{font-size:13px;color:var(--muted);text-align:center;margin:4px 0;font-weight:600}
+  /* otočenie šachovnice: oznam cez šachovnicu a otočenie o 180° */
+  #q-board{position:relative}
+  #q-board.toci .board{animation:otoc .8s ease-in-out}
+  @keyframes otoc{from{transform:rotate(-180deg)}to{transform:rotate(0deg)}}
+  @media (prefers-reduced-motion:reduce){#q-board.toci .board{animation:none}}
+  .otoc-oznam{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:5;pointer-events:none;
+              background:rgba(17,24,39,.9);color:#fff;font-weight:800;font-size:24px;padding:14px 24px;
+              border-radius:14px;text-align:center;box-shadow:0 8px 24px rgba(0,0,0,.3);white-space:nowrap}
+  .otoc-oznam small{display:block;font-size:15px;font-weight:600;opacity:.9;margin-top:4px}
 
   /* --- koniec --- */
   .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}
@@ -311,7 +320,7 @@
 
 <script>
 // ZNAČKA VERZIE — pri každej úprave tohto súboru prepíš dátum.
-(window.VERZIE = window.VERZIE || {})['vizualizacia.html'] = '2026-10-05c';
+(window.VERZIE = window.VERZIE || {})['vizualizacia.html'] = '2026-10-06';
 
 /* =========================================================
    NASTAVENIA – dajú sa ľahko meniť
@@ -327,13 +336,20 @@ const JAZDEC_STUPNE = [
 // Koľko správnych odpovedí za sebou treba na postup na vyšší stupeň
 const JAZDEC_POSTUP = 5;
 // Nájdi pole: stupne obťažnosti. smery: 'klik' = klikni na pole, 'nazov' = ktoré pole je
-// označené; cierny = aký podiel úloh je z pohľadu čierneho (otočená šachovnica)
+// označené; otaca = šachovnica sa občas otočí (pohľad čierneho)
 const POLIA_STUPNE = [
-  { popis: 'klikni na pole · pohľad bieleho',               smery: ['klik'],          cierny: 0   },
-  { popis: 'klikni aj pomenuj pole · pohľad bieleho',       smery: ['klik', 'nazov'], cierny: 0   },
-  { popis: 'klikni aj pomenuj pole · biely aj čierny pohľad', smery: ['klik', 'nazov'], cierny: 0.5 }
+  { popis: 'klikni na pole · pohľad bieleho',               smery: ['klik'],          otaca: false },
+  { popis: 'klikni aj pomenuj pole · pohľad bieleho',       smery: ['klik', 'nazov'], otaca: false },
+  { popis: 'klikni aj pomenuj pole · biely aj čierny pohľad', smery: ['klik', 'nazov'], otaca: true  }
 ];
 const POLIA_POSTUP = 8;
+// Otáčanie šachovnice: hra (aj 3. stupeň) začína bielym dole. Šachovnica ostane
+// otočená rovnako aspoň OTOC_MIN úloh, potom sa pred každou ďalšou úlohou otočí
+// s pravdepodobnosťou OTOC_SANCA. Otočenie ohlási veľký oznam a počas OTOC_PAUZA
+// milisekúnd sa nedá odpovedať.
+const OTOC_MIN = 4;
+const OTOC_SANCA = 0.35;
+const OTOC_PAUZA = 1300;
 // Šprint: končí pri prvej chybe alebo po uplynutí času (60 s alebo 120 s).
 // Výsledok každého šprintu sa ukladá do databázy (tabuľka vizualizacia_sprint,
 // funkcia vizualizacia_zapis — pozri vizualizacia.sql). Do training_log sa
@@ -530,10 +546,10 @@ function genStvorec() {
    'nazov' – pole je označené, hráč vyberie jeho meno zo štyroch možností
    Pri pohľade čierneho je šachovnica otočená (h8 vľavo dole).
    ========================================================= */
-function genPolia(level) {
+function genPolia(level, flip = false) {
   const st = POLIA_STUPNE[level];
   const smer = pick(st.smery);
-  const flip = Math.random() < st.cierny;
+  flip = !!(flip && st.otaca);
   const t = randSq(), s = S(t);
   const b = newBoard();
   b.flip = flip;
@@ -564,7 +580,7 @@ const polieZMena = s => ({ f: FILES.indexOf(s[0]), r: Number(s[1]) - 1 });
    ========================================================= */
 const TYPES = {
   polia:     { name: 'Nájdi pole',       icon: '▦', desc: 'Klikni na pole na šachovnici bez súradníc, neskôr aj urči označené pole a pohľad čierneho.',
-               gen: () => genPolia(state ? state.pl.level : 0) },
+               gen: () => genPolia(state ? state.pl.level : 0, state ? state.pl.flip : false) },
   farba:     { name: 'Farba poľa',       icon: '◩', desc: 'Je pole biele alebo čierne?', gen: genFarba },
   diagonala: { name: 'Diagonála',        icon: '⟋', desc: 'Ležia dve polia na jednej diagonále?', gen: genDiag },
   jazdec:    { name: 'Cesta jazdca',     icon: '♘︎', desc: 'Koľkými ťahmi sa jazdec dostane z poľa na pole? Od krátkych ciest k dlhším.',
@@ -715,7 +731,7 @@ function startGame(typeKey, modeKey) {
             startAt: now, endAt: now + sec * 1000, elapsed: 0, lastOkMs: 0,
             timer: null, nextTimer: null, over: false,
             jz: { level: 0, streak: 0 },           // stupeň v ceste jazdca
-            pl: { level: 0, streak: 0 } };         // stupeň v Nájdi pole
+            pl: { level: 0, streak: 0, flip: false, vOrient: 0 } };   // Nájdi pole: stupeň a otočenie šachovnice
   const m = state.mode;
   $('timebar').hidden = m !== 'sprint';
   $('levelbar').hidden = !STUPNE_TYPU[typeKey];
@@ -753,6 +769,7 @@ function posunStupen(typ, right) {
     p.streak++;
     if (p.streak >= st.postup && p.level < st.stupne.length - 1) {
       p.level++; p.streak = 0;
+      p.flip = false; p.vOrient = 0;             // nový stupeň začína bielym dole
       toast(`${st.nazov} – postup na stupeň ${p.level + 1}: ${st.popis(p.level)}`);
     }
   } else p.streak = 0;
@@ -774,8 +791,19 @@ function updateStat() {
     : `Správne ${state.ok} · Chyby ${state.bad}`;
 }
 
+// Nájdi pole: má sa pred touto úlohou otočiť šachovnica? Rozhoduje sa raz na úlohu.
+function pripravOrientaciu() {
+  const p = state.pl;
+  if (!POLIA_STUPNE[p.level].otaca) { p.flip = false; p.vOrient = 0; return false; }
+  let otocenie = false;
+  if (p.vOrient >= OTOC_MIN && Math.random() < OTOC_SANCA) { p.flip = !p.flip; p.vOrient = 0; otocenie = true; }
+  p.vOrient++;
+  return otocenie;
+}
+
 function nextQ() {
   if (state.over) return;
+  const otocenie = state.typeKey === 'polia' && pripravOrientaciu();
   const q = genQ();
   state.q = q; state.prev = q.html + '|' + q.correct; state.locked = false;
   $('q-type').textContent = TYPES[q.type].name + (q.pohlad || '');
@@ -800,6 +828,21 @@ function nextQ() {
   $('q-fb').innerHTML = '';
   $('q-text').hidden = false;
   $('qcard').classList.toggle('kompakt', q.type === 'polia');
+  if (otocenie) {
+    // Veľký oznam priamo na šachovnici a viditeľné otočenie – hráč sa pozerá na
+    // šachovnicu, nápis pod ňou by prehliadol. Kým oznam svieti, nedá sa odpovedať.
+    state.locked = true;
+    const qb = $('q-board');
+    qb.classList.add('toci');
+    qb.insertAdjacentHTML('beforeend', `<div class="otoc-oznam">↻ Otáčam šachovnicu` +
+      `<small>${q.flip ? 'dole je teraz čierny' : 'dole je zase biely'}</small></div>`);
+    setTimeout(() => {
+      if (state.q !== q || state.over) return;
+      qb.classList.remove('toci');
+      qb.querySelector('.otoc-oznam')?.remove();
+      state.locked = false;
+    }, OTOC_PAUZA);
+  }
   updateStat();
   if (document.activeElement) document.activeElement.blur();
   if (window.scrollY > 0) window.scrollTo({ top: 0, behavior: 'smooth' });   // nová otázka vždy na očiach
