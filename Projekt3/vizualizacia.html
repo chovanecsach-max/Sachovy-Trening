@@ -36,6 +36,11 @@
   .hbtn:hover{border-color:var(--accent2)}
   .hbtn.gold{border-color:#e9c46a;background:#fff8e6;color:#8a5a00}
   .hbtn.gold:hover{border-color:#d4a843}
+  .zadanie-pas{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:#eff6ff;border:1px solid #bfdbfe;
+               color:#1e3a5f;border-radius:12px;padding:10px 14px;margin:0 0 14px;font-size:15px}
+  .zadanie-pas .txt{flex:1 1 260px}
+  .zadanie-pas .primary{padding:8px 16px;font-size:15px}
+  .zadanie-pas a{color:var(--accent2);font-size:14px}
   .test-pas{margin:-6px 0 14px;padding:8px 12px;border-radius:10px;background:#fffbeb;border:1px solid #fde68a;
             color:#92400e;font-size:14px}
 
@@ -250,6 +255,7 @@
       <button class="seg" data-mode="sprint60"><b>Šprint 60 s</b><small>do prvej chyby</small></button>
       <button class="seg" data-mode="sprint120"><b>Šprint 120 s</b><small>do prvej chyby</small></button>
     </div>
+    <div class="zadanie-pas" id="zadaniePas" hidden></div>
     <p class="rules" id="rules" hidden>Šprint sa končí pri prvej chybe alebo po uplynutí času. Rekord je počet správnych odpovedí bez chyby.</p>
     <div class="types" id="types"></div>
   </section>
@@ -320,7 +326,7 @@
 
 <script>
 // ZNAČKA VERZIE — pri každej úprave tohto súboru prepíš dátum.
-(window.VERZIE = window.VERZIE || {})['vizualizacia.html'] = '2026-10-06';
+(window.VERZIE = window.VERZIE || {})['vizualizacia.html'] = '2026-10-07';
 
 /* =========================================================
    NASTAVENIA – dajú sa ľahko meniť
@@ -988,6 +994,12 @@ function finish(reason = 'koniec') {
     const lv = state[stTyp.kluc].level;
     recHtml += `<div class="note">${stTyp.nazov}: dosiahnutý stupeň ${lv + 1} z ${stTyp.stupne.length} (${stTyp.popis(lv)})</div>`;
   }
+  // Šprint pre zadanie od trénera: započíta sa?
+  if (ZADANIE && state.mode === 'sprint' && state.typeKey === ZADANIE.typ && state.sec === ZADANIE.sec) {
+    recHtml += state.ok >= ZADANIE.y
+      ? `<div class="record">📌 Tento šprint sa započíta do zadania (aspoň ${ZADANIE.y} ${pl(ZADANIE.y, 'bod', 'body', 'bodov')}).</div>`
+      : `<div class="note">📌 Do zadania sa započíta šprint s aspoň ${ZADANIE.y} ${pl(ZADANIE.y, 'bodom', 'bodmi', 'bodmi')} – tento mal ${state.ok}.</div>`;
+  }
   $('e-record').innerHTML = recHtml;
 
   const sprint = state.mode === 'sprint';
@@ -1131,9 +1143,35 @@ $('btn-lb').addEventListener('click', otvorRebricek);
 $('lb-back').addEventListener('click', () => { renderTypes(); show('start'); });
 
 /* =========================================================
+   Zadanie od trénera
+   Zo Zadaní sa sem prichádza s adresou ?typ=farba&sprint=60&x=5&y=20
+   (pozri js/vizualizacia-zadania.js). Pripraví sa správny šprint a ukáže sa,
+   čo treba splniť. Splnenie počíta databáza zo šprintov, nie táto stránka.
+   ========================================================= */
+let ZADANIE = null;
+
+function nacitajZadanieZAdresy() {
+  const u = new URLSearchParams(location.search);
+  const typ = u.get('typ'), sec = Number(u.get('sprint')), x = Number(u.get('x')), y = Number(u.get('y'));
+  if (!TYPES[typ] || ![60, 120].includes(sec) || !(x >= 1 && x <= 100) || !(y >= 1 && y <= 1000)) return;
+  ZADANIE = { typ, sec, x: Math.round(x), y: Math.round(y) };
+  mode = 'sprint' + sec;
+  document.querySelectorAll('.seg').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+  const pas = $('zadaniePas');
+  pas.innerHTML =
+    `<span class="txt">📌 <b>Zadanie od trénera:</b> ${TYPES[typ].icon} ${TYPES[typ].name} · šprint ${sec} s · ` +
+    `${ZADANIE.x}× aspoň ${ZADANIE.y} ${pl(ZADANIE.y, 'bod', 'body', 'bodov')}</span>` +
+    `<button class="primary" id="zadanieStart">▶ Spustiť šprint</button>` +
+    (LOKALNE ? '' : '<a href="zadania.html">Moje zadania</a>');
+  pas.hidden = false;
+  $('zadanieStart').addEventListener('click', () => startGame(ZADANIE.typ, 'sprint' + ZADANIE.sec));
+}
+
+/* =========================================================
    Spustenie
    ========================================================= */
 async function init() {
+  nacitajZadanieZAdresy();
   if (LOKALNE) {                                   // súbor z disku: bez prihlásenia
     $('test-pas').hidden = false;
     nacitajRekordyLokalne();
