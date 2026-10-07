@@ -79,7 +79,11 @@ button { padding: 10px 16px; border: none; border-radius: 10px; cursor: pointer;
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/auth.js"></script>
 <script src="js/player.js"></script>
+<script src="js/vizualizacia-zadania.js"></script>
 <script>
+// ZNAČKA VERZIE — pri každej úprave tohto súboru prepíš dátum.
+(window.VERZIE = window.VERZIE || {})['zadania.html'] = '2026-10-07';
+
 // Slovenské názvy zručností (kľúč = hodnota v assignments.skill)
 const SKILL_NAMES = {
   checks: 'Šachy', captures: 'Brania', pawn_breakthrough: 'Pešiakové prielomy',
@@ -90,11 +94,15 @@ const SKILL_NAMES = {
   taktika: 'Taktika', strategia: 'Stratégia', koncovka: 'Koncovka'
 };
 
+// Zadania vizualizácie (viz_farba, …) — názvy z vizualizacia-zadania.js
+Object.assign(SKILL_NAMES, VizZadania.NAZVY_ZRUCNOSTI);
+
 // Základné kategórie sa trénujú cez training.html, zručnosti cez skills.html
 const BASIC_MODES = ['taktika', 'strategia', 'koncovka'];
 
 function goHome()  { location.href = 'index.html'; }
 function goTrain(a) {
+  if (VizZadania.je(a)) { location.href = VizZadania.odkaz(a); return; }   // rovno do správneho šprintu
   if (a.endgame_type) { location.href = 'training.html?mode=koncovka&endgame=' + encodeURIComponent(a.endgame_type); return; }
   location.href = BASIC_MODES.includes(a.skill)
     ? 'training.html?mode=' + a.skill
@@ -123,7 +131,17 @@ function clamp01(x) { return Math.max(0, Math.min(1, x)); }
 // 'count' → podľa počtu úloh vyriešených NA PRVÝ POKUS po zadaní
 //           (opakované riešenie ani výhra po chybe sa nepočítajú)
 // Koncovky fungujú rovnako, len sa filtrujú podľa endgame_type.
-function computeProgress(a, player, logRows, meta) {
+// 'sprint' → vizualizácia: počet šprintov s aspoň Y bodmi po zadaní
+function computeProgress(a, player, logRows, meta, sprinty) {
+  if (VizZadania.je(a)) {
+    const p = VizZadania.pokrok(sprinty, a, player.user_id);
+    return {
+      pct: p.pct,
+      done: p.done,
+      text: `${escapeHtml(VizZadania.popis(a))}: ${VizZadania.ciel(a)} — ` +
+            `splnené <span class="num">${Math.min(p.n, a.target_value)}</span> z <span class="num">${a.target_value}</span>`
+    };
+  }
   if (a.target_type === 'elo' && !a.endgame_type) {
     const cur  = Number(player['elo_' + a.skill] ?? 1000);   // od 1. 9. 2026 je základ 1000
     const base = (a.baseline_elo != null) ? Number(a.baseline_elo) : null;
@@ -177,7 +195,8 @@ function renderCard(a, prog) {
     ${a.note ? `<div class="asg-note">💬 ${escapeHtml(a.note)}</div>` : ''}
     <div class="asg-meta">
       <span>${dl}</span>
-      ${prog.done ? '' : `<button class="train-btn" onclick='goTrain(${JSON.stringify({skill:a.skill,endgame_type:a.endgame_type})})'>Trénovať →</button>`}
+      ${prog.done ? '' : `<button class="train-btn" onclick='goTrain(${JSON.stringify({skill:a.skill,endgame_type:a.endgame_type,
+          target_type:a.target_type,target_value:a.target_value,viz_dlzka:a.viz_dlzka,viz_min_skore:a.viz_min_skore})})'>Trénovať →</button>`}
     </div>
   </div>`;
 }
@@ -236,9 +255,21 @@ async function load() {
     }
   }
 
+  // Zadania vizualizácie: šprinty odohrané od najstaršieho takého zadania
+  let sprinty = [];
+  const needViz = rows.filter(VizZadania.je);
+  if (needViz.length) {
+    try {
+      sprinty = await VizZadania.nacitaj([player.user_id], needViz.map(r => r.created_at).sort()[0]);
+    } catch (e) {
+      historyFailed = true;
+      console.error('Šprinty vizualizácie sa nenačítali:', e);
+    }
+  }
+
   // Spočítaj pokrok a rozdeľ na aktívne / splnené
   const withProg = rows.map(a => {
-    const prog = computeProgress(a, player, logRows, meta);
+    const prog = computeProgress(a, player, logRows, meta, sprinty);
     // Zadanie ručne uzavreté trénerom sa berie ako splnené
     if (a.completed_at) { prog.done = true; prog.pct = 1; }
     return { a, prog };
@@ -266,7 +297,7 @@ async function load() {
   }
   document.getElementById('list').innerHTML = html;
   setStatus(historyFailed
-    ? 'Pokrok pri cieľoch typu „počet úloh" sa nepodarilo načítať — skús obnoviť stránku.'
+    ? 'Pokrok pri niektorých zadaniach sa nepodarilo načítať — skús obnoviť stránku.'
     : '', historyFailed ? 'error' : '');
 }
 
