@@ -11,11 +11,12 @@
 //  Zmena v SQL editore (netreba nič nahrávať na GitHub), pozri vizualizacia.sql:
 //      update nastavenia set hodnota = 'vsetci', zmenene = now() where kluc = 'vizualizacia';
 //
-//  Používa: index.html (tlačidlo v menu) a vizualizacia.html (stránka).
+//  Používa: index.html (tlačidlo v menu), vizualizacia.html (stránka) a
+//           vizualizacia-prehlad.html (upozornenie pri zadávaní).
 //  Potrebuje: js/player.js (sbFetch).
 // ============================================================================
 
-(window.VERZIE = window.VERZIE || {})['vizualizacia-pristup.js'] = '2026-10-05';
+(window.VERZIE = window.VERZIE || {})['vizualizacia-pristup.js'] = '2026-10-07';
 
 const VizPristup = (function () {
   'use strict';
@@ -75,5 +76,5 @@ const VizPristup = (function () {
     return false;
   }
 
-  return { ma: ma, vyzaduj: vyzaduj };
+  return { ma: ma, vyzaduj: vyzaduj, uroven: uroven };
 })();
