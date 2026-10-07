@@ -116,11 +116,12 @@ tr.late td { background: #fffbfa; }
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/auth.js"></script>
 <script src="js/player.js"></script>
+<script src="js/vizualizacia-zadania.js"></script>
 <script>
 // ZNAČKA VERZIE — pri každej úprave tohto súboru prepíš dátum.
 // Vypíše sa v konzole, alebo na mobile po pridaní ?verzia do adresy.
 // Mechanika je v player.js pri funkcii verzie().
-(window.VERZIE = window.VERZIE || {})['zadania-prehlad.html'] = '2026-09-07';
+(window.VERZIE = window.VERZIE || {})['zadania-prehlad.html'] = '2026-10-07';
 
 const USER_ROLE        = sessionStorage.getItem('user_role') || '';
 const USER_NICK        = sessionStorage.getItem('user_nick') || sessionStorage.getItem('user_name') || '';
@@ -141,6 +142,8 @@ const SKILL_NAMES = {
 // Základné kategórie sa trénujú cez training.html, zručnosti cez skills.html
 const BASIC_MODES = ['taktika', 'strategia', 'koncovka'];
 const ELO_FIELDS = [...new Set(Object.keys(SKILL_NAMES).map(k => 'elo_' + k))];
+// Zadania vizualizácie (viz_farba, …) — až PO ELO_FIELDS, tie nemajú ELO stĺpec
+Object.assign(SKILL_NAMES, VizZadania.NAZVY_ZRUCNOSTI);
 
 let allRows = [];   // { a, player, prog, state }
 
@@ -161,7 +164,11 @@ function daysLeft(d) {
 function clamp01(x) { return Math.max(0, Math.min(1, x)); }
 
 // ─── Pokrok (rovnaká logika ako na stránke hráča) ───────────────────────────
-function computeProgress(a, player, logRows, meta) {
+function computeProgress(a, player, logRows, meta, sprinty) {
+  if (VizZadania.je(a)) {                       // vizualizácia: šprinty s aspoň Y bodmi po zadaní
+    const p = VizZadania.pokrok(sprinty, a, player?.user_id);
+    return { pct: p.pct, done: p.done, txt: `${Math.min(p.n, a.target_value)} / ${a.target_value} šprintov` };
+  }
   if (a.target_type === 'elo' && !a.endgame_type) {
     const cur  = Number(player?.['elo_' + a.skill] ?? 1000);   // od 1. 9. 2026 je základ 1000
     const base = (a.baseline_elo != null) ? Number(a.baseline_elo) : null;
@@ -198,7 +205,7 @@ async function sbFetchAll(query) {
 async function load() {
   setStatus('Načítavam...');
   try {
-    const sel = `*,player:players(id,name,surname,${ELO_FIELDS.join(',')})`;
+    const sel = `*,player:players(id,user_id,name,surname,${ELO_FIELDS.join(',')})`;
     const rows = await sbFetchAll(`assignments?select=${sel}&order=created_at.desc`) || [];
 
     if (!rows.length) {
@@ -217,6 +224,7 @@ async function load() {
     // Načítavajú sa aj neúspechy, inak by sa nedalo rozlíšiť riešenie na prvý
     // pokus od výhry po chybe.
     let logRows = [], meta = { puzzles: new Map(), skills: new Map() };
+    let chybaPokroku = '';      // hláška musí ostať viditeľná aj po vykreslení tabuľky
     const needLog = rows.filter(r => r.target_type === 'count' || r.endgame_type);
     if (needLog.length) {
       const from = new Date(needLog.map(r => r.created_at).sort()[0]).toISOString();
@@ -225,12 +233,24 @@ async function load() {
         logRows = await loadAssignmentLog(pids, from);
         meta    = await loadAssignmentPuzzleMeta(logRows);
       } catch (e) {
-        setStatus('Pokrok pri cieľoch „počet úloh" sa nepodarilo načítať.', 'error');
+        chybaPokroku = 'Pokrok pri cieľoch „počet úloh" sa nepodarilo načítať.';
+      }
+    }
+
+    // Zadania vizualizácie: šprinty hráčov od najstaršieho takého zadania
+    let sprinty = [];
+    const needViz = rows.filter(VizZadania.je);
+    if (needViz.length) {
+      try {
+        sprinty = await VizZadania.nacitaj(needViz.map(r => r.player?.user_id),
+                                           needViz.map(r => r.created_at).sort()[0]);
+      } catch (e) {
+        chybaPokroku = 'Pokrok pri zadaniach vizualizácie sa nepodarilo načítať.';
       }
     }
 
     allRows = rows.map(a => {
-      const prog = computeProgress(a, a.player, logRows, meta);
+      const prog = computeProgress(a, a.player, logRows, meta, sprinty);
       // Ručne uzavreté zadanie sa berie ako splnené bez ohľadu na výpočet
       const done = !!a.completed_at || prog.done;
       const late = !done && a.deadline && daysLeft(a.deadline) < 0;
@@ -248,7 +268,7 @@ async function load() {
     }
 
     render();
-    setStatus('');
+    setStatus(chybaPokroku, chybaPokroku ? 'error' : '');
   } catch (e) {
     setStatus('Chyba pri načítaní: ' + e.message, 'error');
   }
@@ -300,7 +320,8 @@ function render() {
       ? `<span class="badge done">✅ Splnené${a.completed_at ? ' (uzavreté)' : ''}</span>`
       : x.late ? '<span class="badge late">⏰ Po termíne</span>'
                : '<span class="badge run">Prebieha</span>';
-    const goal = a.target_type === 'elo' ? `ELO ${a.target_value}`
+    const goal = VizZadania.je(a)       ? `${VizZadania.ciel(a)} · šprint ${a.viz_dlzka} s`
+               : a.target_type === 'elo' ? `ELO ${a.target_value}`
                : `${a.target_value} ${a.endgame_type ? 'koncoviek' : 'úloh'}`;
     let dl = '—';
     if (a.deadline) {
