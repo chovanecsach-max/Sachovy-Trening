@@ -30,6 +30,7 @@ button { padding: 10px 16px; border: none; border-radius: 10px; cursor: pointer;
 .status { margin: 12px 0; padding: 10px; border-radius: 10px; border: 1px solid #d1d5db;
           background: #f8fafc; color: #334155; font-size: 14px; }
 .status.error { background: #fef2f2; border-color: #fca5a5; color: #b91c1c; }
+.status.ok    { background: #f0fdf4; border-color: #86efac; color: #166534; }
 
 /* Súhrn */
 .tiles { display: flex; gap: 10px; flex-wrap: wrap; margin: 4px 0 14px; }
@@ -75,6 +76,24 @@ tr.nehral td.meno { color: #64748b; font-weight: normal; }
 .tip { position: absolute; pointer-events: none; background: #fff; border: 1px solid #cbd5e1; border-radius: 8px;
        box-shadow: 0 4px 14px rgba(0,0,0,.12); padding: 6px 9px; font-size: 12px; color: #475569; white-space: nowrap; z-index: 2; }
 .tip b { color: #111827; font-size: 14px; }
+
+/* Zadanie úlohy označeným hráčom */
+th.chk, td.chk { width: 30px; text-align: center; padding-left: 4px; padding-right: 4px; }
+td.chk input, th.chk input { width: 18px; height: 18px; cursor: pointer; }
+.primary { background: #1e3a5f; color: #fff; font-weight: bold; }
+.primary:disabled { background: #94a3b8; }
+.zadanie-karta { margin-top: 16px; border: 1px solid #d1d5db; border-radius: 12px; padding: 14px; background: #f8fafc; }
+.zk-nadpis { font-weight: bold; font-size: 16px; color: #1e3a5f; margin-bottom: 10px; }
+.zk-nadpis .slabo { display: inline; font-size: 13px; margin-left: 6px; }
+.zadanie-karta input[type=number] { width: 90px; }
+.zadanie-karta input[type=number], .zadanie-karta input[type=date], .zadanie-karta input[type=text] {
+  padding: 8px 10px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px; font-family: inherit; }
+.zadanie-karta .siroke { flex: 1 1 220px; }
+.zadanie-karta .siroke input { width: 100%; box-sizing: border-box; }
+.zk-veta { margin: 12px 0 4px; font-size: 14px; color: #111827; }
+.zk-tip { font-size: 13px; color: #64748b; margin-bottom: 10px; }
+.zk-pozor { font-size: 13px; color: #92400e; background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px;
+            padding: 7px 10px; margin-bottom: 10px; }
 
 @media (max-width: 640px) {
   body { padding: 6px; }
@@ -146,6 +165,25 @@ tr.nehral td.meno { color: #64748b; font-weight: normal; }
       <div id="empty" class="empty" hidden></div>
     </div>
     <div id="legenda" class="legenda" hidden></div>
+
+    <div class="zadanie-karta" id="zadanieKarta" hidden>
+      <div class="zk-nadpis">📌 Zadať úlohu označeným hráčom <span class="slabo" id="zkPocet"></span></div>
+      <div class="filter-row">
+        <div class="filter-field"><label>Úlohy</label><select id="zTyp"></select></div>
+        <div class="filter-field"><label>Šprint</label>
+          <select id="zDlzka"><option value="60">60 sekúnd</option><option value="120">120 sekúnd</option></select></div>
+        <div class="filter-field"><label>Koľkokrát</label><input type="number" id="zX" min="1" max="100" value="5"></div>
+        <div class="filter-field"><label>Aspoň bodov</label><input type="number" id="zY" min="1" max="1000" value="10"></div>
+        <div class="filter-field"><label>Termín</label><input type="date" id="zTermin"></div>
+        <div class="filter-field siroke"><label>Poznámka pre hráča</label>
+          <input type="text" id="zPozn" maxlength="200" placeholder="nepovinné"></div>
+      </div>
+      <div class="zk-veta" id="zkVeta"></div>
+      <div class="zk-tip" id="zkTip"></div>
+      <div class="zk-pozor" id="zkPozor" hidden></div>
+      <button class="primary" id="zZadaj" disabled>Zadať</button>
+      <div id="zkStatus" class="status" hidden></div>
+    </div>
   </section>
 
   <!-- ===== DETAIL HRÁČA ===== -->
@@ -170,9 +208,10 @@ tr.nehral td.meno { color: #64748b; font-weight: normal; }
 <script src="js/auth.js"></script>
 <script src="js/player.js"></script>
 <script src="js/vizualizacia-pristup.js"></script>
+<script src="js/vizualizacia-zadania.js"></script>
 <script>
 // ZNAČKA VERZIE — pri každej úprave tohto súboru prepíš dátum.
-(window.VERZIE = window.VERZIE || {})['vizualizacia-prehlad.html'] = '2026-10-05b';
+(window.VERZIE = window.VERZIE || {})['vizualizacia-prehlad.html'] = '2026-10-07';
 
 // Údaje pripravujú funkcie vizualizacia_prehlad a vizualizacia_hrac
 // (pozri vizualizacia-prehlad.sql). Tréner vidí len hráčov zo skupín,
@@ -296,7 +335,8 @@ function render() {
   $('tiles').hidden = false;
 
   // Hlavička
-  $('thead').innerHTML = '<tr><th class="vlavo">Hráč</th>' +
+  $('thead').innerHTML = '<tr><th class="chk"><input type="checkbox" id="chkVsetci" title="Označiť všetkých"></th>' +
+    '<th class="vlavo">Hráč</th>' +
     TYPY.map(t => `<th>${t.ikona} ${escapeHtml(t.nazov)}</th>`).join('') +
     '<th>Šprintov</th><th>Naposledy</th></tr>';
 
@@ -304,6 +344,8 @@ function render() {
   $('tbody').innerHTML = riadky.map(h => {
     const skupina = viacSkupin && h.skupina_meno ? `<span class="skupina">${escapeHtml(h.skupina_meno)}</span>` : '';
     let r = `<tr class="${h.pocet ? '' : 'nehral'}" data-user="${escapeHtml(h.user_id)}">` +
+            `<td class="chk"><input type="checkbox" class="pchk" data-user="${escapeHtml(h.user_id)}"` +
+            `${oznaceni.has(h.user_id) ? ' checked' : ''} title="Označiť na zadanie"></td>` +
             `<td class="meno vlavo">${escapeHtml(h.meno)}${skupina}</td>`;
     TYPY.forEach(typ => {
       const t = (h.typy || {})[typ.kluc];
@@ -336,12 +378,125 @@ function render() {
     '<span class="nic">·</span> = v období nehral. Stĺpec <b>Naposledy</b> ukazuje posledný šprint vôbec. ' +
     'Kliknutím na hráča sa otvorí jeho vývoj po dňoch. Vizualizácia sa nezapisuje do tréningu a nemení ELO.';
   $('legenda').hidden = false;
+  $('chkVsetci').checked = riadky.length > 0 && riadky.every(h => oznaceni.has(h.user_id));
+  $('zadanieKarta').hidden = false;
+  aktualizujZadanie();
 }
 
 $('tbody').addEventListener('click', e => {
+  if (e.target.closest('td.chk')) {                // zaškrtnutie hráča – detail sa neotvára
+    const ch = e.target.closest('td.chk').querySelector('.pchk');
+    if (e.target !== ch) ch.checked = !ch.checked;
+    if (ch.checked) oznaceni.add(ch.dataset.user); else oznaceni.delete(ch.dataset.user);
+    $('chkVsetci').checked = hraci.every(h => oznaceni.has(h.user_id));
+    aktualizujZadanie();
+    return;
+  }
   const tr = e.target.closest('tr[data-user]');
   if (tr) otvorDetail(tr.dataset.user);
 });
+$('thead').addEventListener('change', e => {
+  if (e.target.id !== 'chkVsetci') return;
+  hraci.forEach(h => { if (e.target.checked) oznaceni.add(h.user_id); else oznaceni.delete(h.user_id); });
+  document.querySelectorAll('.pchk').forEach(c => { c.checked = e.target.checked; });
+  aktualizujZadanie();
+});
+
+// ─── Zadanie úlohy ───────────────────────────────────────────────────────────
+// Tvar: „Farba poľa · šprint 60 s · 5-krát aspoň 20 bodov · do termínu“.
+// Hráč ho splní, keď PO zadaní odohrá toľko šprintov s aspoň toľkými bodmi.
+// Ukladá sa do tabuľky assignments (pozri vizualizacia-zadania.sql), pokrok
+// vidí hráč v Zadaniach a tréner v Prehľade zadaní.
+const oznaceni = new Set();          // user_id označených hráčov
+let urovenViz = 'vsetci';            // komu je vizualizácia otvorená (pre upozornenie)
+
+function hodnotyZadania() {
+  return {
+    typ:   $('zTyp').value,
+    dlzka: Number($('zDlzka').value),
+    x:     Math.round(Number($('zX').value)),
+    y:     Math.round(Number($('zY').value)),
+    termin: $('zTermin').value || null,
+    pozn:  ($('zPozn').value || '').trim() || null
+  };
+}
+
+function aktualizujZadanie() {
+  const v = hodnotyZadania();
+  const vybrani = hraci.filter(h => oznaceni.has(h.user_id));
+  const n = vybrani.length;
+  $('zkPocet').textContent = n ? `(označených ${n})` : '(zaškrtni hráčov v tabuľke)';
+  $('zZadaj').disabled = !n;
+  $('zZadaj').textContent = n ? `Zadať ${n} ${pl(n, 'hráčovi', 'hráčom', 'hráčom')}` : 'Zadať';
+
+  const nazov = (TYPY.find(t => t.kluc === v.typ) || {}).nazov || v.typ;
+  const ok = v.x >= 1 && v.x <= 100 && v.y >= 1 && v.y <= 1000;
+  $('zkVeta').innerHTML = ok
+    ? `Hráč splní zadanie, keď po zadaní odohrá <b>${v.x} ${pl(v.x, 'šprint', 'šprinty', 'šprintov')}</b> ` +
+      `<b>${escapeHtml(nazov)}</b> (${v.dlzka} s) s aspoň <b>${v.y} ${pl(v.y, 'bodom', 'bodmi', 'bodmi')}</b>` +
+      (v.termin ? ` do <b>${datum(v.termin + 'T12:00:00')}</b>.` : ' (bez termínu).')
+    : '<span style="color:#b91c1c">Počet šprintov musí byť 1 až 100 a body 1 až 1000.</span>';
+
+  // Pomôcka na voľbu bodov: najlepšie výsledky označených hráčov v tabuľke
+  if (!n) $('zkTip').textContent = '';
+  else if (v.dlzka !== Number($('fDlzka').value)) {
+    $('zkTip').textContent = `Najlepšie výsledky v šprinte ${v.dlzka} s uvidíš, keď hore prepneš Šprint na ${v.dlzka} sekúnd.`;
+  } else {
+    const naj = vybrani.map(h => (h.typy || {})[v.typ]).filter(Boolean).map(t => t.najlepsie);
+    const nehrali = n - naj.length;
+    $('zkTip').textContent = (naj.length
+      ? `Najlepšie výsledky označených hráčov (${nazov}, ${v.dlzka} s, ${popisObdobia()}): ` +
+        (Math.min(...naj) === Math.max(...naj) ? `${naj[0]}` : `${Math.min(...naj)} až ${Math.max(...naj)}`) + '. '
+      : `Označení hráči v tomto období ${nazov} (${v.dlzka} s) nehrali. `) +
+      (naj.length && nehrali ? `${nehrali} z nich nehral${nehrali === 1 ? '' : 'i'}.` : '');
+  }
+}
+
+async function zadaj() {
+  const v = hodnotyZadania();
+  const vybrani = hraci.filter(h => oznaceni.has(h.user_id) && h.player_id);
+  const st = $('zkStatus');
+  const hlas = (text, typ) => { st.textContent = text; st.className = 'status' + (typ ? ' ' + typ : ''); st.hidden = false; };
+  if (!vybrani.length) { hlas('Zaškrtni aspoň jedného hráča.', 'error'); return; }
+  if (!(v.x >= 1 && v.x <= 100 && v.y >= 1 && v.y <= 1000)) { hlas('Počet šprintov musí byť 1 až 100 a body 1 až 1000.', 'error'); return; }
+
+  const riadky = vybrani.map(h => ({
+    player_id:     h.player_id,
+    trener_id:     sessionStorage.getItem('user_id'),
+    skill:         'viz_' + v.typ,
+    target_type:   'sprint',
+    target_value:  v.x,
+    viz_dlzka:     v.dlzka,
+    viz_min_skore: v.y,
+    deadline:      v.termin,
+    note:          v.pozn
+  }));
+  $('zZadaj').disabled = true;
+  hlas('Zadávam...');
+  try {
+    const ulozene = await sbFetch('assignments?select=id', {
+      method: 'POST', prefer: 'return=representation', body: JSON.stringify(riadky)
+    });
+    if (!ulozene || ulozene.length !== riadky.length) throw new Error('databáza uložila ' + (ulozene ? ulozene.length : 0) + ' z ' + riadky.length);
+    const a = { skill: 'viz_' + v.typ, target_value: v.x, viz_dlzka: v.dlzka, viz_min_skore: v.y };
+    st.innerHTML = '';
+    hlas(`✅ Zadané ${riadky.length} ${pl(riadky.length, 'hráčovi', 'hráčom', 'hráčom')}: ${VizZadania.popis(a)} – ` +
+         `${VizZadania.ciel(a)}${v.termin ? ', termín ' + datum(v.termin + 'T12:00:00') : ''}. Pokrok uvidíš v Prehľade zadaní.`, 'ok');
+    oznaceni.clear();
+    document.querySelectorAll('.pchk').forEach(c => { c.checked = false; });
+    $('chkVsetci').checked = false;
+    aktualizujZadanie();
+  } catch (e) {
+    const t = String(e.message || e);
+    hlas(t.includes('viz_') || t.includes('sprint') || t.includes('column')
+      ? 'Zadanie sa nepodarilo uložiť — v databáze treba spustiť skript vizualizacia-zadania.sql. (' + t + ')'
+      : 'Zadanie sa nepodarilo uložiť: ' + t, 'error');
+    aktualizujZadanie();
+  }
+}
+
+['zTyp', 'zDlzka', 'zX', 'zY', 'zTermin'].forEach(id => $(id).addEventListener('input', aktualizujZadanie));
+$('zZadaj').addEventListener('click', zadaj);
 
 // ─── Detail hráča ────────────────────────────────────────────────────────────
 let detailUser = null;
@@ -498,6 +653,18 @@ async function init() {
 
   // Výber skupiny sa zobrazí každému, kto má prístup k viac než jednej
   if (!await naplnVyberSkupin($('fSkupina'))) $('groupField').hidden = true;
+
+  // Formulár zadania: typy úloh, termín o 14 dní, dĺžka podľa filtra
+  $('zTyp').innerHTML = TYPY.map(t => `<option value="${t.kluc}">${t.ikona} ${escapeHtml(t.nazov)}</option>`).join('');
+  $('zTermin').value = localDay(new Date(Date.now() + 14 * 86400000));
+  $('zDlzka').value = $('fDlzka').value;
+  // Upozornenie, ak vizualizáciu ešte nevidia všetci hráči – zadanie by splniť nemohli
+  urovenViz = await VizPristup.uroven();
+  if (urovenViz !== 'vsetci') {
+    $('zkPozor').textContent = '⚠️ Vizualizácia zatiaľ nie je otvorená všetkým hráčom. Zadanie uvidia v Zadaniach, ' +
+      'ale splniť ho môžu len vybraní testeri — kým vizualizáciu neotvoríš všetkým.';
+    $('zkPozor').hidden = false;
+  }
 
   $('fSkupina').addEventListener('change', load);
   $('fDlzka').addEventListener('change', () => detailUser ? otvorDetail(detailUser) : load());
