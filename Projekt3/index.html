@@ -567,9 +567,10 @@ body {
 <script src="js/player.js"></script>
 <script src="js/hra-postup.js"></script>
 <script src="js/vizualizacia-pristup.js"></script>
+<script src="js/vizualizacia-zadania.js"></script>
 <script>
 // ZNAČKA VERZIE — pri každej úprave tohto súboru prepíš dátum.
-(window.VERZIE = window.VERZIE || {})['index.html'] = '2026-10-05';
+(window.VERZIE = window.VERZIE || {})['index.html'] = '2026-10-07';
 
 // Hlavné menu: všetky tlačidlá v jednom rade; keď ich je viac než 9, v dvoch
 // rovnakých radoch. Tlačidlá sa zobrazujú postupne (Zadania, Súťaže, Hry sa
@@ -876,7 +877,7 @@ async function loadAssignmentBadge() {
   try {
     const player = await getCurrentPlayer();
     if (!player) return;
-    const rows = await sbFetch(`assignments?player_id=eq.${player.id}&select=skill,endgame_type,target_type,target_value,created_at,completed_at`);
+    const rows = await sbFetch(`assignments?player_id=eq.${player.id}&select=skill,endgame_type,target_type,target_value,created_at,completed_at,viz_dlzka,viz_min_skore`);
     if (!rows || !rows.length) return;
 
     // Má aspoň jedno zadanie — zobraz tlačidlo aj trénerovi/adminovi
@@ -893,8 +894,16 @@ async function loadAssignmentBadge() {
       meta    = await loadAssignmentPuzzleMeta(logRows);
     }
 
+    // Zadania vizualizácie — šprinty od najstaršieho otvoreného takého zadania
+    let sprinty = [];
+    const needViz = rows.filter(r => VizZadania.je(r) && !r.completed_at);
+    if (needViz.length) {
+      sprinty = await VizZadania.nacitaj([player.user_id], needViz.map(r => r.created_at).sort()[0]);
+    }
+
     const open = rows.filter(a => {
       if (a.completed_at) return false;                 // ručne uzavreté trénerom
+      if (VizZadania.je(a)) return !VizZadania.pokrok(sprinty, a, player.user_id).done;
       if (a.target_type === 'elo' && !a.endgame_type) {
         // 1000 = predvolená hodnota ELO stĺpcov v databáze (do resetu 1200)
         return Number(player['elo_' + a.skill] ?? 1000) < a.target_value;
