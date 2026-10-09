@@ -745,7 +745,7 @@ button {
 // ZNAČKA VERZIE — pri každej úprave tohto súboru prepíš dátum.
 // Vypíše sa v konzole, alebo na mobile po pridaní ?verzia do adresy.
 // Mechanika je v player.js pri funkcii verzie().
-(window.VERZIE = window.VERZIE || {})['admin.html'] = '2026-09-29';
+(window.VERZIE = window.VERZIE || {})['admin.html'] = '2026-10-09';
 
 // SUPABASE_URL a SUPABASE_KEY poskytuje js/auth.js (nedeklarovať znova!)
 
@@ -1101,9 +1101,8 @@ function switchTab(tab) {
   document.getElementById('errorSection').style.display  = tab === 'errors'  ? 'block' : 'none';
   if (tab === 'errors') nacitajChyby();
   if (tab === 'users') {
+    // loadUsers naplní aj zoznam trénerov pre skupinové prístupy
     loadUsers();
-    // Zoznam trénerov pre správu skupinových prístupov — naplní sa raz
-    if (!tpTreneri.length) tpNaplnTrenerov();
     nacitajUdrzbu();
     nacitajPritomnych();
     // Zoznam sa sám obnovuje — pri nasadzovaní chce admin vidieť, keď
@@ -1458,23 +1457,41 @@ function prepniChybu(i) {
 // ─── Skupinový tréner ───────────────────────────────────────────────────────
 let tpTreneri = [];
 
-async function tpNaplnTrenerov() {
-  try {
-    tpTreneri = await sbFetch(
-      'profiles?role=eq.trener&select=id,name,surname,nick_name&order=surname.asc') || [];
-  } catch (e) { tpTreneri = []; }
+// Zoznam trénerov sa berie z tých istých údajov ako zoznam používateľov
+// (allTreners z loadUsers) a prestavia sa pri každom načítaní používateľov.
+// Predtým sa načítal z databázy len raz za otvorenie stránky — kto sa stal
+// trénerom neskôr (napr. zmenou roly tu v paneli), v ponuke chýbal, kým sa
+// stránka neobnovila.
+// Zoraďuje sa podľa toho, čo je v ponuke naozaj vidieť (prezývka), nie podľa
+// priezviska v databáze — inak ponuka vyzerá nezoradená a meno sa ťažko hľadá.
+// Slovenská abeceda: Ch je až za H.
+function tpNaplnTrenerov() {
+  tpTreneri = (allTreners || []).slice()
+    .sort((a, b) => tpMeno(a).localeCompare(tpMeno(b), 'sk'));
+
   const sel = document.getElementById('tpTrener');
   if (!sel) return;
+  const doterajsi = sel.value;
+
+  sel.innerHTML = '<option value="">— vyber trénera —</option>';
   tpTreneri.forEach(t => {
     const o = document.createElement('option');
     o.value = t.id;
-    o.textContent = t.nick_name || `${t.surname || ''} ${t.name || ''}`.trim();
+    o.textContent = tpMeno(t);
     sel.appendChild(o);
   });
+
+  // Vybraný tréner zostane vybraný; ak medzitým prestal byť trénerom,
+  // výber sa zruší aj so zoznamom jeho prístupov.
+  if (doterajsi && tpTreneri.some(t => t.id === doterajsi)) {
+    sel.value = doterajsi;
+  } else if (doterajsi) {
+    tpNacitaj();
+  }
 }
 
 function tpMeno(t) {
-  return t.nick_name || `${t.surname || ''} ${t.name || ''}`.trim();
+  return (t.nick_name || '').trim() || `${t.surname || ''} ${t.name || ''}`.trim() || t.email || '(bez mena)';
 }
 
 async function tpNacitaj() {
@@ -1562,6 +1579,7 @@ async function loadUsers() {
 
     renderUserList(playerMap);
     populateTrenerSelect('mrTrener');
+    tpNaplnTrenerov();
     setUserStatus(`Načítaných ${allUsers.length} používateľov`, 'success');
   } catch(e) {
     setUserStatus('Chyba: ' + e.message, 'error');
