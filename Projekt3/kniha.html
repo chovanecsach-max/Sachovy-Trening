@@ -140,6 +140,9 @@ h3.sekcia { margin: 0 0 10px; font-size: 16px; color: #475569; font-weight: bold
 .kap-stav .hotovo { color: #15803d; font-weight: bold; }
 .pruh { grid-column: 2; height: 6px; border-radius: 3px; background: #e5e7eb; overflow: hidden; }
 .pruh i { display: block; height: 100%; background: #f59e0b; }
+.kap.zamknuta { opacity: .6; cursor: not-allowed; }
+.kap.zamknuta:hover { background: #f8fafc; border-color: #e5e7eb; transform: none; }
+.kap-stav .zamok { color: #64748b; }
 
 /* ── Test ───────────────────────────────────────────────────────────── */
 .test {
@@ -159,6 +162,8 @@ h3.sekcia { margin: 0 0 10px; font-size: 16px; color: #475569; font-weight: bold
 .test-popis { font-size: 14px; color: #475569; margin-top: 2px; }
 .test-stav { font-size: 14px; margin-top: 6px; }
 .test-stav .ok { color: #15803d; font-weight: bold; }
+.test.zamknuty { background: #f8fafc; border-color: #e5e7eb; }
+button:disabled { opacity: .55; cursor: not-allowed; }
 
 @media (max-width: 600px) {
   .lista-nazov { font-size: 19px; }
@@ -210,7 +215,7 @@ h3.sekcia { margin: 0 0 10px; font-size: 16px; color: #475569; font-weight: bold
 <script src="js/knihy.js"></script>
 <script>
 // ZNAČKA VERZIE — pri každej úprave tohto súboru prepíš dátum.
-(window.VERZIE = window.VERZIE || {})['kniha.html'] = '2026-10-27';
+(window.VERZIE = window.VERZIE || {})['kniha.html'] = '2026-10-27b';
 
 function el(tag, cls, text) {
   const e = document.createElement(tag);
@@ -225,9 +230,10 @@ function znacka(hotova) {
 }
 function sklon(n, jeden, dva, pat) { return n === 1 ? jeden : (n >= 2 && n <= 4 ? dva : pat); }
 
-function vykresli(kniha) {
+function vykresli(kniha, postup) {
   const B = Knihy.KNIHY[kniha];
-  const P = Knihy.prehlad(kniha, Knihy.pouzivatel());
+  const P = Knihy.prehlad(kniha, postup);
+  const O = Knihy.odomknutie(kniha, postup);
   document.title = B.nazov + ' – ' + B.diel;
   document.getElementById('nazov').textContent = B.ikona + ' ' + B.nazov;
   document.getElementById('podtitul').textContent = B.diel + ' · ' + B.popis;
@@ -237,47 +243,62 @@ function vykresli(kniha) {
   const box = document.getElementById('kapitoly');
   box.innerHTML = '';
   let hvSpolu = 0, hvMax = 0, hotove = 0;
-  P.kapitoly.forEach(k => {
+  P.kapitoly.forEach((k, i) => {
     hvSpolu += k.hviezdy; hvMax += k.max;
-    const hotova = k.vyriesene >= k.uloh;
+    const hotova = k.vyriesene >= k.uloh, otvorena = O.kapitoly[k.cislo];
     if (hotova) hotove++;
-    const b = el('button', 'kap');
+    const b = el('button', 'kap' + (otvorena ? '' : ' zamknuta'));
     b.type = 'button';
     b.appendChild(znacka(hotova));
     b.appendChild(el('span', 'kap-cislo', 'Kapitola ' + k.cislo));
     b.appendChild(el('span', 'kap-nazov', k.nazov));
     const st = el('span', 'kap-stav');
-    if (!k.vyriesene && !k.ukazka) st.appendChild(el('span', null, 'Ešte nezačatá'));
+    if (!otvorena) st.appendChild(el('span', 'zamok', '🔒 Odomkne sa po kapitole ' + P.kapitoly[i - 1].cislo));
+    else if (!k.vyriesene && !k.ukazka) st.appendChild(el('span', null, 'Ešte nezačatá'));
     else st.appendChild(el('span', hotova ? 'hotovo' : null,
       hotova ? 'Hotová' : k.vyriesene + ' z ' + k.uloh + ' ' + sklon(k.uloh, 'úlohy', 'úloh', 'úloh')));
-    st.appendChild(el('span', 'hv', '★ ' + k.hviezdy + ' z ' + k.max));
+    if (otvorena) st.appendChild(el('span', 'hv', '★ ' + k.hviezdy + ' z ' + k.max));
     b.appendChild(st);
     const pr = el('span', 'pruh'); const ii = el('i');
     ii.style.width = Math.round(100 * k.hviezdy / k.max) + '%';
     pr.appendChild(ii); b.appendChild(pr);
-    b.setAttribute('aria-label', 'Kapitola ' + k.cislo + ': ' + k.nazov + ', ' + k.hviezdy + ' z ' + k.max + ' hviezd');
-    b.addEventListener('click', () => { location.href = Knihy.adresaKapitoly(kniha, k.cislo); });
+    b.setAttribute('aria-label', 'Kapitola ' + k.cislo + ': ' + k.nazov +
+      (otvorena ? ', ' + k.hviezdy + ' z ' + k.max + ' hviezd' : ', zamknutá'));
+    if (otvorena) b.addEventListener('click', () => { location.href = Knihy.adresaKapitoly(kniha, k.cislo); });
+    else b.setAttribute('aria-disabled', 'true');
     box.appendChild(b);
   });
 
   // test
   const T = P.test, t = document.getElementById('test');
   t.innerHTML = '';
+  t.classList.toggle('zamknuty', !O.test);
   const tx = el('div', 'test-text');
   tx.appendChild(znacka(T.zlozeny));
   const tt = el('div');
   tt.appendChild(el('div', 'test-nazov', B.test.nazov));
   tt.appendChild(el('div', 'test-popis', T.uloh + ' úloh zo všetkých kapitol · na úspech treba ' + T.hranica + ' bodov · počíta sa prvá odpoveď'));
   const ts = el('div', 'test-stav');
-  if (T.zlozeny) ts.innerHTML = '<span class="ok">Test si zložil – Odznak Stratég 1.</span> Body: ' + T.body + ' z ' + T.uloh + '.';
-  else if (T.odpovedane) ts.textContent = 'Body: ' + T.body + ' z ' + T.uloh + ' · odpovedal si na ' + T.odpovedane + ' z ' + T.uloh + ' úloh.';
-  else ts.textContent = 'Test si ešte nezačal.';
+  const pokusText = T.pokus > 1 ? T.pokus + '. pokus: ' : '';
+  if (!O.test) {
+    ts.textContent = '🔒 Test sa odomkne, keď vyriešiš všetky úlohy v kapitole ' + O.posledna + '.';
+  } else if (T.zlozeny) {
+    ts.innerHTML = '<span class="ok">Test si zložil – Odznak Stratég 1.</span> Najlepší výsledok: ' +
+      T.najlepsi.body + ' z ' + T.uloh + (T.pokus > 1 ? ' (' + T.najlepsi.pokus + '. pokus)' : '') + '.';
+  } else if (T.odpovedane) {
+    ts.textContent = pokusText + 'Body: ' + T.body + ' z ' + T.uloh + ' · odpovedal si na ' + T.odpovedane + ' z ' + T.uloh + ' úloh.';
+  } else if (T.predosle.length) {
+    ts.textContent = 'Začínaš ' + T.pokus + '. pokus. Najlepší doterajší výsledok: ' + T.najlepsi.body + ' z ' + T.uloh + '.';
+  } else {
+    ts.textContent = 'Test si ešte nezačal.';
+  }
   tt.appendChild(ts);
   tx.appendChild(tt);
   t.appendChild(tx);
-  const tb = el('button', T.odpovedane >= T.uloh ? 'secondary' : 'primary',
+  const tb = el('button', (T.odpovedane >= T.uloh || !O.test) ? 'secondary' : 'primary',
     !T.odpovedane ? 'Začať test' : (T.odpovedane < T.uloh ? 'Pokračovať v teste' : 'Výsledok testu'));
-  tb.addEventListener('click', () => { location.href = Knihy.adresaTestu(kniha); });
+  if (O.test) tb.addEventListener('click', () => { location.href = Knihy.adresaTestu(kniha); });
+  else tb.disabled = true;
   t.appendChild(tb);
 
   // súhrn v bubline
@@ -285,14 +306,16 @@ function vykresli(kniha) {
   s.innerHTML = '';
   const r1 = el('span'); r1.innerHTML = 'Hviezdy: <b>' + hvSpolu + ' z ' + hvMax + '</b>'; s.appendChild(r1);
   const r2 = el('span'); r2.innerHTML = 'Hotové kapitoly: <b>' + hotove + ' z ' + P.kapitoly.length + '</b>'; s.appendChild(r2);
-  const r3 = el('span'); r3.innerHTML = 'Test: <b>' + (T.odpovedane ? T.body + ' z ' + T.uloh + ' bodov' : 'ešte nezačatý') + '</b>'; s.appendChild(r3);
+  const r3 = el('span');
+  r3.innerHTML = 'Test: <b>' + (T.zlozeny ? 'zložený' : (T.odpovedane ? T.body + ' z ' + T.uloh + ' bodov' : 'ešte nezačatý')) + '</b>';
+  s.appendChild(r3);
 }
 
 // Adminovi lišta s tým, kto knihu vidí (zmena v SQL editore, pozri knihy-pristup.sql)
 async function pasPristupu(kniha) {
   const pas = document.getElementById('pas');
   if (Knihy.jeLokalne()) {
-    pas.textContent = 'Test zo súboru — prihlásenie je vypnuté a postup sa ukladá len v tomto prehliadači.';
+    pas.textContent = 'Test zo súboru — prihlásenie je vypnuté, všetky kapitoly sú otvorené a postup sa ukladá len v tomto prehliadači.';
     pas.hidden = false;
     return;
   }
@@ -300,7 +323,8 @@ async function pasPristupu(kniha) {
   const u = await Knihy.uroven(kniha);
   const kto = { vsetci: 'všetci vrátane hráčov', personal: 'admin, hlavný tréner a tréneri (a testeri)' }[u] ||
               'len admin a testeri';
-  pas.textContent = 'Knihu teraz vidia: ' + kto + '. Zmena v SQL editore, pozri knihy-pristup.sql.';
+  pas.textContent = 'Knihu teraz vidia: ' + kto + '. Zmena v SQL editore, pozri knihy-pristup.sql. ' +
+                    'Hráčom sa kapitoly odomykajú postupne, personál má otvorené všetky.';
   pas.hidden = false;
 }
 
@@ -311,10 +335,11 @@ async function init() {
     return;
   }
   if (!await Knihy.prihlasenie(kniha)) return;
-  vykresli(kniha);
+  const postup = await Knihy.nacitajPostup(kniha, Knihy.pouzivatel());
+  vykresli(kniha, postup);
   pasPristupu(kniha);
-  // návrat tlačidlom Späť z kapitoly: stránka môže prísť z vyrovnávacej pamäte, postup prekresli
-  window.addEventListener('pageshow', e => { if (e.persisted) vykresli(kniha); });
+  // návrat tlačidlom Späť z kapitoly: stránka môže prísť z vyrovnávacej pamäte — načítaj postup znova
+  window.addEventListener('pageshow', e => { if (e.persisted) location.reload(); });
 }
 init();
 </script>

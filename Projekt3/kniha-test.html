@@ -40,7 +40,7 @@ header.hlava{display:flex;align-items:center;justify-content:space-between;gap:1
 .hlava h1{margin:0;font-size:13px;font-weight:normal;color:var(--les-svetly)}
 .hlava h2{margin:2px 0 0;font-size:22px;line-height:1.2;font-weight:bold}
 .hviezdy-spolu{font-weight:700;font-size:18px;white-space:nowrap}
-.hviezdy-spolu span{color:var(--zlta);-webkit-text-stroke:.6px #8a6d00}
+.hviezdy-spolu span{color:var(--zlta);-webkit-text-stroke:.6px #b45309}
 
 /* turistická značka: biela–farba–biela */
 .znacka{display:inline-flex;flex-direction:column;width:26px;height:22px;border-radius:3px;overflow:hidden;box-shadow:0 0 0 1px var(--linka);flex:none}
@@ -48,11 +48,11 @@ header.hlava{display:flex;align-items:center;justify-content:space-between;gap:1
 .znacka i:nth-child(2){background:var(--farba,var(--cervena))}
 .trasa{display:flex;align-items:center;gap:0;margin:0 0 14px;padding:8px 10px;background:var(--papier);border-radius:10px;border:1px solid var(--linka);overflow-x:auto}
 .zastavka{display:flex;align-items:center;gap:8px;border:0;background:none;padding:4px 6px;border-radius:8px;color:var(--les-svetly);font-size:14px;white-space:nowrap}
-.zastavka .znacka{--farba:#d5dccf}
+.zastavka .znacka{--farba:#cbd5e1}
 .zastavka.hotova .znacka{--farba:var(--cervena)}
 .zastavka.aktualna{color:var(--les);font-weight:700;background:#fef3c7}
 .zastavka.aktualna .znacka{--farba:var(--cervena);box-shadow:0 0 0 2px var(--cervena)}
-.zastavka .h{font-size:12px;color:#8a6d00;letter-spacing:1px}
+.zastavka .h{font-size:12px;color:#b45309;letter-spacing:1px}
 .chodnik{flex:1;min-width:14px;height:0;border-top:2px dashed var(--linka);margin:0 2px}
 
 main.hra{display:grid;grid-template-columns:minmax(280px,520px) 1fr;gap:20px;align-items:start}
@@ -88,7 +88,7 @@ main.hra{display:grid;grid-template-columns:minmax(280px,520px) 1fr;gap:20px;ali
 .karta h3{margin:0 0 6px;font-size:14px;font-weight:500;color:var(--les-svetly)}
 .karta ol{list-style:none;margin:0;padding:0;display:grid;gap:4px}
 .karta li{display:flex;gap:10px;align-items:center;padding:4px 6px;border-radius:8px;font-size:14px;color:var(--les-svetly)}
-.karta li .znacka{width:20px;height:17px;--farba:#d5dccf}
+.karta li .znacka{width:20px;height:17px;--farba:#cbd5e1}
 .karta li b{color:var(--les);font-weight:500;min-width:62px}
 .karta li.teraz{background:#fef3c7;color:var(--les)}
 .karta li.teraz .znacka{--farba:var(--cervena)}
@@ -262,6 +262,11 @@ var SKUP = {A:'A – jeden ťah', B:'B – cieľ a ťah', C:'C – výber z dvoc
 var stav = { obr:'uvod', hra:0, krok:0, ply:0, chyby:0, chybyKrok:0, pomocka:false, vyber:null, fen:'', posledny:null, zamok:false, hviezdy:{}, body:{} };
 var ul = ulozisko.nacitaj(); if (ul && ul.body) stav.body = ul.body;
 function uloz(){ ulozisko.uloz({body:stav.body}); }
+function bodov(n){ return n===1 ? 'bod' : (n>=2 && n<=4 ? 'body' : 'bodov'); }
+function predosleText(){
+  var p=ulozisko.predosle(); if (!p.length) return '';
+  return 'Predošlé pokusy: '+p.map(function(x){ return x.pokus+'. pokus – '+x.body+' '+bodov(x.body); }).join(', ')+'.';
+}
 
 var $ = function(id){ return document.getElementById(id); };
 function el(tag, cls, text){ var e=document.createElement(tag); if(cls) e.className=cls; if(text!=null) e.textContent=text; return e; }
@@ -645,7 +650,7 @@ function koniecUlohy(cezAlt){
   if (cezAlt){ var fin=h.ciara[h.ciara.length-1].kom; var m=(fin||'').match(/Čo si zapamätať:.*$/m); if (m) komentar(m[0]); }
   if (h.zaver) komentar(h.zaver);
   var bod = stav.chyby===0 ? 1 : 0, prve = !(h.kolo in stav.body);
-  if (prve){ stav.body[h.kolo]=bod; uloz(); }
+  if (prve){ stav.body[h.kolo]=bod; ulozisko.uloz({body:stav.body}, {kolo:h.kolo, bod:bod}); }
   kresliTrasu(); stav.zamok=true; vycistiSpravu();
   if (prve) pridaj(bod ? '<span class="ok">Bod za úlohu: 1.</span> Vyriešené bez chyby.'
                        : '<span class="zle">Bod za úlohu: 0.</span> Úloha nebola vyriešená bez chyby.');
@@ -679,6 +684,7 @@ function uvod(){
   var d=el('section','obrazovka');
   d.appendChild(el('h2', null, K.nazov));
   d.appendChild(el('p', null, K.uvod));
+  if (ulozisko.pokus()>1) d.appendChild(el('p', null, 'Toto je tvoj '+ulozisko.pokus()+'. pokus. '+predosleText()));
   d.appendChild(el('p', null, 'Úlohy sú v troch skupinách po desať: A – jeden ťah, B – najprv nájdi cieľ, potom zahraj ťah, C – vyber lepší z dvoch ťahov a pokračuj. Pomôcky v teste nie sú.'));
   d.appendChild(el('p', null, 'Bod získaš, keď úlohu vyriešiš bez chyby. Po chybe uvidíš, prečo ťah nefunguje, a úlohu môžeš dokončiť, ale bod už nezískaš.'));
   var n=odpovedane();
@@ -698,10 +704,16 @@ function koniecTestu(){
   var d=el('section','obrazovka'), s=skore(), n=odpovedane(), N=K.hry.length, ok=s>=HRANICA;
   d.appendChild(el('h2', null, ok ? 'Test si zložil!' : 'Test zatiaľ nie je zložený'));
   var sk=el('p','skore'); sk.innerHTML='<b>'+s+'</b> z '+N+' bodov'; d.appendChild(sk);
+  if (ulozisko.pokus()>1) d.appendChild(el('p', null, 'Pokus č. '+ulozisko.pokus()+'. '+predosleText()));
+  var uzMa = ulozisko.predosle().some(function(x){ return x.body>=HRANICA; });
   if (ok){
     var od=el('div','odznak'); var zn=el('span','znacka'); zn.innerHTML='<i></i><i></i><i></i>'; od.appendChild(zn);
     var tx=el('div'); tx.appendChild(el('b', null, 'Odznak Stratég 1')); var pp=el('p', null, 'Zvládol si prvé mikroplány. Môžeš pokračovať do 2. dielu.'); pp.style.margin='2px 0 0'; tx.appendChild(pp);
     od.appendChild(tx); d.appendChild(od);
+  } else if (uzMa){
+    var od2=el('div','odznak'); var zn2=el('span','znacka'); zn2.innerHTML='<i></i><i></i><i></i>'; od2.appendChild(zn2);
+    var tx2=el('div'); tx2.appendChild(el('b', null, 'Odznak Stratég 1')); var pp2=el('p', null, 'Ten už máš z predošlého pokusu.'); pp2.style.margin='2px 0 0'; tx2.appendChild(pp2);
+    od2.appendChild(tx2); d.appendChild(od2);
   } else {
     d.appendChild(el('p', null, 'Na úspech potrebuješ '+HRANICA+' bodov. Chýba ti ešte '+(HRANICA-s)+'. Zopakuj kapitoly, ktoré sú nižšie označené, a skús test znova.'));
   }
@@ -734,8 +746,8 @@ function koniecTestu(){
   var b1=el('button','tl druhe','Prezrieť úlohy'); b1.addEventListener('click', function(){ zacniHru(0); }); d.appendChild(b1);
   var b2=el('button','tl druhe','Začať test odznova');
   b2.addEventListener('click', function(){
-    if (b2.dataset.potvrd!=='1'){ b2.dataset.potvrd='1'; b2.textContent='Naozaj? Výsledky sa vymažú – klikni znova'; return; }
-    stav.body={}; uloz(); uvod();
+    if (b2.dataset.potvrd!=='1'){ b2.dataset.potvrd='1'; b2.textContent='Naozaj? Začne sa nový pokus od 1. úlohy – klikni znova'; return; }
+    stav.body={}; ulozisko.novyPokus(); uvod();
   });
   d.appendChild(b2);
   o.appendChild(d);
@@ -752,7 +764,7 @@ uvod();
 <script src="js/knihy.js"></script>
 <script>
 // ZNAČKA VERZIE — pri každej úprave tohto súboru prepíš dátum.
-(window.VERZIE = window.VERZIE || {})['kniha-test.html'] = '2026-10-27';
+(window.VERZIE = window.VERZIE || {})['kniha-test.html'] = '2026-10-27b';
 // Prihlásenie, prístup, načítanie obsahu a postupu — pozri js/knihy.js.
 // Pri otvorení zo súboru (file://) sa prihlásenie preskočí.
 Knihy.spustiStranku('test');
