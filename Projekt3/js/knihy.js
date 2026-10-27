@@ -2,7 +2,7 @@
 //  knihy.js — interaktívne knihy (Cesta stratéga)
 // ----------------------------------------------------------------------------
 //  Kniha = kapitoly (ukážka a päť úloh) a záverečný test. Obsah kapitol leží
-//  v súboroch knihy/<kniha>/kNN.js a test.js. Vyrábajú sa z PGN knihy nástrojom
+//  v súboroch js/knihy/<kniha>/kNN.js a test.js. Vyrábajú sa z PGN knihy nástrojom
 //  mimo webu — ručne sa neupravujú.
 //
 //  Stránky:  kniha.html?kniha=cesta-stratega-1            — obsah knihy
@@ -46,7 +46,7 @@ const Knihy = (function () {
       diel: '1. diel',
       popis: 'Stratégia pre hráčov do 1400 Elo',
       ikona: '🧭',
-      priecinok: 'knihy/cesta-stratega-1/',
+      priecinok: 'js/knihy/cesta-stratega-1/',
       verzia: '2026-10-27',
       kapitoly: [
         { cislo: 1,  nazov: 'Najprv súper a bezpečnosť',        subor: 'k01.js' },
@@ -236,7 +236,7 @@ const Knihy = (function () {
     return jeLokalne() ? '' : (sessionStorage.getItem('user_id') || '');
   }
 
-  // Obsah kapitoly alebo testu: súbor knihy/<kniha>/kNN.js sa pridá ako <script>
+  // Obsah kapitoly alebo testu: súbor js/knihy/<kniha>/kNN.js sa pridá ako <script>
   // (funguje na webe aj pri otvorení zo súboru, kde fetch nejde).
   function nacitajData(kniha, subor) {
     const b = KNIHY[kniha], kluc = kniha + '/' + subor.replace(/\.js$/, '');
