@@ -472,6 +472,9 @@ body {
     <button class="sub-btn" id="hryPrehladSubBtn" onclick="goHryPrehlad()" style="display:none;">
       <div class="sub-icon i-hry">🎲</div>Prehľad hier
     </button>
+    <button class="sub-btn" id="knihyPrehladSubBtn" onclick="goKnihyPrehlad()" style="display:none;">
+      <div class="sub-icon i-knihy">📚</div>Prehľad kníh
+    </button>
     <button class="sub-btn" id="vizPrehladSubBtn" onclick="goVizPrehlad()" style="display:none;">
       <div class="sub-icon i-viz">👁️</div>Prehľad vizualizácie
     </button>
@@ -587,7 +590,7 @@ body {
 <script src="js/vizualizacia-zadania.js"></script>
 <script>
 // ZNAČKA VERZIE — pri každej úprave tohto súboru prepíš dátum.
-(window.VERZIE = window.VERZIE || {})['index.html'] = '2026-10-27';
+(window.VERZIE = window.VERZIE || {})['index.html'] = '2026-10-27b';
 
 // Hlavné menu: všetky tlačidlá v jednom rade; keď ich je viac než 9, v dvoch
 // rovnakých radoch. Tlačidlá sa zobrazujú postupne (Zadania, Súťaže, Hry sa
@@ -662,6 +665,9 @@ async function initPage() {
       if (!await Knihy.pristupKKnihe(b.dataset.kniha, role)) b.style.display = 'none';
     }
     document.getElementById('btnKnihy').style.display = 'flex';
+    if (role === 'trener' || role === 'hlavny_trener' || role === 'admin') {
+      document.getElementById('knihyPrehladSubBtn').style.display = 'flex';
+    }
   });
   // Vizualizácia — kto ju vidí, určuje riadok 'vizualizacia' v tabuľke nastavenia
   // (a vybraní testeri hier), pozri js/vizualizacia-pristup.js
@@ -862,6 +868,7 @@ function goMojeSutaze()   { location.href = 'moje-sutaze.html'; }
 function goHra(kluc)      { location.href = kluc + '.html'; }
 function goHryPrehlad()   { location.href = 'hry-prehlad.html'; }
 function goKniha(kluc)    { location.href = 'kniha.html?kniha=' + encodeURIComponent(kluc); }
+function goKnihyPrehlad() { location.href = 'kniha-prehlad.html'; }
 function goVizualizacia() { location.href = 'vizualizacia.html'; }
 function goVizPrehlad()   { location.href = 'vizualizacia-prehlad.html'; }
 

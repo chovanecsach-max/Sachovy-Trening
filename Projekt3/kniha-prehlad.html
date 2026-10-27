@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Prehľad kníh</title>
+<style>
+body { font-family: Arial, sans-serif; background: #f4f4f6; margin: 0; padding: 12px; color: #111827; }
+.app { max-width: 1250px; margin: 0 auto; background: white; border-radius: 14px;
+       box-shadow: 0 10px 30px rgba(0,0,0,0.08); padding: 20px; }
+h1 { margin: 0 0 6px 0; text-align: center; font-size: 26px; }
+.subtitle { text-align: center; color: #475569; margin: 0 0 18px 0; }
+
+.role-banner { padding: 10px 14px; border-radius: 10px; margin-bottom: 16px; font-size: 14px; text-align: center; }
+.role-banner.trener        { background: #f0fdf4; border: 1px solid #86efac; color: #166534; }
+.role-banner.hlavny_trener { background: #faf5ff; border: 1px solid #d8b4fe; color: #6b21a8; }
+.role-banner.admin         { background: #fff7ed; border: 1px solid #fdba74; color: #c2410c; }
+
+.filter-card { border: 1px solid #d1d5db; border-radius: 12px; padding: 14px; margin-bottom: 16px; background: #f8fafc; }
+.filter-row { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; }
+.filter-field { display: flex; flex-direction: column; gap: 4px; }
+.filter-field label { font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: bold; }
+select { padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px; background: white; min-width: 160px; }
+button { padding: 10px 16px; border: none; border-radius: 10px; cursor: pointer; font-size: 14px; }
+.secondary { background: #e5e7eb; color: #111827; }
+.secondary:hover { background: #d1d5db; }
+
+.status { margin: 12px 0; padding: 10px; border-radius: 10px; border: 1px solid #d1d5db;
+          background: #f8fafc; color: #334155; font-size: 14px; }
+.status.error { background: #fef2f2; border-color: #fca5a5; color: #b91c1c; }
+
+/* Súhrn */
+.tiles { display: flex; gap: 10px; flex-wrap: wrap; margin: 4px 0 14px; }
+.tile { flex: 1; min-width: 120px; border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px 14px; background: #fff; }
+.tile .n { font-size: 22px; font-weight: bold; line-height: 1.1; }
+.tile .l { font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: bold; margin-top: 3px; }
+.tile.run .n  { color: #b45309; }
+.tile.done .n { color: #166534; }
+
+/* Tabuľka */
+.table-wrapper { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th { background: #1e3a5f; color: white; padding: 9px 6px; text-align: center; font-size: 12px; white-space: nowrap; }
+th.vlavo, td.vlavo { text-align: left; }
+th.skup { background: #334155; }
+td { padding: 7px 6px; border-bottom: 1px solid #e5e7eb; vertical-align: middle; text-align: center; }
+tr.nezacal td { color: #94a3b8; }
+tr.hotovo td { background: #f8fdf9; }
+td.meno { white-space: nowrap; font-weight: bold; color: #111827; cursor: pointer; }
+td.meno:hover { color: #1d4ed8; }
+td.meno .skupina { display: block; font-weight: normal; font-size: 11px; color: #94a3b8; }
+td.meno .sipka { color: #94a3b8; font-weight: normal; margin-left: 4px; font-size: 11px; }
+tr.nezacal td.meno { color: #64748b; font-weight: normal; }
+tfoot td { background: #f1f5f9; font-weight: bold; border-top: 2px solid #cbd5e1; border-bottom: none; }
+
+.nic { color: #cbd5e1; }
+.slabo { display: block; font-size: 11px; color: #94a3b8; font-weight: normal; }
+.kap-hv b { color: #b45309; }
+.kap-hv.plna b { color: #166534; }
+.kap-hv .z { color: #94a3b8; font-size: 11px; }
+.ok  { color: #166534; font-weight: bold; white-space: nowrap; }
+.zle { color: #b91c1c; font-weight: bold; white-space: nowrap; }
+.pol { color: #b45309; font-weight: bold; white-space: nowrap; }
+.test-ok  { color: #166534; font-weight: bold; white-space: nowrap; }
+.test-zle { color: #b45309; font-weight: bold; white-space: nowrap; }
+
+.bar { height: 8px; width: 80px; background: #eef2f7; border-radius: 5px; overflow: hidden; margin: 0 auto 3px; }
+.bar span { display: block; height: 100%; background: #f59e0b; }
+.bar span.plna { background: #16a34a; }
+.prog-txt { font-size: 11px; color: #64748b; white-space: nowrap; }
+
+/* Detail hráča */
+tr.detail > td { background: #f8fafc; text-align: left; padding: 10px 12px 14px; }
+.det-nadpis { font-size: 13px; font-weight: bold; color: #334155; margin: 0 0 8px; }
+table.det { width: auto; font-size: 12px; margin-bottom: 6px; }
+table.det th { background: #e2e8f0; color: #334155; padding: 5px 8px; }
+table.det td { padding: 4px 8px; background: #fff; border-bottom: 1px solid #eef2f7; }
+.hv { white-space: nowrap; letter-spacing: -1px; }
+.hv .p { color: #f59e0b; }
+.hv .x { color: #e2e8f0; }
+.pokus { margin: 0 0 6px; font-size: 13px; line-height: 1.5; }
+.pokus b { color: #111827; }
+
+.empty { text-align: center; color: #64748b; font-style: italic; padding: 30px; }
+.legenda { margin-top: 16px; padding: 12px 14px; border: 1px solid #e2e8f0; border-radius: 10px;
+           background: #f8fafc; font-size: 13px; color: #475569; line-height: 1.6; }
+.legenda b { color: #111827; }
+.legenda .kap { display: inline-block; margin-right: 14px; white-space: nowrap; }
+
+@media (max-width: 640px) {
+  body { padding: 6px; }
+  .app { padding: 12px; }
+  h1 { font-size: 21px; }
+  select { min-width: 130px; }
+  td, th { padding: 6px 4px; }
+}
+</style>
+</head>
+<body oncontextmenu="return false;">
+<div class="app">
+  <h1>📚 Prehľad kníh</h1>
+  <p class="subtitle">Ako hráči prechádzajú interaktívnymi knihami.</p>
+
+  <div id="roleBanner" class="role-banner" style="display:none;"></div>
+
+  <div class="filter-card">
+    <div class="filter-row">
+      <div class="filter-field">
+        <label>Kniha</label>
+        <select id="fKniha"></select>
+      </div>
+      <div class="filter-field" id="groupField">
+        <label>Skupina</label>
+        <select id="fSkupina"></select>
+      </div>
+      <div class="filter-field">
+        <label>Zobraziť</label>
+        <select id="fPohlad">
+          <option value="kapitoly">Kapitoly</option>
+          <option value="test">Záverečný test</option>
+        </select>
+      </div>
+      <div class="filter-field" id="pokusField" style="display:none;">
+        <label>Pokus v teste</label>
+        <select id="fPokus">
+          <option value="najlepsi">Najlepší</option>
+          <option value="prvy">Prvý</option>
+          <option value="posledny">Posledný</option>
+        </select>
+      </div>
+      <div class="filter-field">
+        <label>Zoradiť</label>
+        <select id="fZoradit">
+          <option value="meno">Podľa mena</option>
+          <option value="postup">Podľa postupu</option>
+          <option value="aktivita">Podľa poslednej aktivity</option>
+        </select>
+      </div>
+      <button class="secondary" onclick="goHome()">Späť do menu</button>
+    </div>
+  </div>
+
+  <div id="status" class="status">Načítavam...</div>
+
+  <div class="tiles" id="tiles" style="display:none;">
+    <div class="tile"><div class="n" id="tHraci">0</div><div class="l">Hráčov</div></div>
+    <div class="tile run"><div class="n" id="tZacali">0</div><div class="l">Začali knihu</div></div>
+    <div class="tile run"><div class="n" id="tKapitoly">0</div><div class="l">Prešli všetky kapitoly</div></div>
+    <div class="tile run"><div class="n" id="tTest">0</div><div class="l">Robili test</div></div>
+    <div class="tile done"><div class="n" id="tZlozili">0</div><div class="l">Zložili test</div></div>
+  </div>
+
+  <div class="table-wrapper">
+    <table id="tbl" style="display:none;">
+      <thead id="thead"></thead>
+      <tbody id="tbody"></tbody>
+      <tfoot id="tfoot"></tfoot>
+    </table>
+    <div id="empty" class="empty" style="display:none;"></div>
+  </div>
+
+  <div id="legenda" class="legenda" style="display:none;"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/auth.js"></script>
+<script src="js/player.js"></script>
+<script src="js/knihy.js"></script>
+<script>
+// ZNAČKA VERZIE — pri každej úprave tohto súboru prepíš dátum.
+(window.VERZIE = window.VERZIE || {})['kniha-prehlad.html'] = '2026-10-27';
+
+// Údaje: tabuľky kniha_postup (úlohy v kapitolách) a kniha_test (odpovede
+// v teste po pokusoch), pozri knihy-postup.sql. RLS pustí len hráčov zo
+// skupín, ku ktorým má prihlásený prístup. Obsah testu (ktorá úloha patrí
+// ku ktorej kapitole a skupine A/B/C) sa berie zo súboru testu knihy.
+
+const USER_ROLE        = sessionStorage.getItem('user_role') || '';
+const USER_NICK        = sessionStorage.getItem('user_nick') || sessionStorage.getItem('user_name') || '';
+const STAFF            = ['trener', 'hlavny_trener', 'admin'];
+
+let hraci = [];          // hráči zvolenej skupiny
+let ulohy = {};          // user_id → { 'kapitola.uloha' → riadok kniha_postup }
+let testy = {};          // user_id → { pokus → { uloha → { bod, kedy } } }
+let testUlohy = [];      // [{ uloha, kapitoly: [3, 8], skupina: 'A' }]
+let treneri = {};        // id trénera → meno
+let viacSkupin = false;
+let otvorene = new Set();  // user_id hráčov s rozbaleným detailom
+
+function goHome() { location.href = 'index.html'; }
+function esc(s) { return escapeHtml(s == null ? '' : String(s)); }
+
+function setStatus(text, type = '') {
+  const el = document.getElementById('status');
+  el.textContent = text;
+  el.className = 'status' + (type ? ' ' + type : '');
+  el.style.display = text ? '' : 'none';
+}
+
+// Načítanie po dávkach — Supabase vracia najviac 1000 riadkov na dotaz
+async function sbFetchAll(query) {
+  const PAGE = 1000;
+  let all = [], off = 0;
+  while (true) {
+    const sep = query.includes('?') ? '&' : '?';
+    const batch = await sbFetch(`${query}${sep}limit=${PAGE}&offset=${off}`);
+    if (!batch || !batch.length) break;
+    all = all.concat(batch);
+    if (batch.length < PAGE) break;
+    off += PAGE;
+  }
+  return all;
+}
+
+function aktualnaKniha() { return document.getElementById('fKniha').value; }
+function knihaB() { return Knihy.KNIHY[aktualnaKniha()]; }
+function datum(ts) {
+  if (!ts) return '';
+  const d = new Date(ts);
+  return isNaN(d) ? '' : d.toLocaleDateString('sk-SK');
+}
+function bodov(n) { return n === 1 ? 'bod' : (n >= 2 && n <= 4 ? 'body' : 'bodov'); }
+function hviezdyHtml(n) {
+  let h = '<span class="hv">';
+  for (let i = 1; i <= 3; i++) h += i <= n ? '<span class="p">★</span>' : '<span class="x">★</span>';
+  return h + '</span>';
+}
+function menoHraca(p) { return `${p.surname || ''} ${p.name || ''}`.trim() || '?'; }
+
+// ─── Načítanie ───────────────────────────────────────────────────────────────
+async function load() {
+  setStatus('Načítavam...');
+  ['tbl', 'tiles', 'empty', 'legenda'].forEach(id => { document.getElementById(id).style.display = 'none'; });
+  const kniha = aktualnaKniha(), B = knihaB();
+  try {
+    // 1) Hráči skupiny (bez trénerov a adminov)
+    const tf = document.getElementById('fSkupina').value;
+    let q = 'players?select=id,user_id,name,surname,trener_id,profile:profiles!user_id(role)&order=surname.asc,name.asc';
+    const skupiny = await viditelneSkupiny();
+    if (tf && tf !== 'all') q += `&trener_id=eq.${tf}`;
+    else q = filterSkupiny(q, skupiny);
+    hraci = (await sbFetchAll(q) || []).filter(p => p.user_id && !STAFF.includes(p.profile?.role));
+    viacSkupin = (!tf || tf === 'all') && (skupiny === null || skupiny.length > 1);
+
+    // 2) Postup v kapitolách a odpovede v teste
+    const k = encodeURIComponent(kniha);
+    const [r1, r2] = await Promise.all([
+      sbFetchAll(`kniha_postup?kniha=eq.${k}&select=user_id,kapitola,uloha,hviezdy,prve_hviezdy,pokusy,naposledy`),
+      sbFetchAll(`kniha_test?kniha=eq.${k}&select=user_id,pokus,uloha,bod,kedy`)
+    ]);
+    ulohy = {}; testy = {};
+    r1.forEach(r => { (ulohy[r.user_id] = ulohy[r.user_id] || {})[r.kapitola + '.' + r.uloha] = r; });
+    r2.forEach(r => {
+      const t = testy[r.user_id] = testy[r.user_id] || {};
+      (t[r.pokus] = t[r.pokus] || {})[r.uloha] = { bod: r.bod, kedy: r.kedy };
+    });
+
+    // 3) Obsah testu: kapitoly a skupina každej úlohy
+    const T = await Knihy.nacitajData(kniha, B.test.subor);
+    testUlohy = T.hry.map(h => ({
+      uloha: parseInt(String(h.kolo).split('.')[1], 10),
+      kapitoly: String(h.princip || '').split(',').map(x => parseInt(x, 10)).filter(x => x > 0),
+      skupina: h.skupina || ''
+    }));
+  } catch (e) {
+    console.error(e);
+    const t = String(e.message || e);
+    if ((t.includes('kniha_postup') || t.includes('kniha_test')) &&
+        (t.includes('does not exist') || t.includes('PGRST205') || t.includes('schema cache'))) {
+      setStatus('Tabuľky kniha_postup a kniha_test v databáze ešte neexistujú — treba spustiť skript knihy-postup.sql.', 'error');
+    } else {
+      setStatus('Chyba pri načítaní: ' + t, 'error');
+    }
+    return;
+  }
+
+  if (!hraci.length) {
+    setStatus('');
+    const e = document.getElementById('empty');
+    e.textContent = 'Táto skupina nemá žiadnych hráčov.';
+    e.style.display = '';
+    return;
+  }
+  setStatus('');
+  render();
+}
+
+// ─── Vyhodnotenie jedného hráča ──────────────────────────────────────────────
+function vyhodnotPokus(cislo, odp) {
+  const kl = Object.keys(odp);
+  const casy = kl.map(u => odp[u].kedy).filter(Boolean).sort();
+  return { pokus: cislo, odp: odp, body: kl.filter(u => odp[u].bod === 1).length,
+           odpovedane: kl.length, kedy: casy.length ? casy[casy.length - 1] : null };
+}
+
+function vyhodnot(p) {
+  const B = knihaB(), U = B.ulohVKapitole;
+  const moje = ulohy[p.user_id] || {};
+  const casy = [];
+  const kap = B.kapitoly.map(k => {
+    let hviezdy = 0, vyriesene = 0, prve3 = 0, pokusy = 0;
+    for (let u = 1; u <= U; u++) {
+      const r = moje[k.cislo + '.' + u];
+      if (!r || !(r.hviezdy > 0)) continue;
+      vyriesene++; hviezdy += r.hviezdy; pokusy += r.pokusy || 0;
+      if (r.prve_hviezdy === 3) prve3++;
+    }
+    return { cislo: k.cislo, hviezdy, vyriesene, prve3, pokusy, max: 3 * U, hotova: vyriesene === U,
+             ukazka: !!moje[k.cislo + '.0'] };
+  });
+  Object.values(moje).forEach(r => { if (r.naposledy) casy.push(r.naposledy); });
+
+  const t = testy[p.user_id] || {};
+  const pokusy = Object.keys(t).map(Number).sort((a, b) => a - b).map(n => vyhodnotPokus(n, t[n]));
+  pokusy.forEach(x => { if (x.kedy) casy.push(x.kedy); });
+  const najlepsi = pokusy.reduce((a, x) => (!a || x.body > a.body ? x : a), null);
+  const volba = document.getElementById('fPokus').value;
+  const vybrany = !pokusy.length ? null
+    : volba === 'prvy' ? pokusy[0] : volba === 'posledny' ? pokusy[pokusy.length - 1] : najlepsi;
+  casy.sort();
+  return {
+    moje, kap, pokusy, najlepsi, vybrany,
+    hotove: kap.filter(k => k.hotova).length,
+    hviezd: kap.reduce((s, k) => s + k.hviezdy, 0),
+    zacal: Object.keys(moje).length > 0 || pokusy.length > 0,
+    vsetky: kap.every(k => k.hotova),
+    zlozil: !!najlepsi && najlepsi.body >= B.test.hranica,
+    naposledy: casy.length ? casy[casy.length - 1] : null
+  };
+}
+
+// Výsledok vybraného pokusu po kapitolách a skupinách: { 'k3': {x, t, odp}, 'sA': … }
+function poKapitolach(pokus) {
+  const v = {};
+  testUlohy.forEach(tu => {
+    const o = pokus && pokus.odp[tu.uloha];
+    const kluce = tu.kapitoly.map(k => 'k' + k).concat(tu.skupina ? ['s' + tu.skupina] : []);
+    kluce.forEach(kl => {
+      const c = v[kl] = v[kl] || { x: 0, t: 0, odp: 0 };
+      c.t++;
+      if (o) { c.odp++; if (o.bod === 1) c.x++; }
+    });
+  });
+  return v;
+}
+
+// ─── Vykreslenie ─────────────────────────────────────────────────────────────
+function render() {
+  const B = knihaB();
+  const pohlad = document.getElementById('fPohlad').value;
+  const zoradit = document.getElementById('fZoradit').value;
+  document.getElementById('pokusField').style.display = pohlad === 'test' ? '' : 'none';
+
+  let riadky = hraci.map(p => ({ p, v: vyhodnot(p) }));
+  if (zoradit === 'postup') {
+    const sk = r => pohlad === 'test' ? (r.v.vybrany ? r.v.vybrany.body : -1) : r.v.hotove * 100 + r.v.hviezd;
+    riadky.sort((a, b) => (sk(b) - sk(a)) || menoHraca(a.p).localeCompare(menoHraca(b.p), 'sk'));
+  } else if (zoradit === 'aktivita') {
+    riadky.sort((a, b) => String(b.v.naposledy || '').localeCompare(String(a.v.naposledy || '')) ||
+                          menoHraca(a.p).localeCompare(menoHraca(b.p), 'sk'));
+  }
+
+  // Súhrn
+  document.getElementById('tHraci').textContent    = riadky.length;
+  document.getElementById('tZacali').textContent   = riadky.filter(r => r.v.zacal).length;
+  document.getElementById('tKapitoly').textContent = riadky.filter(r => r.v.vsetky).length;
+  document.getElementById('tTest').textContent     = riadky.filter(r => r.v.pokusy.length).length;
+  document.getElementById('tZlozili').textContent  = riadky.filter(r => r.v.zlozil).length;
+  document.getElementById('tiles').style.display = '';
+
+  if (pohlad === 'test') renderTest(riadky); else renderKapitoly(riadky);
+  document.getElementById('tbl').style.display = '';
+  legenda(pohlad);
+}
+
+function bunkaMena(p, v, stlpcov) {
+  const skupina = viacSkupin && treneri[p.trener_id] ? `<span class="skupina">${esc(treneri[p.trener_id])}</span>` : '';
+  const sipka = v.zacal ? `<span class="sipka">${otvorene.has(p.user_id) ? '▲' : '▼'}</span>` : '';
+  return `<td class="meno vlavo" data-u="${esc(p.user_id)}" title="${v.zacal ? 'Klikni pre podrobnosti' : ''}">` +
+         `${esc(menoHraca(p))}${sipka}${skupina}</td>`;
+}
+
+function bunkaTestu(v) {
+  const B = knihaB(), n = B.test.uloh;
+  const x = v.najlepsi;
+  if (!x) return '<td><span class="nic">—</span></td>';
+  const tip = `Najlepší pokus: ${x.pokus}. (${x.body} z ${n}), pokusov ${v.pokusy.length}`;
+  return `<td title="${esc(tip)}"><span class="${v.zlozil ? 'test-ok' : 'test-zle'}">${v.zlozil ? '✓' : '✗'} ${x.body} / ${n}</span>` +
+         `<span class="slabo">${v.pokusy.length}× pokus</span></td>`;
+}
+
+function renderKapitoly(riadky) {
+  const B = knihaB(), N = B.kapitoly.length, U = B.ulohVKapitole;
+  let h = '<tr><th class="vlavo">Hráč</th><th>Kapitoly</th>';
+  B.kapitoly.forEach(k => { h += `<th title="${esc(k.nazov)}">${k.cislo}</th>`; });
+  h += '<th>Test</th><th>Naposledy</th></tr>';
+  document.getElementById('thead').innerHTML = h;
+  const stlpcov = N + 4;
+
+  let b = '';
+  riadky.forEach(({ p, v }) => {
+    b += `<tr class="${!v.zacal ? 'nezacal' : (v.vsetky ? 'hotovo' : '')}">` + bunkaMena(p, v, stlpcov);
+    const pct = Math.round(100 * v.hotove / N);
+    b += v.zacal
+      ? `<td><div class="bar"><span class="${v.vsetky ? 'plna' : ''}" style="width:${pct}%"></span></div>` +
+        `<span class="prog-txt">${v.hotove} / ${N}</span></td>`
+      : '<td><span class="prog-txt">nezačal</span></td>';
+    v.kap.forEach((k, i) => {
+      if (!k.vyriesene) { b += `<td title="${esc(B.kapitoly[i].nazov)}"><span class="nic">·</span></td>`; return; }
+      const tip = `${k.cislo}. ${B.kapitoly[i].nazov}: ${k.hviezdy} z ${k.max} hviezd, vyriešené ${k.vyriesene} z ${U} úloh, ` +
+                  `na prvý pokus bez chyby ${k.prve3} z ${k.vyriesene}, riešení spolu ${k.pokusy}`;
+      b += `<td title="${esc(tip)}"><span class="kap-hv${k.hotova ? ' plna' : ''}"><b>${k.hviezdy}</b><span class="z">/${k.max}</span></span>` +
+           `<span class="slabo">${k.hotova ? 'prvý: ' + k.prve3 + '/' + U : k.vyriesene + '/' + U + ' úloh'}</span></td>`;
+    });
+    b += bunkaTestu(v);
+    b += `<td class="prog-txt">${v.naposledy ? datum(v.naposledy) : ''}</td></tr>`;
+    if (otvorene.has(p.user_id) && v.zacal) b += `<tr class="detail"><td colspan="${stlpcov}">${detailKapitol(v)}</td></tr>`;
+  });
+  document.getElementById('tbody').innerHTML = b;
+
+  // Skupina: priemer hviezd tých, čo kapitolu dokončili, a podiel úloh na prvý pokus bez chyby
+  let f = '<tr><td class="vlavo">Skupina</td><td></td>';
+  B.kapitoly.forEach((k, i) => {
+    let dok = 0, hv = 0, vyr = 0, p3 = 0;
+    riadky.forEach(({ v }) => {
+      const x = v.kap[i];
+      vyr += x.vyriesene; p3 += x.prve3;
+      if (x.hotova) { dok++; hv += x.hviezdy; }
+    });
+    if (!vyr) { f += '<td><span class="nic">·</span></td>'; return; }
+    const tip = `${k.nazov}: dokončili ${dok} hráči, priemer ${dok ? (hv / dok).toFixed(1) : '–'} hviezd; ` +
+                `na prvý pokus bez chyby ${p3} z ${vyr} vyriešených úloh`;
+    f += `<td title="${esc(tip)}">${dok ? (hv / dok).toFixed(1).replace('.', ',') : '–'}` +
+         `<span class="slabo">${Math.round(100 * p3 / vyr)} %</span></td>`;
+  });
+  f += '<td></td><td></td></tr>';
+  document.getElementById('tfoot').innerHTML = f;
+}
+
+function detailKapitol(v) {
+  const B = knihaB(), U = B.ulohVKapitole;
+  let h = '<div class="det-nadpis">Úlohy v kapitolách — najlepší výsledok (v zátvorke prvý, ak bol horší) · počet riešení</div>';
+  h += '<table class="det"><tr><th class="vlavo">Kapitola</th><th>Ukážka</th>';
+  for (let u = 1; u <= U; u++) h += `<th>Úloha ${u}</th>`;
+  h += '</tr>';
+  B.kapitoly.forEach((k, i) => {
+    const x = v.kap[i];
+    if (!x.vyriesene && !x.ukazka) return;
+    h += `<tr><td class="vlavo">${k.cislo}. ${esc(k.nazov)}</td>`;
+    h += `<td>${x.ukazka ? '✓' : '<span class="nic">·</span>'}</td>`;
+    for (let u = 1; u <= U; u++) {
+      const r = v.moje[k.cislo + '.' + u];
+      if (!r || !(r.hviezdy > 0)) { h += '<td><span class="nic">·</span></td>'; continue; }
+      const prvy = (r.prve_hviezdy != null && r.prve_hviezdy < r.hviezdy) ? ` <span class="prog-txt">(${r.prve_hviezdy}★)</span>` : '';
+      h += `<td title="${esc('naposledy ' + datum(r.naposledy))}">${hviezdyHtml(r.hviezdy)}${prvy} <span class="prog-txt">${r.pokusy}×</span></td>`;
+    }
+    h += '</tr>';
+  });
+  return h + '</table>';
+}
+
+function renderTest(riadky) {
+  const B = knihaB(), N = B.test.uloh;
+  const skupiny = [...new Set(testUlohy.map(t => t.skupina).filter(Boolean))].sort();
+  let h = '<tr><th class="vlavo">Hráč</th><th>Body</th><th>Pokusy</th>';
+  B.kapitoly.forEach(k => { h += `<th title="${esc(k.nazov)}">${k.cislo}</th>`; });
+  skupiny.forEach(s => { h += `<th class="skup" title="Skupina úloh ${s}">${s}</th>`; });
+  h += '<th>Naposledy</th></tr>';
+  document.getElementById('thead').innerHTML = h;
+  const stlpcov = 3 + B.kapitoly.length + skupiny.length + 1;
+
+  const sucet = {};      // pre riadok Skupina: kluc → {x, odp}
+  let b = '';
+  riadky.forEach(({ p, v }) => {
+    const x = v.vybrany;
+    b += `<tr class="${!x ? 'nezacal' : (v.zlozil ? 'hotovo' : '')}">` + bunkaMena(p, v, stlpcov);
+    if (!x) {
+      b += `<td><span class="prog-txt">nerobil</span></td><td></td>`;
+      B.kapitoly.forEach(() => { b += '<td><span class="nic">·</span></td>'; });
+      skupiny.forEach(() => { b += '<td><span class="nic">·</span></td>'; });
+      b += `<td class="prog-txt">${v.naposledy ? datum(v.naposledy) : ''}</td></tr>`;
+      return;
+    }
+    const zlozeny = x.body >= B.test.hranica;
+    const tip = `${x.pokus}. pokus: ${x.body} z ${N} ${bodov(x.body)}, odpovedal na ${x.odpovedane} z ${N}`;
+    b += `<td title="${esc(tip)}"><span class="${zlozeny ? 'test-ok' : 'test-zle'}">${zlozeny ? '✓' : '✗'} ${x.body} / ${N}</span>` +
+         `<span class="slabo">${x.odpovedane < N ? 'odpovedal ' + x.odpovedane + '/' + N : x.pokus + '. pokus'}</span></td>`;
+    b += `<td title="${esc(v.pokusy.map(q => q.pokus + '. pokus: ' + q.body + ' ' + bodov(q.body)).join(', '))}">${v.pokusy.length}</td>`;
+    const pk = poKapitolach(x);
+    const bunka = (kl, nazov) => {
+      const c = pk[kl];
+      if (!c || !c.t) return '<td><span class="nic">–</span></td>';
+      const s = sucet[kl] = sucet[kl] || { x: 0, odp: 0 };
+      s.x += c.x; s.odp += c.odp;
+      if (!c.odp) return `<td title="${esc(nazov)}"><span class="nic">·</span></td>`;
+      // v nedokončenom pokuse sa počíta len z úloh, na ktoré odpovedal
+      const tr = c.x === c.odp ? 'ok' : (c.x === 0 ? 'zle' : 'pol');
+      return `<td title="${esc(nazov + ': správne ' + c.x + ' z ' + c.odp + (c.odp < c.t ? ' (odpovedal na ' + c.odp + ' z ' + c.t + ' úloh)' : ''))}">` +
+             `<span class="${tr}">${c.x}/${c.odp}</span>${c.odp < c.t ? '<span class="slabo">z ' + c.t + '</span>' : ''}</td>`;
+    };
+    B.kapitoly.forEach(k => { b += bunka('k' + k.cislo, k.cislo + '. ' + k.nazov); });
+    skupiny.forEach(s => { b += bunka('s' + s, 'Skupina ' + s); });
+    b += `<td class="prog-txt">${v.naposledy ? datum(v.naposledy) : ''}</td></tr>`;
+    if (otvorene.has(p.user_id)) b += `<tr class="detail"><td colspan="${stlpcov}">${detailTestu(v)}</td></tr>`;
+  });
+  document.getElementById('tbody').innerHTML = b;
+
+  // Skupina: podiel správnych odpovedí po kapitolách (vo vybranom pokuse každého hráča)
+  let f = '<tr><td class="vlavo">Skupina</td><td></td><td></td>';
+  const pct = kl => { const s = sucet[kl]; return (s && s.odp) ? Math.round(100 * s.x / s.odp) + ' %' : '<span class="nic">·</span>'; };
+  B.kapitoly.forEach(k => { f += `<td title="${esc(k.nazov)}: podiel správnych odpovedí">${pct('k' + k.cislo)}</td>`; });
+  skupiny.forEach(s => { f += `<td>${pct('s' + s)}</td>`; });
+  f += '<td></td></tr>';
+  document.getElementById('tfoot').innerHTML = f;
+}
+
+function detailTestu(v) {
+  const B = knihaB(), N = B.test.uloh;
+  let h = '<div class="det-nadpis">Pokusy v teste</div>';
+  v.pokusy.forEach(x => {
+    const chyby = testUlohy.filter(tu => x.odp[tu.uloha] && x.odp[tu.uloha].bod === 0)
+      .map(tu => `${tu.uloha} (kap. ${tu.kapitoly.join(', ')})`);
+    h += `<p class="pokus"><b>${x.pokus}. pokus</b>${x.kedy ? ' · ' + datum(x.kedy) : ''} · ` +
+         `<b>${x.body} z ${N}</b> ${bodov(x.body)}${x.odpovedane < N ? ' · odpovedal na ' + x.odpovedane + ' z ' + N : ''}` +
+         (chyby.length ? `<br>Chyby v úlohách: ${esc(chyby.join(', '))}` : (x.odpovedane ? '<br>Bez chyby.' : '')) + '</p>';
+  });
+  return h;
+}
+
+function legenda(pohlad) {
+  const B = knihaB();
+  let l = `<b>${esc(B.nazov)}, ${esc(B.diel)}</b> — ${esc(B.popis)}. Kapitoly: ` +
+          B.kapitoly.map(k => `<span class="kap"><b>${k.cislo}</b> ${esc(k.nazov)}</span>`).join('');
+  if (pohlad === 'test') {
+    l += `<br><b>Záverečný test</b>: ${B.test.uloh} úloh, na zloženie treba ${B.test.hranica} bodov. ` +
+         'Bod je za úlohu vyriešenú bez chyby a počíta sa prvá odpoveď. Hráč môže test začať odznova — každý pokus sa ukladá zvlášť. ' +
+         'V stĺpcoch kapitol je, koľko úloh danej kapitoly hráč vo vybranom pokuse vyriešil bez chyby z tých, na ktoré odpovedal ' +
+         '(pri nedokončenom pokuse je pod tým celkový počet úloh; niektoré úlohy patria k dvom kapitolám). ' +
+         'A – jeden ťah, B – cieľ a ťah, C – výber z dvoch ťahov a ťah. Riadok <b>Skupina</b>: podiel správnych odpovedí. ' +
+         'Kliknutím na meno sa ukážu pokusy a úlohy s chybou.';
+  } else {
+    l += `<br>V bunke kapitoly sú hviezdy (najviac ${3 * B.ulohVKapitole}); pod nimi pri dokončenej kapitole počet úloh ` +
+         'vyriešených na prvý pokus bez chyby a pomôcky, inak počet vyriešených úloh. ' +
+         'Riadok <b>Skupina</b>: priemer hviezd tých, čo kapitolu dokončili, a podiel úloh vyriešených na prvý pokus bez chyby. ' +
+         'Kliknutím na meno sa ukážu jednotlivé úlohy.';
+  }
+  l += '<br>🔒 Hráčom sa kapitoly odomykajú postupne (po vyriešení všetkých úloh predchádzajúcej), test po poslednej kapitole. ' +
+       'Kniha sa nezapisuje do tréningu a nemení ELO ani štatistiky.';
+  const leg = document.getElementById('legenda');
+  leg.innerHTML = l;
+  leg.style.display = '';
+}
+
+// ─── Inicializácia ───────────────────────────────────────────────────────────
+async function init() {
+  const ok = await refreshSession();
+  if (!ok) { location.href = 'login.html'; return; }
+  if (!STAFF.includes(sessionStorage.getItem('user_role') || '')) {
+    alert('Prehľad kníh je dostupný len pre trénerov a administrátorov.');
+    goHome();
+    return;
+  }
+
+  // Vo výbere sú len knihy, ktoré prihlásený vidí (admin všetky)
+  const fKniha = document.getElementById('fKniha');
+  for (const k of Object.keys(Knihy.KNIHY)) {
+    if (!await Knihy.pristupKKnihe(k)) continue;
+    const o = document.createElement('option');
+    o.value = k;
+    o.textContent = Knihy.KNIHY[k].nazov + ', ' + Knihy.KNIHY[k].diel;
+    fKniha.appendChild(o);
+  }
+  if (!fKniha.options.length) {
+    Knihy.oznam('📚', 'Knihy sa pripravujú', 'Na knihách ešte pracujeme. Čoskoro ich nájdeš v menu Knihy.');
+    return;
+  }
+  const chcena = new URLSearchParams(location.search).get('kniha');
+  if (chcena && [...fKniha.options].some(o => o.value === chcena)) fKniha.value = chcena;
+
+  const b = document.getElementById('roleBanner');
+  if (USER_ROLE === 'trener') {
+    b.textContent = `🧑‍🏫 Tréner ${USER_NICK} — moji hráči`;
+    b.className = 'role-banner trener';
+  } else if (USER_ROLE === 'hlavny_trener') {
+    b.textContent = `👑 Hlavný tréner ${USER_NICK} — všetci hráči`;
+    b.className = 'role-banner hlavny_trener';
+  } else {
+    b.textContent = '🔧 Admin — všetci hráči';
+    b.className = 'role-banner admin';
+  }
+  b.style.display = '';
+
+  if (!await naplnVyberSkupin(document.getElementById('fSkupina'))) {
+    document.getElementById('groupField').style.display = 'none';
+  }
+  try {
+    const t = await sbFetch('profiles?role=eq.trener&select=id,name,surname,nick_name') || [];
+    t.forEach(x => { treneri[x.id] = x.nick_name || `${x.surname || ''} ${x.name || ''}`.trim(); });
+  } catch (e) { /* bez mien skupín sa zaobídeme */ }
+
+  fKniha.addEventListener('change', load);
+  document.getElementById('fSkupina').addEventListener('change', load);
+  ['fPohlad', 'fPokus', 'fZoradit'].forEach(id =>
+    document.getElementById(id).addEventListener('change', () => { if (hraci.length) render(); }));
+  // rozbalenie detailu hráča
+  document.getElementById('tbody').addEventListener('click', e => {
+    const td = e.target.closest('td.meno');
+    if (!td || !td.dataset.u) return;
+    const u = td.dataset.u;
+    if (otvorene.has(u)) otvorene.delete(u); else otvorene.add(u);
+    render();
+  });
+
+  await load();
+}
+
+init();
+</script>
+</body>
+</html>

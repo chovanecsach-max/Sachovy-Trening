@@ -61,6 +61,7 @@ button {
 .lista-nazov { font-size: 22px; font-weight: bold; }
 .lista-podtitul { font-size: 13px; color: #64748b; margin-top: 2px; }
 .lista button { white-space: nowrap; flex: none; }
+.lista-tlacidla { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
 .pas {
   margin: -4px 0 14px;
   padding: 7px 12px;
@@ -182,7 +183,10 @@ button:disabled { opacity: .55; cursor: not-allowed; }
       <div class="lista-nazov" id="nazov">Cesta stratéga</div>
       <div class="lista-podtitul" id="podtitul"></div>
     </div>
-    <button class="secondary" onclick="location.href='index.html'">Späť na úvod</button>
+    <div class="lista-tlacidla">
+      <button class="secondary" id="tlPrehlad" hidden>Prehľad hráčov</button>
+      <button class="secondary" onclick="location.href='index.html'">Späť na úvod</button>
+    </div>
   </div>
   <div class="pas" id="pas" hidden></div>
 
@@ -215,7 +219,7 @@ button:disabled { opacity: .55; cursor: not-allowed; }
 <script src="js/knihy.js"></script>
 <script>
 // ZNAČKA VERZIE — pri každej úprave tohto súboru prepíš dátum.
-(window.VERZIE = window.VERZIE || {})['kniha.html'] = '2026-10-27b';
+(window.VERZIE = window.VERZIE || {})['kniha.html'] = '2026-10-27c';
 
 function el(tag, cls, text) {
   const e = document.createElement(tag);
@@ -338,6 +342,12 @@ async function init() {
   const postup = await Knihy.nacitajPostup(kniha, Knihy.pouzivatel());
   vykresli(kniha, postup);
   pasPristupu(kniha);
+  // tréner a admin: odkaz na prehľad hráčov v tejto knihe
+  if (!Knihy.jeLokalne() && Knihy.jePersonal()) {
+    const tp = document.getElementById('tlPrehlad');
+    tp.hidden = false;
+    tp.addEventListener('click', () => { location.href = 'kniha-prehlad.html?kniha=' + encodeURIComponent(kniha); });
+  }
   // návrat tlačidlom Späť z kapitoly: stránka môže prísť z vyrovnávacej pamäte — načítaj postup znova
   window.addEventListener('pageshow', e => { if (e.persisted) location.reload(); });
 }
