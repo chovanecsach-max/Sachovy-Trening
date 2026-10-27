@@ -40,7 +40,7 @@
 //             vyzadujPlatnost, hlasPritomnost).
 // ============================================================================
 
-(window.VERZIE = window.VERZIE || {})['knihy.js'] = '2026-10-27b';
+(window.VERZIE = window.VERZIE || {})['knihy.js'] = '2026-10-27c';
 
 const Knihy = (function () {
   'use strict';
@@ -504,6 +504,7 @@ const Knihy = (function () {
     pouzivatel: pouzivatel,
     parametre: parametre,
     nacitajPostup: nacitajPostup,
+    nacitajData: nacitajData,
     prehlad: prehlad,
     odomknutie: odomknutie,
     ulozisko: ulozisko,
