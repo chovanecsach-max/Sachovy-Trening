@@ -165,6 +165,7 @@ body {
 .i-stat      { background: #eff6ff; color: #2563eb; }
 .i-admin     { background: rgba(212,168,67,0.15); color: #a07828; }
 .i-hry       { background: #fef3c7; color: #b45309; }
+.i-knihy     { background: #fee2e2; color: #b91c1c; }
 .i-viz       { background: #ecfeff; color: #0e7490; }
 
 .nav-btn.nav-admin {
@@ -190,6 +191,7 @@ body {
 .submenu-trener { grid-template-columns: repeat(4, 1fr); }
 .submenu-koncovky { grid-template-columns: repeat(4, 1fr); }
 .submenu-hry { grid-template-columns: repeat(4, 1fr); }
+.submenu-knihy { grid-template-columns: repeat(4, 1fr); }
 .sub-pozn { display: block; font-size: 10.5px; color: #94a3b8; font-weight: 400; margin-top: 3px; }
 /* Hra, ktorú hráč ešte nemá odomknutú (klik ukáže, čo treba splniť) */
 .sub-btn.zamknuta { opacity: 0.6; }
@@ -308,6 +310,7 @@ body {
   .submenu-trener { grid-template-columns: repeat(3, 1fr); }
   .submenu-koncovky { grid-template-columns: repeat(2, 1fr); }
   .submenu-hry { grid-template-columns: repeat(2, 1fr); }
+  .submenu-knihy { grid-template-columns: repeat(2, 1fr); }
   .sub-btn { padding: 12px 4px; font-size: 11px; gap: 6px; min-height: 74px;
              touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
   .sub-icon { width: 32px; height: 32px; font-size: 15px; }
@@ -322,6 +325,7 @@ body {
   .submenu-trener { grid-template-columns: repeat(3, 1fr); }
   .submenu-koncovky { grid-template-columns: repeat(2, 1fr); }
   .submenu-hry { grid-template-columns: repeat(2, 1fr); }
+  .submenu-knihy { grid-template-columns: repeat(2, 1fr); }
   .leaderboards { grid-template-columns: 1fr; }
 }
 </style>
@@ -396,6 +400,10 @@ body {
     <button class="nav-btn" id="btnHry" onclick="toggleHryMenu()" style="display:none;">
       <div class="nav-icon i-hry">🎲</div>
       Hry
+    </button>
+    <button class="nav-btn" id="btnKnihy" onclick="toggleKnihyMenu()" style="display:none;">
+      <div class="nav-icon i-knihy">📚</div>
+      Knihy
     </button>
     <button class="nav-btn" id="btnViz" onclick="goVizualizacia()" style="display:none;">
       <div class="nav-icon i-viz">👁️</div>
@@ -536,6 +544,14 @@ body {
     </button>
   </div>
 
+  <!-- Podmenu kníh — interaktívne knihy (kapitoly s úlohami a záverečný test) -->
+  <div id="knihySubmenu" class="submenu submenu-knihy">
+    <button class="sub-btn" data-kniha="cesta-stratega-1" onclick="goKniha('cesta-stratega-1')">
+      <div class="sub-icon i-knihy">🧭</div>Cesta stratéga
+      <span class="sub-pozn">1. diel · stratégia do 1400</span>
+    </button>
+  </div>
+
   <!-- 5 rebríčkov vedľa seba -->
   <div class="leaderboards">
     <div class="lb-card">
@@ -566,11 +582,12 @@ body {
 <script src="js/auth.js"></script>
 <script src="js/player.js"></script>
 <script src="js/hra-postup.js"></script>
+<script src="js/knihy.js"></script>
 <script src="js/vizualizacia-pristup.js"></script>
 <script src="js/vizualizacia-zadania.js"></script>
 <script>
 // ZNAČKA VERZIE — pri každej úprave tohto súboru prepíš dátum.
-(window.VERZIE = window.VERZIE || {})['index.html'] = '2026-10-07';
+(window.VERZIE = window.VERZIE || {})['index.html'] = '2026-10-27';
 
 // Hlavné menu: všetky tlačidlá v jednom rade; keď ich je viac než 9, v dvoch
 // rovnakých radoch. Tlačidlá sa zobrazujú postupne (Zadania, Súťaže, Hry sa
@@ -635,6 +652,16 @@ async function initPage() {
       document.getElementById('hraHrozbaBtn').classList.add('zamknuta');
       document.getElementById('hraHrozbaPozn').textContent = '🔒 odomkne sa po skúške Vidličky na trhu';
     });
+  });
+  // Knihy — kto ktorú knihu vidí, určujú riadky 'knihy:<kniha>' a 'knihy' v tabuľke
+  // nastavenia (a vybraní testeri hier), pozri js/knihy.js. Menu Knihy sa ukáže,
+  // keď je otvorená aspoň jedna kniha, a sú v ňom len knihy, ktoré používateľ vidí.
+  Knihy.pristup(role).then(async ok => {
+    if (!ok) return;
+    for (const b of document.querySelectorAll('#knihySubmenu [data-kniha]')) {
+      if (!await Knihy.pristupKKnihe(b.dataset.kniha, role)) b.style.display = 'none';
+    }
+    document.getElementById('btnKnihy').style.display = 'flex';
   });
   // Vizualizácia — kto ju vidí, určuje riadok 'vizualizacia' v tabuľke nastavenia
   // (a vybraní testeri hier), pozri js/vizualizacia-pristup.js
@@ -834,6 +861,7 @@ function goSutaze()       { location.href = 'sutaze.html'; }
 function goMojeSutaze()   { location.href = 'moje-sutaze.html'; }
 function goHra(kluc)      { location.href = kluc + '.html'; }
 function goHryPrehlad()   { location.href = 'hry-prehlad.html'; }
+function goKniha(kluc)    { location.href = 'kniha.html?kniha=' + encodeURIComponent(kluc); }
 function goVizualizacia() { location.href = 'vizualizacia.html'; }
 function goVizPrehlad()   { location.href = 'vizualizacia-prehlad.html'; }
 
@@ -958,7 +986,7 @@ function toggleKoncovkyMenu() {
   const menu = document.getElementById('koncovkySubmenu');
   const btn  = document.getElementById('btnKoncovky');
   const isOpen = menu.classList.contains('open');
-  closeSkillsMenu(); closeTrenerMenu(); closeHryMenu();
+  closeSkillsMenu(); closeTrenerMenu(); closeHryMenu(); closeKnihyMenu();
   menu.classList.toggle('open');
   btn.classList.toggle('active', !isOpen);
   if (!isOpen) loadKoncovkyTypes();
@@ -975,7 +1003,7 @@ function toggleSkillsMenu() {
   const menu = document.getElementById('skillsSubmenu');
   const btn  = document.getElementById('btnSkills');
   const isOpen = menu.classList.contains('open');
-  closeTrenerMenu(); closeKoncovkyMenu(); closeHryMenu();
+  closeTrenerMenu(); closeKoncovkyMenu(); closeHryMenu(); closeKnihyMenu();
   menu.classList.toggle('open');
   btn.classList.toggle('active', !isOpen);
 }
@@ -984,7 +1012,7 @@ function toggleTrenerMenu() {
   const menu = document.getElementById('trenerSubmenu');
   const btn  = document.getElementById('trenerBtn');
   const isOpen = menu.classList.contains('open');
-  closeSkillsMenu(); closeKoncovkyMenu(); closeHryMenu();
+  closeSkillsMenu(); closeKoncovkyMenu(); closeHryMenu(); closeKnihyMenu();
   menu.classList.toggle('open');
   btn.classList.toggle('active', !isOpen);
 }
@@ -998,7 +1026,7 @@ function toggleHryMenu() {
   const menu = document.getElementById('hrySubmenu');
   const btn  = document.getElementById('btnHry');
   const isOpen = menu.classList.contains('open');
-  closeSkillsMenu(); closeKoncovkyMenu(); closeTrenerMenu();
+  closeSkillsMenu(); closeKoncovkyMenu(); closeTrenerMenu(); closeKnihyMenu();
   menu.classList.toggle('open');
   btn.classList.toggle('active', !isOpen);
 }
@@ -1006,6 +1034,22 @@ function toggleHryMenu() {
 function closeHryMenu() {
   const m = document.getElementById('hrySubmenu');
   const b = document.getElementById('btnHry');
+  if (m) m.classList.remove('open');
+  if (b) b.classList.remove('active');
+}
+
+function toggleKnihyMenu() {
+  const menu = document.getElementById('knihySubmenu');
+  const btn  = document.getElementById('btnKnihy');
+  const isOpen = menu.classList.contains('open');
+  closeSkillsMenu(); closeKoncovkyMenu(); closeTrenerMenu(); closeHryMenu();
+  menu.classList.toggle('open');
+  btn.classList.toggle('active', !isOpen);
+}
+
+function closeKnihyMenu() {
+  const m = document.getElementById('knihySubmenu');
+  const b = document.getElementById('btnKnihy');
   if (m) m.classList.remove('open');
   if (b) b.classList.remove('active');
 }

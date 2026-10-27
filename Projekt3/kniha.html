@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cesta stratéga</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0f1117">
+<link rel="apple-touch-icon" href="ikona-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Šach tréning">
+
+<style>
+[hidden] { display: none !important; }
+* { box-sizing: border-box; }
+
+body {
+  font-family: Arial, sans-serif;
+  background: #f4f4f6;
+  margin: 0;
+  padding: 10px;
+  color: #111827;
+}
+.app {
+  max-width: 1180px;
+  margin: 0 auto;
+  background: white;
+  border-radius: 14px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+  padding: 12px 14px 18px;
+  min-height: 60vh;
+}
+
+/* ── Tlačidlá (ako v hrách) ─────────────────────────────────────────── */
+button {
+  padding: 10px 14px;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 15px;
+  font-family: inherit;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+.primary   { background: #111827; color: white; font-weight: bold; }
+.primary:hover { background: #1f2937; }
+.secondary { background: #e5e7eb; color: #111827; }
+.secondary:hover { background: #d1d5db; }
+
+/* ── Horná lišta ────────────────────────────────────────────────────── */
+.lista {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-bottom: 10px;
+  margin-bottom: 14px;
+  border-bottom: 1px solid #e5e7eb;
+}
+.lista-nazov { font-size: 22px; font-weight: bold; }
+.lista-podtitul { font-size: 13px; color: #64748b; margin-top: 2px; }
+.lista button { white-space: nowrap; flex: none; }
+.pas {
+  margin: -4px 0 14px;
+  padding: 7px 12px;
+  border-radius: 10px;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  color: #92400e;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+/* ── Kompas ─────────────────────────────────────────────────────────── */
+.sprievodca { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 18px; }
+.avatar { flex: none; width: 64px; height: 64px; }
+.bublina {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  background: #fffbeb;
+  border: 2px solid #fcd34d;
+  border-radius: 16px;
+  padding: 12px 16px;
+  font-size: 15px;
+  line-height: 1.5;
+}
+.bublina::before {
+  content: '';
+  position: absolute;
+  left: -11px;
+  top: 20px;
+  border: 10px solid transparent;
+  border-right-color: #fcd34d;
+  border-left: 0;
+}
+.bublina .meno { font-weight: bold; font-size: 14px; color: #92400e; margin-bottom: 2px; }
+.bublina p { margin: 0 0 8px; }
+.bublina p:last-child { margin-bottom: 0; }
+.suhrn { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 14px; color: #475569; }
+.suhrn b { color: #111827; }
+
+/* ── Turistická značka (biela – červená – biela) ─────────────────────── */
+.znacka {
+  display: inline-flex; flex-direction: column; width: 26px; height: 22px;
+  border-radius: 3px; overflow: hidden; box-shadow: 0 0 0 1px #cbd5e1; flex: none;
+}
+.znacka i { flex: 1; background: #fff; }
+.znacka i:nth-child(2) { background: var(--farba, #cbd5e1); }
+.znacka.hotova { --farba: #dc2626; }
+
+/* ── Kapitoly ───────────────────────────────────────────────────────── */
+h3.sekcia { margin: 0 0 10px; font-size: 16px; color: #475569; font-weight: bold; }
+.kapitoly {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 10px;
+  margin-bottom: 18px;
+}
+.kap {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 12px;
+  align-items: start;
+  text-align: left;
+  padding: 12px 14px;
+  background: #f8fafc;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  color: #111827;
+  transition: border-color .15s, background .15s, transform .1s;
+}
+.kap:hover { background: #f1f5f9; border-color: #cbd5e1; transform: translateY(-1px); }
+.kap .znacka { grid-row: span 2; margin-top: 2px; }
+.kap-cislo { font-size: 12px; color: #64748b; }
+.kap-nazov { font-size: 15px; font-weight: bold; line-height: 1.3; }
+.kap-stav { grid-column: 2; font-size: 13px; color: #64748b; display: flex; justify-content: space-between; gap: 8px; }
+.kap-stav .hv { color: #b45309; font-weight: bold; white-space: nowrap; }
+.kap-stav .hotovo { color: #15803d; font-weight: bold; }
+.pruh { grid-column: 2; height: 6px; border-radius: 3px; background: #e5e7eb; overflow: hidden; }
+.pruh i { display: block; height: 100%; background: #f59e0b; }
+
+/* ── Test ───────────────────────────────────────────────────────────── */
+.test {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 18px;
+  flex-wrap: wrap;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: #fffbeb;
+  border: 2px solid #fcd34d;
+}
+.test-text { display: flex; gap: 12px; align-items: flex-start; min-width: 0; }
+.test .znacka { width: 34px; height: 28px; }
+.test-nazov { font-size: 17px; font-weight: bold; }
+.test-popis { font-size: 14px; color: #475569; margin-top: 2px; }
+.test-stav { font-size: 14px; margin-top: 6px; }
+.test-stav .ok { color: #15803d; font-weight: bold; }
+
+@media (max-width: 600px) {
+  .lista-nazov { font-size: 19px; }
+  .lista button { padding: 8px 10px; font-size: 14px; }
+  .avatar { width: 48px; height: 48px; }
+  .bublina { padding: 10px 12px; font-size: 14px; }
+  .kapitoly { grid-template-columns: 1fr; }
+  .test button { width: 100%; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="lista">
+    <div>
+      <div class="lista-nazov" id="nazov">Cesta stratéga</div>
+      <div class="lista-podtitul" id="podtitul"></div>
+    </div>
+    <button class="secondary" onclick="location.href='index.html'">Späť na úvod</button>
+  </div>
+  <div class="pas" id="pas" hidden></div>
+
+  <div class="sprievodca">
+    <svg class="avatar" viewBox="0 0 56 56" aria-hidden="true">
+      <circle cx="28" cy="28" r="26" fill="#fff" stroke="#1e3a5f" stroke-width="2.5"/>
+      <circle cx="28" cy="28" r="20" fill="none" stroke="#cbd5e1" stroke-width="1.5"/>
+      <path d="M28 9 L33 28 L28 47 L23 28 Z" fill="#1e3a5f"/>
+      <path d="M28 9 L33 28 L23 28 Z" fill="#dc2626"/>
+      <circle cx="28" cy="28" r="3" fill="#fff" stroke="#1e3a5f" stroke-width="1.5"/>
+    </svg>
+    <div class="bublina">
+      <div class="meno">Kompas</div>
+      <p>Ahoj, som Kompas. Na tejto ceste ťa naučím hľadať v pozícii cieľ a vybrať figúru, ktorá k nemu pôjde.</p>
+      <p>Každá kapitola začína ukážkou a pokračuje piatimi úlohami. Za úlohu získaš až tri hviezdy. Na konci ťa čaká test z <span id="testUloh">30</span> úloh.</p>
+      <div class="suhrn" id="suhrn"></div>
+    </div>
+  </div>
+
+  <h3 class="sekcia">Kapitoly</h3>
+  <div class="kapitoly" id="kapitoly"></div>
+
+  <h3 class="sekcia">Záverečný test</h3>
+  <div class="test" id="test"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/auth.js"></script>
+<script src="js/player.js"></script>
+<script src="js/knihy.js"></script>
+<script>
+// ZNAČKA VERZIE — pri každej úprave tohto súboru prepíš dátum.
+(window.VERZIE = window.VERZIE || {})['kniha.html'] = '2026-10-27';
+
+function el(tag, cls, text) {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (text != null) e.textContent = text;
+  return e;
+}
+function znacka(hotova) {
+  const z = el('span', 'znacka' + (hotova ? ' hotova' : ''));
+  z.innerHTML = '<i></i><i></i><i></i>';
+  return z;
+}
+function sklon(n, jeden, dva, pat) { return n === 1 ? jeden : (n >= 2 && n <= 4 ? dva : pat); }
+
+function vykresli(kniha) {
+  const B = Knihy.KNIHY[kniha];
+  const P = Knihy.prehlad(kniha, Knihy.pouzivatel());
+  document.title = B.nazov + ' – ' + B.diel;
+  document.getElementById('nazov').textContent = B.ikona + ' ' + B.nazov;
+  document.getElementById('podtitul').textContent = B.diel + ' · ' + B.popis;
+  document.getElementById('testUloh').textContent = B.test.uloh;
+
+  // kapitoly
+  const box = document.getElementById('kapitoly');
+  box.innerHTML = '';
+  let hvSpolu = 0, hvMax = 0, hotove = 0;
+  P.kapitoly.forEach(k => {
+    hvSpolu += k.hviezdy; hvMax += k.max;
+    const hotova = k.vyriesene >= k.uloh;
+    if (hotova) hotove++;
+    const b = el('button', 'kap');
+    b.type = 'button';
+    b.appendChild(znacka(hotova));
+    b.appendChild(el('span', 'kap-cislo', 'Kapitola ' + k.cislo));
+    b.appendChild(el('span', 'kap-nazov', k.nazov));
+    const st = el('span', 'kap-stav');
+    if (!k.vyriesene && !k.ukazka) st.appendChild(el('span', null, 'Ešte nezačatá'));
+    else st.appendChild(el('span', hotova ? 'hotovo' : null,
+      hotova ? 'Hotová' : k.vyriesene + ' z ' + k.uloh + ' ' + sklon(k.uloh, 'úlohy', 'úloh', 'úloh')));
+    st.appendChild(el('span', 'hv', '★ ' + k.hviezdy + ' z ' + k.max));
+    b.appendChild(st);
+    const pr = el('span', 'pruh'); const ii = el('i');
+    ii.style.width = Math.round(100 * k.hviezdy / k.max) + '%';
+    pr.appendChild(ii); b.appendChild(pr);
+    b.setAttribute('aria-label', 'Kapitola ' + k.cislo + ': ' + k.nazov + ', ' + k.hviezdy + ' z ' + k.max + ' hviezd');
+    b.addEventListener('click', () => { location.href = Knihy.adresaKapitoly(kniha, k.cislo); });
+    box.appendChild(b);
+  });
+
+  // test
+  const T = P.test, t = document.getElementById('test');
+  t.innerHTML = '';
+  const tx = el('div', 'test-text');
+  tx.appendChild(znacka(T.zlozeny));
+  const tt = el('div');
+  tt.appendChild(el('div', 'test-nazov', B.test.nazov));
+  tt.appendChild(el('div', 'test-popis', T.uloh + ' úloh zo všetkých kapitol · na úspech treba ' + T.hranica + ' bodov · počíta sa prvá odpoveď'));
+  const ts = el('div', 'test-stav');
+  if (T.zlozeny) ts.innerHTML = '<span class="ok">Test si zložil – Odznak Stratég 1.</span> Body: ' + T.body + ' z ' + T.uloh + '.';
+  else if (T.odpovedane) ts.textContent = 'Body: ' + T.body + ' z ' + T.uloh + ' · odpovedal si na ' + T.odpovedane + ' z ' + T.uloh + ' úloh.';
+  else ts.textContent = 'Test si ešte nezačal.';
+  tt.appendChild(ts);
+  tx.appendChild(tt);
+  t.appendChild(tx);
+  const tb = el('button', T.odpovedane >= T.uloh ? 'secondary' : 'primary',
+    !T.odpovedane ? 'Začať test' : (T.odpovedane < T.uloh ? 'Pokračovať v teste' : 'Výsledok testu'));
+  tb.addEventListener('click', () => { location.href = Knihy.adresaTestu(kniha); });
+  t.appendChild(tb);
+
+  // súhrn v bubline
+  const s = document.getElementById('suhrn');
+  s.innerHTML = '';
+  const r1 = el('span'); r1.innerHTML = 'Hviezdy: <b>' + hvSpolu + ' z ' + hvMax + '</b>'; s.appendChild(r1);
+  const r2 = el('span'); r2.innerHTML = 'Hotové kapitoly: <b>' + hotove + ' z ' + P.kapitoly.length + '</b>'; s.appendChild(r2);
+  const r3 = el('span'); r3.innerHTML = 'Test: <b>' + (T.odpovedane ? T.body + ' z ' + T.uloh + ' bodov' : 'ešte nezačatý') + '</b>'; s.appendChild(r3);
+}
+
+// Adminovi lišta s tým, kto knihu vidí (zmena v SQL editore, pozri knihy-pristup.sql)
+async function pasPristupu(kniha) {
+  const pas = document.getElementById('pas');
+  if (Knihy.jeLokalne()) {
+    pas.textContent = 'Test zo súboru — prihlásenie je vypnuté a postup sa ukladá len v tomto prehliadači.';
+    pas.hidden = false;
+    return;
+  }
+  if ((sessionStorage.getItem('user_role') || '') !== 'admin') return;
+  const u = await Knihy.uroven(kniha);
+  const kto = { vsetci: 'všetci vrátane hráčov', personal: 'admin, hlavný tréner a tréneri (a testeri)' }[u] ||
+              'len admin a testeri';
+  pas.textContent = 'Knihu teraz vidia: ' + kto + '. Zmena v SQL editore, pozri knihy-pristup.sql.';
+  pas.hidden = false;
+}
+
+async function init() {
+  const kniha = Knihy.parametre().kniha;
+  if (!Knihy.KNIHY[kniha]) {
+    Knihy.oznam('📚', 'Kniha sa nenašla', 'Táto kniha neexistuje. Vyber ju v menu Knihy.');
+    return;
+  }
+  if (!await Knihy.prihlasenie(kniha)) return;
+  vykresli(kniha);
+  pasPristupu(kniha);
+  // návrat tlačidlom Späť z kapitoly: stránka môže prísť z vyrovnávacej pamäte, postup prekresli
+  window.addEventListener('pageshow', e => { if (e.persisted) vykresli(kniha); });
+}
+init();
+</script>
+<script>
+if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(e =>
+      console.warn('Service worker sa nezaregistroval:', e));
+  });
+}
+</script>
+</body>
+</html>
