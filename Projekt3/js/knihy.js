@@ -40,7 +40,7 @@
 //             vyzadujPlatnost, hlasPritomnost).
 // ============================================================================
 
-(window.VERZIE = window.VERZIE || {})['knihy.js'] = '2026-10-27c';
+(window.VERZIE = window.VERZIE || {})['knihy.js'] = '2026-10-29b';
 
 const Knihy = (function () {
   'use strict';
@@ -57,7 +57,7 @@ const Knihy = (function () {
       popis: 'Stratégia pre hráčov do 1400 Elo',
       ikona: '🧭',
       priecinok: 'js/knihy/cesta-stratega-1/',
-      verzia: '2026-10-27',
+      verzia: '2026-10-29b',
       kapitoly: [
         { cislo: 1,  nazov: 'Najprv súper a bezpečnosť',        subor: 'k01.js' },
         { cislo: 2,  nazov: 'Kto stojí lepšie',                 subor: 'k02.js' },
