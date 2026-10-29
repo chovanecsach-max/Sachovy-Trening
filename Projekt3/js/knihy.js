@@ -40,7 +40,7 @@
 //             vyzadujPlatnost, hlasPritomnost).
 // ============================================================================
 
-(window.VERZIE = window.VERZIE || {})['knihy.js'] = '2026-10-29b';
+(window.VERZIE = window.VERZIE || {})['knihy.js'] = '2026-10-29d';
 
 const Knihy = (function () {
   'use strict';
@@ -57,7 +57,7 @@ const Knihy = (function () {
       popis: 'Stratégia pre hráčov do 1400 Elo',
       ikona: '🧭',
       priecinok: 'js/knihy/cesta-stratega-1/',
-      verzia: '2026-10-29b',
+      verzia: '2026-10-29c',
       kapitoly: [
         { cislo: 1,  nazov: 'Najprv súper a bezpečnosť',        subor: 'k01.js' },
         { cislo: 2,  nazov: 'Kto stojí lepšie',                 subor: 'k02.js' },
@@ -73,7 +73,25 @@ const Knihy = (function () {
       ],
       ulohVKapitole: 5,
       // cislo = číslo „kapitoly“ testu v obsahu (úlohy 12.1 – 12.30)
-      test: { nazov: 'Test zo stratégie 1', subor: 'test.js', cislo: 12, uloh: 30, hranica: 24 }
+      test: { nazov: 'Test zo stratégie 1', subor: 'test.js', cislo: 12, uloh: 30, hranica: 24, odznak: 'Stratég 1' }
+    },
+    // 2. diel vzniká po kapitolách: v zozname sú len hotové kapitoly, test sa pripravuje.
+    //  vlastnyPristup: riadi sa len riadkom 'knihy:cesta-stratega-2' (nie spoločným 'knihy'),
+    //  takže kým ho admin nepridá, vidí 2. diel len admin a testeri.
+    'cesta-stratega-2': {
+      nazov: 'Cesta stratéga',
+      diel: '2. diel',
+      popis: 'Stratégia pre hráčov do 1600 Elo',
+      ikona: '🧭',
+      priecinok: 'js/knihy/cesta-stratega-2/',
+      verzia: '2026-10-29',
+      vlastnyPristup: true,
+      kapitoly: [
+        { cislo: 1,  nazov: 'Súperov plán – profylaxia',        subor: 'k01.js' }
+      ],
+      ulohVKapitole: 5,
+      test: { nazov: 'Test zo stratégie 2', subor: 'test.js', cislo: 12, uloh: 30, hranica: 24, odznak: 'Stratég 2',
+              pripravuje: true }
     }
   };
   const PRVA = Object.keys(KNIHY)[0];
@@ -105,7 +123,8 @@ const Knihy = (function () {
 
   // Komu je kniha otvorená: 'admin' | 'personal' | 'vsetci'
   async function uroven(kniha) {
-    const n = await nastavenia();
+    const n = await nastavenia(), b = KNIHY[kniha] || {};
+    if (b.vlastnyPristup) return n['knihy:' + kniha] || 'admin';
     return n['knihy:' + kniha] || n['knihy'] || 'admin';
   }
 
@@ -372,7 +391,8 @@ const Knihy = (function () {
       kapitoly[k.cislo] = vsetko || i === 0 || dokoncena(b.kapitoly[i - 1].cislo);
     });
     const posledna = b.kapitoly[b.kapitoly.length - 1].cislo;
-    return { kapitoly: kapitoly, test: vsetko || dokoncena(posledna), vsetko: vsetko,
+    const test = !b.test.pripravuje && (vsetko || dokoncena(posledna));
+    return { kapitoly: kapitoly, test: test, vsetko: vsetko,
              dokoncena: dokoncena, posledna: posledna };
   }
 
@@ -439,6 +459,11 @@ const Knihy = (function () {
 
     const obsahUrl = adresaObsahu(kniha);
     let subor, cast, i = -1;
+    if (typ === 'test' && b.test.pripravuje) {
+      oznam('📚', b.test.nazov + ' sa pripravuje', 'Záverečný test tohto dielu ešte pripravujeme.',
+            [{ text: 'Obsah knihy', url: obsahUrl }]);
+      return;
+    }
     if (typ === 'test') {
       subor = b.test.subor; cast = 'test';
     } else {
@@ -486,8 +511,9 @@ const Knihy = (function () {
       nav.dalsia = (i + 1 < b.kapitoly.length)
         ? { text: 'Ďalšia kapitola', url: adresaKapitoly(kniha, b.kapitoly[i + 1].cislo),
             zamknute: 'Ďalšia kapitola sa odomkne, keď vyriešiš všetky úlohy tejto kapitoly.' }
+        : (b.test.pripravuje ? null
         : { text: 'Na záverečný test', url: adresaTestu(kniha),
-            zamknute: 'Záverečný test sa odomkne, keď vyriešiš všetky úlohy tejto kapitoly.' };
+            zamknute: 'Záverečný test sa odomkne, keď vyriešiš všetky úlohy tejto kapitoly.' });
     }
     lista(kniha);
     window.spustiKnihu(obsah, ulozisko(kniha, userId, cast, postup), nav);
