@@ -73,8 +73,17 @@ main.hra{display:grid;grid-template-columns:minmax(280px,520px) 1fr;gap:20px;ali
 .pole.posledny{background-image:linear-gradient(rgba(250,204,21,.5),rgba(250,204,21,.5))}
 .pole.mozny::after{content:"";position:absolute;left:36%;top:36%;width:28%;height:28%;border-radius:50%;background:rgba(0,85,164,.45);pointer-events:none}
 .pole.mozny.obsadene::after{left:0;top:0;width:100%;height:100%;border-radius:0;background:radial-gradient(circle,transparent 62%,rgba(0,85,164,.5) 63%)}
-.na-tahu{display:flex;align-items:center;gap:8px;margin-top:8px;font-size:14px;color:var(--les-svetly)}
+.na-tahu{display:flex;align-items:center;gap:8px;margin-top:8px;font-size:14px;color:var(--les-svetly);flex-wrap:wrap;min-height:30px}
 .na-tahu .bod{width:14px;height:14px;border-radius:50%;box-shadow:0 0 0 1.5px var(--les)}
+/* prehrávanie ťahov dozadu a dopredu */
+.navig{margin-left:auto;display:flex;gap:4px}
+.navig[hidden]{display:none}
+.nav-tl{border:0;border-radius:8px;width:40px;height:30px;padding:0;background:var(--plocha);box-shadow:0 0 0 1.5px var(--linka);color:var(--les);display:inline-flex;align-items:center;justify-content:center;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+.nav-tl svg{width:18px;height:18px;fill:currentColor}
+.nav-tl:hover:not(:disabled){background:var(--papier)}
+.nav-tl:disabled{opacity:.35;cursor:default}
+body.prezeram .sachovnica{outline:3px solid var(--modra);outline-offset:2px}
+body.prezeram #na-tahu{color:var(--modra);font-weight:700}
 
 /* panel */
 .panel{display:flex;flex-direction:column;gap:14px}
@@ -185,7 +194,13 @@ body.pevne .tlacidla,body.pevne .tlacidla:not(:has(button:not([hidden]))){displa
   <main class="hra">
     <div class="sachovnica-obal">
       <div class="sachovnica" id="sachovnica" role="grid" aria-label="Šachovnica"></div>
-      <div class="na-tahu"><span class="bod" id="bod"></span><span id="na-tahu"></span></div>
+      <div class="na-tahu"><span class="bod" id="bod"></span><span id="na-tahu"></span>
+        <span class="navig" id="navig" hidden>
+          <button type="button" class="nav-tl" id="nav-zac" aria-label="Na začiatok" title="Na začiatok (Home)"><svg viewBox="0 0 24 24"><path d="M5 5h2.5v14H5zM20 5v14L8.5 12z"/></svg></button>
+          <button type="button" class="nav-tl" id="nav-spat" aria-label="Ťah späť" title="Ťah späť (←)"><svg viewBox="0 0 24 24"><path d="M17 5v14L6 12z"/></svg></button>
+          <button type="button" class="nav-tl" id="nav-vpred" aria-label="Ťah dopredu" title="Ťah dopredu (→)"><svg viewBox="0 0 24 24"><path d="M7 5v14l11-7z"/></svg></button>
+          <button type="button" class="nav-tl" id="nav-kon" aria-label="Na koniec" title="Na koniec (End)"><svg viewBox="0 0 24 24"><path d="M4 5v14l11.5-7zM16.5 5H19v14h-2.5z"/></svg></button>
+        </span></div>
     </div>
     <div class="panel">
       <div class="sprievodca">
@@ -253,7 +268,11 @@ function krokAkt(){ return hraAkt().kroky[stav.krok]; }
 
 function kresli(opts){
   opts = opts || {};
-  var h = hraAkt(), m = rozloz(stav.fen), sach = $('sachovnica'); sach.innerHTML='';
+  // pri prezeraní starších ťahov sa kreslí pozícia z histórie, bez značiek a výberu
+  var prez = stav.prezeram && stav.hist && stav.hist[stav.ix];
+  var fenK = prez ? prez.fen : stav.fen, poslK = prez ? prez.uci : stav.posledny;
+  if (prez) opts = {};
+  var h = hraAkt(), m = rozloz(fenK), sach = $('sachovnica'); sach.innerHTML='';
   var biela = h.orient === 'w';
   for (var rr=0; rr<8; rr++) for (var ff=0; ff<8; ff++){
     var r = biela ? 7-rr : rr, f = biela ? ff : 7-ff;
@@ -264,17 +283,53 @@ function kresli(opts){
       s.src='img/Pieces/'+(p===p.toUpperCase()?'w':'b')+p.toUpperCase()+'.svg'; b.appendChild(s); }
     if (ff===0) b.appendChild(el('span','sur r', String(r+1)));
     if (rr===7) b.appendChild(el('span','sur s', 'abcdefgh'[f]));
-    if (stav.posledny && (stav.posledny.slice(0,2)===sq || stav.posledny.slice(2,4)===sq)) b.classList.add('posledny');
-    if (stav.vyber === sq) b.classList.add('vybrane');
+    if (poslK && (poslK.slice(0,2)===sq || poslK.slice(2,4)===sq)) b.classList.add('posledny');
+    if (!prez && stav.vyber === sq) b.classList.add('vybrane');
     if (opts.mozne && opts.mozne.indexOf(sq)>=0){ b.classList.add('mozny'); if (m[sq]) b.classList.add('obsadene'); }
     if (opts.znacky && opts.znacky[sq]) b.classList.add(opts.znacky[sq]);
     b.addEventListener('click', klik);
     sach.appendChild(b);
   }
-  var t = naTahu(stav.fen);
+  var t = naTahu(fenK);
   $('bod').style.background = t==='w' ? '#fff' : '#151a17';
-  $('na-tahu').textContent = t==='w' ? 'Biely na ťahu' : 'Čierny na ťahu';
+  $('na-tahu').textContent = prez ? (prez.sk ? 'Pozícia po ťahu ' + prez.sk : 'Východisková pozícia')
+                                  : (t==='w' ? 'Biely na ťahu' : 'Čierny na ťahu');
+  aktualizujNav();
 }
+
+/* ---------- prehrávanie ťahov dozadu a dopredu ---------- */
+// stav.hist = pozície, ktoré sa naozaj zahrali (bez chybných pokusov, ktoré sa vrátia späť)
+function zaznam(fen, uci, sk){
+  var hh = stav.hist || (stav.hist = []), l = hh[hh.length-1];
+  if (l && l.fen === fen) return;
+  hh.push({fen:fen, uci:uci||null, sk:sk||''});
+  stav.prezeram = false; stav.ix = hh.length-1;
+}
+function navig(kam){
+  var hh = stav.hist || [], n = hh.length; if (n < 2) return;
+  var ix = stav.prezeram ? stav.ix : n-1;
+  if (kam==='zac') ix = 0;
+  else if (kam==='spat') ix = Math.max(0, ix-1);
+  else if (kam==='vpred') ix = Math.min(n-1, ix+1);
+  else ix = n-1;
+  stav.ix = ix; stav.prezeram = ix < n-1; stav.vyber = null;
+  kresli();
+}
+function aktualizujNav(){
+  var nv = $('navig'); if (!nv) return;
+  var n = (stav.hist || []).length, ix = stav.prezeram ? stav.ix : n-1;
+  nv.hidden = n < 2;
+  $('nav-zac').disabled = $('nav-spat').disabled = ix <= 0;
+  $('nav-vpred').disabled = $('nav-kon').disabled = ix >= n-1;
+  document.body.classList.toggle('prezeram', !!stav.prezeram);
+}
+document.addEventListener('keydown', function(e){
+  if (stav.obr !== 'hra' || e.altKey || e.ctrlKey || e.metaKey) return;
+  var tg = e.target && e.target.tagName; if (tg === 'INPUT' || tg === 'TEXTAREA' || tg === 'SELECT') return;
+  var k = {ArrowLeft:'spat', ArrowRight:'vpred', Home:'zac', End:'kon'}[e.key];
+  if (!k) return;
+  e.preventDefault(); navig(k);
+});
 function nazovFig(p){ var n={k:'kráľ',q:'dáma',r:'veža',b:'strelec',n:'jazdec',p:'pešiak'}[p.toLowerCase()]; return (p===p.toUpperCase()?'biely ':'čierny ')+n; }
 
 /* ---------- trasa a karta ---------- */
@@ -321,7 +376,7 @@ function prisposob(){
   var vyska=Math.floor(window.innerHeight - top - 34);
   if (vyska < 420) return;               // veľmi nízke okno: bežné posúvanie stránky
   r.setProperty('--vyska-hry', vyska+'px');
-  r.setProperty('--sirka-dosky', Math.max(280, Math.min(520, vyska-40))+'px');
+  r.setProperty('--sirka-dosky', Math.max(280, Math.min(520, vyska-48))+'px');
   b.classList.add('pevne');
 }
 window.addEventListener('resize', prisposob);
@@ -389,16 +444,20 @@ function vycistiSpravu(){ sprava().innerHTML=''; sprava().className='sprava'; }
 /* ---------- priebeh ---------- */
 function zacniHru(i){
   stav.obr='hra'; stav.otv=null; stav.hra=i; stav.krok=0; stav.ply=0; stav.chyby=0; stav.pomocka=false; stav.vyber=null; stav.posledny=null; stav.zamok=false;
-  var h=hraAkt(); stav.fen=h.fen;
+  var h=hraAkt(); stav.fen=h.fen; stav.hist=[]; stav.histZnacka=null; zaznam(h.fen, null, '');
   var obs=$('obsah'); obs.innerHTML=''; obs.appendChild(document.getElementById('t-hra').content.cloneNode(true));
   $('tl-pomocka').addEventListener('click', ukazPomocku);
   $('tl-riesenie').addEventListener('click', ukazRiesenie);
   $('tl-znova').addEventListener('click', skusZnova);
   $('tl-dalej').addEventListener('click', dalej);
+  $('nav-zac').addEventListener('click', function(){ navig('zac'); });
+  $('nav-spat').addEventListener('click', function(){ navig('spat'); });
+  $('nav-vpred').addEventListener('click', function(){ navig('vpred'); });
+  $('nav-kon').addEventListener('click', function(){ navig('kon'); });
   kresliTrasu(); window.scrollTo({top:0}); prisposob(); zacniKrok();
 }
 function zacniKrok(){
-  var k=krokAkt(); stav.chybyKrok=0; stav.vyber=null;
+  var k=krokAkt(); stav.chybyKrok=0; stav.vyber=null; stav.prezeram=false;
   $('otazka').textContent = k.otazka || '';
   kresliKartu(krokNaKartu(k));
   vycistiSpravu(); $('pomocka-box').innerHTML=''; $('volby').innerHTML='';
@@ -441,6 +500,7 @@ function chyba(){
 }
 
 function klik(e){
+  if (stav.prezeram){ navig('kon'); return; }
   if (stav.zamok) return;
   var sq = e.currentTarget.dataset.sq, k = krokAkt();
   if (!k) return;
@@ -516,7 +576,11 @@ function klikTah(sq){
   if (moja && moznePre(sq).length){ stav.vyber=sq; kresli({mozne:moznePre(sq)}); }
 }
 
-function nastav(fen, uci){ stav.fen=fen; stav.posledny=uci; kresli(); }
+function nastav(fen, uci, sk){ stav.fen=fen; stav.posledny=uci; if (sk!=null) zaznam(fen, uci, sk); kresli(); }
+function vratHist(){ // zruší ťahy vyvrátenia chybného pokusu
+  if (stav.histZnacka!=null && stav.hist){ stav.hist.length = Math.max(1, stav.histZnacka); stav.histZnacka=null; }
+  stav.prezeram=false;
+}
 function cakaj(ms){ return new Promise(function(r){ setTimeout(r, ms); }); }
 function prehrajLiniu(riadky, odsek){
   // varianty sa vypisujú v jednom riadku; komentár z konca varianty príde na koniec
@@ -524,7 +588,7 @@ function prehrajLiniu(riadky, odsek){
   riadky.forEach(function(r, i){
     pr = pr.then(function(){ return cakaj(800); }).then(function(){
       var sk = (i>0 && predBiely && jeCierny(r.sk)) ? bezCisla(r.sk) : r.sk; predBiely = !jeCierny(r.sk);
-      nastav(r.fen, r.uci); odsek.innerHTML += ' ' + tah(sk+znak(r.nags));
+      nastav(r.fen, r.uci, r.sk); odsek.innerHTML += ' ' + tah(sk+znak(r.nags));
       if (r.kom){ if (i===riadky.length-1) koniec = r.kom; else { odsek.innerHTML += ' ' + esc(r.kom); predBiely=false; } }
     });
   });
@@ -534,14 +598,14 @@ function hracovychTahov(){ var h=hraAkt(), n=0; for (var i=0;i<stav.ply;i++) if 
 function vyhodnot(uci){
   var p=plyAkt(), k=krokAkt();
   if (uci===p.uci){
-    vycistiSpravu(); nastav(p.fen, uci);
+    vycistiSpravu(); nastav(p.fen, uci, p.sk);
     zapisTah(p, '<span class="ok">Výborne!</span> ');
     stav.ply++;
     return pokracuj();
   }
   var alt=(p.alt||[]).filter(function(a){ return a.uci===uci; })[0];
   if (alt && alt.nags.indexOf(1)>=0){
-    vycistiSpravu(); stav.zamok=true; nastav(alt.fen, uci);
+    vycistiSpravu(); stav.zamok=true; nastav(alt.fen, uci, alt.sk);
     var od = pridaj('<span class="ok">Výborne!</span> '+tah(alt.sk)+' '+esc(alt.kom));
     var lin = pridaj('', 'linia');
     return prehrajLiniu(alt.line, lin).then(function(kon){ if (kon) komentar(kon); koniecUlohy(true); });
@@ -554,7 +618,7 @@ function vyhodnot(uci){
   }
   chyba(); vycistiSpravu();
   if (alt){
-    stav.zamok=true; nastav(alt.fen, uci);
+    stav.zamok=true; stav.histZnacka=stav.hist.length; nastav(alt.fen, uci, alt.sk);
     pridaj('<span class="zle">Nie celkom.</span> '+tah(alt.sk)+' '+esc(alt.kom), null, sprava());
     var l2 = pridaj('', 'linia', sprava());
     return prehrajLiniu(alt.line, l2).then(function(kon){
@@ -573,11 +637,11 @@ function spatFen(fen, uci){ // len na krátke zobrazenie chybného ťahu
   var t=fen.split(' '); t[0]=rows.join('/'); t[1]=t[1]==='w'?'b':'w'; return t.join(' ');
 }
 function skusZnova(){
-  var p=plyAkt(); stav.zamok=false; nastav(p.fen_pred, stav.ply>0 ? hraAkt().ciara[stav.ply-1].uci : null);
+  vratHist(); var p=plyAkt(); stav.zamok=false; nastav(p.fen_pred, stav.ply>0 ? hraAkt().ciara[stav.ply-1].uci : null);
   vycistiSpravu(); tlacidla({pomocka:!stav.pomocka && !!krokAkt().pomocka, riesenie:stav.chybyKrok>=2});
 }
 function ukazRiesenie(){
-  var k=krokAkt();
+  vratHist(); var k=krokAkt();
   if (k.typ==='volba') return volbaKlik(k.spravna);
   if (k.typ==='ciel' || k.typ==='figura' || k.typ==='hrozba'){
     var zn={}; k.polia.forEach(function(q){ zn[q]='ciel-ok'; }); kresli({znacky:zn});
@@ -594,7 +658,7 @@ function pokracuj(){
     if (!p) return Promise.resolve('koniec');
     if (p.hrac && !hotovo) return Promise.resolve('hrac');
     return cakaj(900).then(function(){
-      nastav(p.fen, p.uci); zapisTah(p);
+      nastav(p.fen, p.uci, p.sk); zapisTah(p);
       if (!p.hrac) zapisAlt(p);
       stav.ply++; return dalsi();
     });
@@ -620,7 +684,7 @@ function koniecUlohy(cezAlt){
   stav.krok = h.kroky.length;
 }
 function dalej(){
-  var h=hraAkt();
+  var h=hraAkt(); stav.prezeram=false;
   if (stav.krok >= h.kroky.length){
     if (stav.hra < K.hry.length-1) return zacniHru(stav.hra+1);
     return koniecKapitoly();
@@ -629,7 +693,7 @@ function dalej(){
   if (k.typ==='ukazka'){
     var p=h.ciara[stav.ply];
     if (!p) return koniecUlohy(false);
-    nastav(p.fen, p.uci); zapisTah(p); zapisAlt(p); stav.ply++;
+    nastav(p.fen, p.uci, p.sk); zapisTah(p); zapisAlt(p); stav.ply++;
     if (!h.ciara[stav.ply]) koniecUlohy(false);
     return;
   }
@@ -680,7 +744,7 @@ uvod();
 <script src="js/knihy.js"></script>
 <script>
 // ZNAČKA VERZIE — pri každej úprave tohto súboru prepíš dátum.
-(window.VERZIE = window.VERZIE || {})['kniha-kapitola.html'] = '2026-10-27b';
+(window.VERZIE = window.VERZIE || {})['kniha-kapitola.html'] = '2026-10-29';
 // Prihlásenie, prístup, načítanie obsahu a postupu — pozri js/knihy.js.
 // Pri otvorení zo súboru (file://) sa prihlásenie preskočí.
 Knihy.spustiStranku('kapitola');
