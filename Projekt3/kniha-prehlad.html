@@ -168,7 +168,7 @@ table.det td { padding: 4px 8px; background: #fff; border-bottom: 1px solid #eef
 <script src="js/knihy.js"></script>
 <script>
 // ZNAČKA VERZIE — pri každej úprave tohto súboru prepíš dátum.
-(window.VERZIE = window.VERZIE || {})['kniha-prehlad.html'] = '2026-10-27';
+(window.VERZIE = window.VERZIE || {})['kniha-prehlad.html'] = '2026-10-29';
 
 // Údaje: tabuľky kniha_postup (úlohy v kapitolách) a kniha_test (odpovede
 // v teste po pokusoch), pozri knihy-postup.sql. RLS pustí len hráčov zo
@@ -232,6 +232,10 @@ async function load() {
   setStatus('Načítavam...');
   ['tbl', 'tiles', 'empty', 'legenda'].forEach(id => { document.getElementById(id).style.display = 'none'; });
   const kniha = aktualnaKniha(), B = knihaB();
+  // test, ktorý sa ešte pripravuje, sa v ponuke nezobrazí
+  const fp = document.getElementById('fPohlad');
+  fp.querySelector('option[value="test"]').hidden = !!B.test.pripravuje;
+  if (B.test.pripravuje && fp.value === 'test') fp.value = 'kapitoly';
   try {
     // 1) Hráči skupiny (bez trénerov a adminov)
     const tf = document.getElementById('fSkupina').value;
@@ -256,7 +260,7 @@ async function load() {
     });
 
     // 3) Obsah testu: kapitoly a skupina každej úlohy
-    const T = await Knihy.nacitajData(kniha, B.test.subor);
+    const T = B.test.pripravuje ? { hry: [] } : await Knihy.nacitajData(kniha, B.test.subor);
     testUlohy = T.hry.map(h => ({
       uloha: parseInt(String(h.kolo).split('.')[1], 10),
       kapitoly: String(h.princip || '').split(',').map(x => parseInt(x, 10)).filter(x => x > 0),
@@ -366,6 +370,7 @@ function render() {
   document.getElementById('tKapitoly').textContent = riadky.filter(r => r.v.vsetky).length;
   document.getElementById('tTest').textContent     = riadky.filter(r => r.v.pokusy.length).length;
   document.getElementById('tZlozili').textContent  = riadky.filter(r => r.v.zlozil).length;
+  ['tTest', 'tZlozili'].forEach(id => { document.getElementById(id).parentElement.style.display = B.test.pripravuje ? 'none' : ''; });
   document.getElementById('tiles').style.display = '';
 
   if (pohlad === 'test') renderTest(riadky); else renderKapitoly(riadky);
@@ -544,7 +549,8 @@ function legenda(pohlad) {
          'Riadok <b>Skupina</b>: priemer hviezd tých, čo kapitolu dokončili, a podiel úloh vyriešených na prvý pokus bez chyby. ' +
          'Kliknutím na meno sa ukážu jednotlivé úlohy.';
   }
-  l += '<br>🔒 Hráčom sa kapitoly odomykajú postupne (po vyriešení všetkých úloh predchádzajúcej), test po poslednej kapitole. ' +
+  l += '<br>🔒 Hráčom sa kapitoly odomykajú postupne (po vyriešení všetkých úloh predchádzajúcej)' +
+       (B.test.pripravuje ? '; test tohto dielu sa ešte pripravuje. ' : ', test po poslednej kapitole. ') +
        'Kniha sa nezapisuje do tréningu a nemení ELO ani štatistiky.';
   const leg = document.getElementById('legenda');
   leg.innerHTML = l;

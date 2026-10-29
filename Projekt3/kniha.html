@@ -219,7 +219,7 @@ button:disabled { opacity: .55; cursor: not-allowed; }
 <script src="js/knihy.js"></script>
 <script>
 // ZNAČKA VERZIE — pri každej úprave tohto súboru prepíš dátum.
-(window.VERZIE = window.VERZIE || {})['kniha.html'] = '2026-10-27c';
+(window.VERZIE = window.VERZIE || {})['kniha.html'] = '2026-10-29';
 
 function el(tag, cls, text) {
   const e = document.createElement(tag);
@@ -284,10 +284,12 @@ function vykresli(kniha, postup) {
   tt.appendChild(el('div', 'test-popis', T.uloh + ' úloh zo všetkých kapitol · na úspech treba ' + T.hranica + ' bodov · počíta sa prvá odpoveď'));
   const ts = el('div', 'test-stav');
   const pokusText = T.pokus > 1 ? T.pokus + '. pokus: ' : '';
-  if (!O.test) {
+  if (B.test.pripravuje) {
+    ts.textContent = '📚 Test sa pripravuje – pribudne, keď budú hotové všetky kapitoly.';
+  } else if (!O.test) {
     ts.textContent = '🔒 Test sa odomkne, keď vyriešiš všetky úlohy v kapitole ' + O.posledna + '.';
   } else if (T.zlozeny) {
-    ts.innerHTML = '<span class="ok">Test si zložil – Odznak Stratég 1.</span> Najlepší výsledok: ' +
+    ts.innerHTML = '<span class="ok">Test si zložil – Odznak ' + (B.test.odznak || 'Stratég') + '.</span> Najlepší výsledok: ' +
       T.najlepsi.body + ' z ' + T.uloh + (T.pokus > 1 ? ' (' + T.najlepsi.pokus + '. pokus)' : '') + '.';
   } else if (T.odpovedane) {
     ts.textContent = pokusText + 'Body: ' + T.body + ' z ' + T.uloh + ' · odpovedal si na ' + T.odpovedane + ' z ' + T.uloh + ' úloh.';
@@ -300,6 +302,7 @@ function vykresli(kniha, postup) {
   tx.appendChild(tt);
   t.appendChild(tx);
   const tb = el('button', (T.odpovedane >= T.uloh || !O.test) ? 'secondary' : 'primary',
+    B.test.pripravuje ? 'Pripravuje sa' :
     !T.odpovedane ? 'Začať test' : (T.odpovedane < T.uloh ? 'Pokračovať v teste' : 'Výsledok testu'));
   if (O.test) tb.addEventListener('click', () => { location.href = Knihy.adresaTestu(kniha); });
   else tb.disabled = true;
@@ -311,7 +314,7 @@ function vykresli(kniha, postup) {
   const r1 = el('span'); r1.innerHTML = 'Hviezdy: <b>' + hvSpolu + ' z ' + hvMax + '</b>'; s.appendChild(r1);
   const r2 = el('span'); r2.innerHTML = 'Hotové kapitoly: <b>' + hotove + ' z ' + P.kapitoly.length + '</b>'; s.appendChild(r2);
   const r3 = el('span');
-  r3.innerHTML = 'Test: <b>' + (T.zlozeny ? 'zložený' : (T.odpovedane ? T.body + ' z ' + T.uloh + ' bodov' : 'ešte nezačatý')) + '</b>';
+  r3.innerHTML = 'Test: <b>' + (B.test.pripravuje ? 'pripravuje sa' : T.zlozeny ? 'zložený' : (T.odpovedane ? T.body + ' z ' + T.uloh + ' bodov' : 'ešte nezačatý')) + '</b>';
   s.appendChild(r3);
 }
 
