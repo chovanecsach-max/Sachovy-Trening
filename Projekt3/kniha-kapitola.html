@@ -413,6 +413,8 @@ function altHtml(a){
     var sk=(pred && jeCierny(r.sk)) ? bezCisla(r.sk) : r.sk;
     h+=' '+tah(sk+znak(r.nags)); pred=!jeCierny(r.sk);
     if (r.kom){ h+=' '+esc(r.kom); pred=false; }
+    // vnorené varianty (iný ťah na tom istom mieste) v zátvorke
+    (r.sub||[]).forEach(function(v){ h+=' ('+altHtml(v)+')'; pred=false; });
   });
   return h;
 }
@@ -659,7 +661,7 @@ function pokracuj(){
     if (p.hrac && !hotovo) return Promise.resolve('hrac');
     return cakaj(900).then(function(){
       nastav(p.fen, p.uci, p.sk); zapisTah(p);
-      if (!p.hrac) zapisAlt(p);
+      if (!p.hrac || hotovo) zapisAlt(p);   // po vyriešení úlohy aj varianty k ťahom hráča
       stav.ply++; return dalsi();
     });
   }
@@ -744,7 +746,7 @@ uvod();
 <script src="js/knihy.js"></script>
 <script>
 // ZNAČKA VERZIE — pri každej úprave tohto súboru prepíš dátum.
-(window.VERZIE = window.VERZIE || {})['kniha-kapitola.html'] = '2026-10-29';
+(window.VERZIE = window.VERZIE || {})['kniha-kapitola.html'] = '2026-10-30';
 // Prihlásenie, prístup, načítanie obsahu a postupu — pozri js/knihy.js.
 // Pri otvorení zo súboru (file://) sa prihlásenie preskočí.
 Knihy.spustiStranku('kapitola');
