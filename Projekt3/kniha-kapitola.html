@@ -84,6 +84,11 @@ main.hra{display:grid;grid-template-columns:minmax(280px,520px) 1fr;gap:20px;ali
 .nav-tl:disabled{opacity:.35;cursor:default}
 body.prezeram .sachovnica{outline:3px solid var(--modra);outline-offset:2px}
 body.prezeram #na-tahu{color:var(--modra);font-weight:700}
+/* hráč má ťahať: nápis pod šachovnicou sa zvýrazní */
+.na-tahu.tvoj-tah #na-tahu{color:#78350f;font-weight:700;background:#fef3c7;box-shadow:0 0 0 2px #f59e0b;border-radius:999px;padding:2px 10px}
+.na-tahu.tvoj-tah .bod{box-shadow:0 0 0 2px #f59e0b,0 0 0 4px #fef3c7}
+@media (prefers-reduced-motion:no-preference){.na-tahu.tvoj-tah .bod{animation:tvojTah 1.6s ease-in-out infinite}}
+@keyframes tvojTah{50%{box-shadow:0 0 0 2px #f59e0b,0 0 0 6px rgba(245,158,11,.25)}}
 
 /* panel */
 .panel{display:flex;flex-direction:column;gap:14px}
@@ -294,7 +299,21 @@ function kresli(opts){
   $('bod').style.background = t==='w' ? '#fff' : '#151a17';
   $('na-tahu').textContent = prez ? (prez.sk ? 'Pozícia po ťahu ' + prez.sk : 'Východisková pozícia')
                                   : (t==='w' ? 'Biely na ťahu' : 'Čierny na ťahu');
-  aktualizujNav();
+  aktualizujNav(); oznacTah();
+}
+
+/* ---------- je hráč na ťahu? (krok Ťah, nič sa neprehráva, neprezerá sa história) ---------- */
+function cakaNaTah(){
+  if (stav.obr!=='hra' || stav.zamok || stav.prezeram) return false;
+  var h=hraAkt(), k=h && h.kroky[stav.krok];
+  if (!k || k.typ!=='tah') return false;
+  var p=h.ciara[stav.ply]; return !!(p && p.hrac && p.fen_pred===stav.fen);
+}
+function oznacTah(){
+  var nt=document.querySelector('.na-tahu'); if (!nt || stav.prezeram) { if (nt) nt.classList.remove('tvoj-tah'); return; }
+  var ano=cakaNaTah(), t=naTahu(stav.fen);
+  nt.classList.toggle('tvoj-tah', ano);
+  $('na-tahu').textContent = (t==='w' ? 'Biely na ťahu' : 'Čierny na ťahu') + (ano ? ' – tvoj ťah' : '');
 }
 
 /* ---------- prehrávanie ťahov dozadu a dopredu ---------- */
@@ -653,7 +672,7 @@ function ukazRiesenie(){
 }
 function pokracuj(){
   var h=hraAkt(), k=krokAkt();
-  stav.zamok=true; tlacidla({});
+  stav.zamok=true; tlacidla({}); oznacTah();
   var hotovo = hracovychTahov() >= k.pocet;
   function dalsi(){
     var p=h.ciara[stav.ply];
@@ -666,7 +685,12 @@ function pokracuj(){
     });
   }
   return dalsi().then(function(v){
-    if (v==='hrac'){ stav.zamok=false; tlacidla({pomocka:!stav.pomocka && !!k.pomocka}); }
+    if (v==='hrac'){
+      stav.zamok=false; tlacidla({pomocka:!stav.pomocka && !!k.pomocka});
+      var sp=h.ciara[stav.ply-1];
+      $('otazka').textContent = (sp && !sp.hrac ? 'Súper odpovedal '+sp.sk+'. ' : '') + 'Teraz si na ťahu ty – zahraj ďalší ťah.';
+      oznacTah();
+    }
     else koniecUlohy(false);
   });
 }
@@ -746,7 +770,7 @@ uvod();
 <script src="js/knihy.js"></script>
 <script>
 // ZNAČKA VERZIE — pri každej úprave tohto súboru prepíš dátum.
-(window.VERZIE = window.VERZIE || {})['kniha-kapitola.html'] = '2026-10-30';
+(window.VERZIE = window.VERZIE || {})['kniha-kapitola.html'] = '2026-10-30b';
 // Prihlásenie, prístup, načítanie obsahu a postupu — pozri js/knihy.js.
 // Pri otvorení zo súboru (file://) sa prihlásenie preskočí.
 Knihy.spustiStranku('kapitola');
