@@ -40,7 +40,7 @@
 //             vyzadujPlatnost, hlasPritomnost).
 // ============================================================================
 
-(window.VERZIE = window.VERZIE || {})['knihy.js'] = '2026-10-29d';
+(window.VERZIE = window.VERZIE || {})['knihy.js'] = '2026-10-29e';
 
 const Knihy = (function () {
   'use strict';
@@ -84,10 +84,11 @@ const Knihy = (function () {
       popis: 'Stratégia pre hráčov do 1600 Elo',
       ikona: '🧭',
       priecinok: 'js/knihy/cesta-stratega-2/',
-      verzia: '2026-10-29',
+      verzia: '2026-10-29b',
       vlastnyPristup: true,
       kapitoly: [
-        { cislo: 1,  nazov: 'Súperov plán – profylaxia',        subor: 'k01.js' }
+        { cislo: 1,  nazov: 'Súperov plán – profylaxia',        subor: 'k01.js' },
+        { cislo: 2,  nazov: 'Materiál verzus aktivita',         subor: 'k02.js' }
       ],
       ulohVKapitole: 5,
       test: { nazov: 'Test zo stratégie 2', subor: 'test.js', cislo: 12, uloh: 30, hranica: 24, odznak: 'Stratég 2',
