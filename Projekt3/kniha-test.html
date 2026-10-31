@@ -485,6 +485,15 @@ function zapisAlt(p){
     pridaj(uvod+altHtml(a), 'cfp');
   });
 }
+// ťah s variantmi: varianty sa vypíšu pred rámikom „Čo si zapamätať“, aby záver bol posledný
+function zapisTahAAlt(p, sAlt){
+  var m=(p.kom||'').match(/(^|\n)Čo si zapamätať:[\s\S]*$/);
+  if (sAlt && p.alt && m){
+    zapisTah(Object.assign({}, p, {kom: p.kom.slice(0, m.index)}));
+    zapisAlt(p);
+    komentar(m[0].trim());
+  } else { zapisTah(p); if (sAlt) zapisAlt(p); }
+}
 function zapisTah(p, prefix){
   var otv=stav.otv; stav.otv=null;
   var sk=p.sk, maKom=!!(p.kom||'').trim();
@@ -720,8 +729,8 @@ function pokracuj(){
     if (!p) return Promise.resolve('koniec');
     if (p.hrac && !hotovo) return Promise.resolve('hrac');
     return cakaj(900).then(function(){
-      nastav(p.fen, p.uci, p.sk); zapisTah(p);
-      if (!p.hrac || hotovo) zapisAlt(p);   // po vyriešení úlohy aj varianty k ťahom hráča
+      nastav(p.fen, p.uci, p.sk);
+      zapisTahAAlt(p, !p.hrac || hotovo);   // po vyriešení úlohy aj varianty k ťahom hráča
       stav.ply++; return dalsi();
     });
   }
@@ -759,7 +768,7 @@ function dalej(){
   if (k.typ==='ukazka'){
     var p=h.ciara[stav.ply];
     if (!p) return koniecUlohy(false);
-    nastav(p.fen, p.uci, p.sk); zapisTah(p); zapisAlt(p); stav.ply++;
+    nastav(p.fen, p.uci, p.sk); zapisTahAAlt(p, true); stav.ply++;
     if (!h.ciara[stav.ply]) koniecUlohy(false);
     return;
   }
@@ -854,7 +863,7 @@ uvod();
 <script src="js/knihy.js"></script>
 <script>
 // ZNAČKA VERZIE — pri každej úprave tohto súboru prepíš dátum.
-(window.VERZIE = window.VERZIE || {})['kniha-test.html'] = '2026-10-30b';
+(window.VERZIE = window.VERZIE || {})['kniha-test.html'] = '2026-10-31';
 // Prihlásenie, prístup, načítanie obsahu a postupu — pozri js/knihy.js.
 // Pri otvorení zo súboru (file://) sa prihlásenie preskočí.
 Knihy.spustiStranku('test');
