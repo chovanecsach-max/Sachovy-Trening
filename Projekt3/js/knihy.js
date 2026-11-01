@@ -40,7 +40,7 @@
 //             vyzadujPlatnost, hlasPritomnost).
 // ============================================================================
 
-(window.VERZIE = window.VERZIE || {})['knihy.js'] = '2026-11-01a';
+(window.VERZIE = window.VERZIE || {})['knihy.js'] = '2026-11-01b';
 
 const Knihy = (function () {
   'use strict';
@@ -84,14 +84,15 @@ const Knihy = (function () {
       popis: 'Stratégia pre hráčov do 1600 Elo',
       ikona: '🧭',
       priecinok: 'js/knihy/cesta-stratega-2/',
-      verzia: '2026-11-01a',
+      verzia: '2026-11-01b',
       vlastnyPristup: true,
       kapitoly: [
         { cislo: 1,  nazov: 'Súperov plán – profylaxia',        subor: 'k01.js' },
         { cislo: 2,  nazov: 'Materiál verzus aktivita',         subor: 'k02.js' },
         { cislo: 3,  nazov: 'Útok na kráľa – oslabiť a otvoriť', subor: 'k03.js' },
         { cislo: 4,  nazov: 'Útok na kráľa – priviesť figúry',  subor: 'k04.js' },
-        { cislo: 5,  nazov: 'Slabý pešiak – vytvoriť',          subor: 'k05.js' }
+        { cislo: 5,  nazov: 'Slabý pešiak – vytvoriť',          subor: 'k05.js' },
+        { cislo: 6,  nazov: 'Slabý pešiak – napadnúť a zúžitkovať', subor: 'k06.js' }
       ],
       ulohVKapitole: 5,
       test: { nazov: 'Test zo stratégie 2', subor: 'test.js', cislo: 12, uloh: 30, hranica: 24, odznak: 'Stratég 2',
