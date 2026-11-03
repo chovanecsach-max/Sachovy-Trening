@@ -40,7 +40,7 @@
 //             vyzadujPlatnost, hlasPritomnost).
 // ============================================================================
 
-(window.VERZIE = window.VERZIE || {})['knihy.js'] = '2026-11-01d';
+(window.VERZIE = window.VERZIE || {})['knihy.js'] = '2026-11-02a';
 
 const Knihy = (function () {
   'use strict';
@@ -84,7 +84,7 @@ const Knihy = (function () {
       popis: 'Stratégia pre hráčov do 1600 Elo',
       ikona: '🧭',
       priecinok: 'js/knihy/cesta-stratega-2/',
-      verzia: '2026-11-01d',
+      verzia: '2026-11-02a',
       vlastnyPristup: true,
       kapitoly: [
         { cislo: 1,  nazov: 'Súperov plán – profylaxia',        subor: 'k01.js' },
@@ -94,7 +94,9 @@ const Knihy = (function () {
         { cislo: 5,  nazov: 'Slabý pešiak – vytvoriť',          subor: 'k05.js' },
         { cislo: 6,  nazov: 'Slabý pešiak – napadnúť a zúžitkovať', subor: 'k06.js' },
         { cislo: 7,  nazov: 'Slabé pole – vyrobiť a zaistiť',   subor: 'k07.js' },
-        { cislo: 8,  nazov: 'Slabé pole – obsadiť a zúžitkovať', subor: 'k08.js' }
+        { cislo: 8,  nazov: 'Slabé pole – obsadiť a zúžitkovať', subor: 'k08.js' },
+        { cislo: 9,  nazov: 'Dobrá a zlá figúra',               subor: 'k09.js' },
+        { cislo: 10, nazov: 'Voľný pešiak',                     subor: 'k10.js' }
       ],
       ulohVKapitole: 5,
       test: { nazov: 'Test zo stratégie 2', subor: 'test.js', cislo: 12, uloh: 30, hranica: 24, odznak: 'Stratég 2',
