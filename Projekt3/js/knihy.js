@@ -40,7 +40,7 @@
 //             vyzadujPlatnost, hlasPritomnost).
 // ============================================================================
 
-(window.VERZIE = window.VERZIE || {})['knihy.js'] = '2026-11-03b';
+(window.VERZIE = window.VERZIE || {})['knihy.js'] = '2026-11-03c';
 
 const Knihy = (function () {
   'use strict';
@@ -75,7 +75,7 @@ const Knihy = (function () {
       // cislo = číslo „kapitoly“ testu v obsahu (úlohy 12.1 – 12.30)
       test: { nazov: 'Test zo stratégie 1', subor: 'test.js', cislo: 12, uloh: 30, hranica: 24, odznak: 'Stratég 1' }
     },
-    // 2. diel vzniká po kapitolách: v zozname sú len hotové kapitoly, test sa pripravuje.
+    // 2. diel: 11 kapitol a záverečný test.
     //  vlastnyPristup: riadi sa len riadkom 'knihy:cesta-stratega-2' (nie spoločným 'knihy'),
     //  takže kým ho admin nepridá, vidí 2. diel len admin a testeri.
     'cesta-stratega-2': {
@@ -84,7 +84,7 @@ const Knihy = (function () {
       popis: 'Stratégia pre hráčov do 1600 Elo',
       ikona: '🧭',
       priecinok: 'js/knihy/cesta-stratega-2/',
-      verzia: '2026-11-03b',
+      verzia: '2026-11-03c',
       vlastnyPristup: true,
       kapitoly: [
         { cislo: 1,  nazov: 'Súperov plán – profylaxia',        subor: 'k01.js' },
@@ -100,8 +100,7 @@ const Knihy = (function () {
         { cislo: 11, nazov: 'Priestor a premena výhody',        subor: 'k11.js' }
       ],
       ulohVKapitole: 5,
-      test: { nazov: 'Test zo stratégie 2', subor: 'test.js', cislo: 12, uloh: 30, hranica: 24, odznak: 'Stratég 2',
-              pripravuje: true }
+      test: { nazov: 'Test zo stratégie 2', subor: 'test.js', cislo: 12, uloh: 30, hranica: 24, odznak: 'Stratég 2' }
     }
   };
   const PRVA = Object.keys(KNIHY)[0];
