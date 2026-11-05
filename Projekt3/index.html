@@ -435,6 +435,10 @@ body {
       Súťaže
       <span id="sutazBadge" style="display:none;position:absolute;top:6px;right:10px;background:#d97706;color:#fff;font-size:11px;font-weight:bold;min-width:18px;height:18px;line-height:18px;border-radius:9px;padding:0 4px;">0</span>
     </button>
+    <button class="nav-btn" id="druzstvaBtn" onclick="goDruzstva()" style="display:none;">
+      <div class="nav-icon i-stat">👥</div>
+      Družstvá
+    </button>
     <button class="nav-btn" onclick="goStats()">
       <div class="nav-icon i-stat">📊</div>
       Štatistika
@@ -594,7 +598,7 @@ body {
 <script src="js/vizualizacia-zadania.js"></script>
 <script>
 // ZNAČKA VERZIE — pri každej úprave tohto súboru prepíš dátum.
-(window.VERZIE = window.VERZIE || {})['index.html'] = '2026-10-29';
+(window.VERZIE = window.VERZIE || {})['index.html'] = '2026-11-05';
 
 // Hlavné menu: všetky tlačidlá v jednom rade; keď ich je viac než 9, v dvoch
 // rovnakých radoch. Tlačidlá sa zobrazujú postupne (Zadania, Súťaže, Hry sa
@@ -698,6 +702,9 @@ async function initPage() {
 
   // Prebiehajúce súťaže na odznak pri tlačidle Súťaže
   loadSutazBadge();
+
+  // Tlačidlo Družstvá — len pre manažéra družstva (a admina)
+  loadDruzstvaBtn();
 
   try {
     const player = await getCurrentPlayer();
@@ -869,6 +876,18 @@ function goKoncovkyMapa()  { location.href = "koncovky-mapa.html"; }
 function goCasovaMapa()   { location.href = 'casova-mapa.html'; }
 function goSutaze()       { location.href = 'sutaze.html'; }
 function goMojeSutaze()   { location.href = 'moje-sutaze.html'; }
+function goDruzstva()     { location.href = 'druzstvo.html'; }
+
+// Tlačidlo Družstvá: databáza vráti len družstvá, ktorých je používateľ
+// manažérom (admin vidí všetky). Keď nevráti nič, tlačidlo ostane skryté.
+async function loadDruzstvaBtn() {
+  try {
+    const rows = await sbFetch('druzstva?select=id&limit=1');
+    if (rows && rows.length) document.getElementById('druzstvaBtn').style.display = 'flex';
+  } catch (e) {
+    console.warn('Družstvá sa nenačítali:', e);
+  }
+}
 function goHra(kluc)      { location.href = kluc + '.html'; }
 function goHryPrehlad()   { location.href = 'hry-prehlad.html'; }
 function goKniha(kluc)    { location.href = 'kniha.html?kniha=' + encodeURIComponent(kluc); }

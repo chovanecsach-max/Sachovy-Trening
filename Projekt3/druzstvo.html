@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Družstvá</title>
+<link rel="icon" type="image/svg+xml" href="logo2_favicon.svg">
+<style>
+body { font-family: Arial, sans-serif; background: #f4f4f6; margin: 0; padding: 12px; color: #111827; }
+.app { max-width: 1150px; margin: 0 auto; background: white; border-radius: 14px;
+       box-shadow: 0 10px 30px rgba(0,0,0,0.08); padding: 20px; }
+h1 { margin: 0 0 6px 0; text-align: center; font-size: 26px; }
+h2 { font-size: 18px; margin: 28px 0 10px; color: #1e3a5f; }
+.subtitle { text-align: center; color: #475569; margin: 0 0 18px 0; }
+
+.role-banner { padding: 10px 14px; border-radius: 10px; margin-bottom: 16px; font-size: 14px; text-align: center; }
+.role-banner.manazer { background: #eff6ff; border: 1px solid #bfdbfe; color: #1d4ed8; }
+.role-banner.admin   { background: #fff7ed; border: 1px solid #fdba74; color: #c2410c; }
+
+.filter-card { border: 1px solid #d1d5db; border-radius: 12px; padding: 14px; margin-bottom: 16px; background: #f8fafc; }
+.filter-row { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; }
+.filter-field { display: flex; flex-direction: column; gap: 4px; }
+.filter-field label { font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: bold; }
+select { padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px; background: white; min-width: 200px; }
+button { padding: 10px 16px; border: none; border-radius: 10px; cursor: pointer; font-size: 14px; }
+button:disabled { opacity: 0.4; cursor: default; }
+.secondary { background: #e5e7eb; color: #111827; }
+.primary { background: #1e3a5f; color: white; }
+.tyzden-nav { display: flex; align-items: center; gap: 6px; }
+.tyzden-nav button { padding: 8px 12px; }
+.tyzden-label { font-weight: bold; font-size: 15px; min-width: 190px; text-align: center; }
+
+.status { margin: 12px 0; padding: 10px; border-radius: 10px; border: 1px solid #d1d5db;
+          background: #f8fafc; color: #334155; font-size: 14px; }
+.status.error { background: #fef2f2; border-color: #fca5a5; color: #b91c1c; }
+.status.success { background: #f0fdf4; border-color: #86efac; color: #166534; }
+.status.info { background: #fffbeb; border-color: #fcd34d; color: #92400e; }
+
+.tiles { display: flex; gap: 10px; flex-wrap: wrap; margin: 4px 0 14px; }
+.tile { flex: 1; min-width: 120px; border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px 14px; background: #fff; }
+.tile .n { font-size: 22px; font-weight: bold; line-height: 1.1; }
+.tile .l { font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: bold; margin-top: 3px; }
+.tile.zel .n { color: #166534; }
+.tile.cer .n { color: #b91c1c; }
+.tile.siv .n { color: #64748b; }
+
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th { background: #1e3a5f; color: white; padding: 9px 8px; text-align: left; font-size: 12px; white-space: nowrap; }
+td { padding: 8px; border-bottom: 1px solid #e5e7eb; vertical-align: middle; }
+.table-wrapper { overflow-x: auto; }
+.num { text-align: right; white-space: nowrap; }
+.maly { font-size: 11px; color: #64748b; white-space: nowrap; }
+.siva { color: #94a3b8; }
+.plus { color: #166534; font-weight: bold; }
+.minus { color: #b91c1c; font-weight: bold; }
+tr.bez-uctu td { background: #fafafa; }
+
+.dni { white-space: nowrap; }
+.dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 3px;
+       border: 1px solid #94a3b8; vertical-align: middle; }
+.dot.on { background: #1e3a5f; border-color: #1e3a5f; }
+.dot.buduci { border-style: dashed; border-color: #cbd5e1; }
+
+.bars { display: inline-flex; align-items: flex-end; gap: 2px; height: 22px; vertical-align: middle; }
+.bars span { display: inline-block; width: 7px; background: #94a3b8; border-radius: 2px 2px 0 0; min-height: 2px; }
+
+.badge { font-size: 11px; font-weight: bold; padding: 3px 9px; border-radius: 20px; white-space: nowrap; display: inline-block; }
+.badge.zel { background: #f0fdf4; color: #166534; border: 1px solid #86efac; }
+.badge.ora { background: #fffbeb; color: #92400e; border: 1px solid #fcd34d; }
+.badge.cer { background: #fef2f2; color: #b91c1c; border: 1px solid #fca5a5; }
+.badge.siv { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; }
+
+.legenda { font-size: 12px; color: #475569; margin-top: 10px; line-height: 1.8; }
+.legenda .badge { margin-right: 4px; }
+.pozn { font-size: 12px; color: #64748b; font-style: italic; margin-top: 6px; }
+.empty { text-align: center; color: #64748b; font-style: italic; padding: 30px; }
+
+.act { background: none; border: 1px solid #cbd5e1; border-radius: 7px; padding: 4px 9px; font-size: 12px; margin-right: 4px; }
+.act:hover { border-color: #1e3a5f; color: #1e3a5f; }
+.kandidati td { background: #f8fafc; }
+.kandidat { display: flex; align-items: center; gap: 10px; padding: 4px 0; flex-wrap: wrap; }
+.kandidat.aktualny { font-weight: bold; }
+
+textarea { width: 100%; box-sizing: border-box; min-height: 180px; padding: 10px; border: 1px solid #d1d5db;
+           border-radius: 10px; font-family: Consolas, monospace; font-size: 13px; }
+.vkladanie { border: 1px solid #d1d5db; border-radius: 12px; padding: 14px; background: #f8fafc; margin-top: 14px; }
+.vkladanie p { margin: 0 0 8px; font-size: 13px; color: #475569; }
+.nahlad-chyby { color: #b91c1c; font-size: 13px; margin: 8px 0; }
+
+@media print {
+  body { background: white; padding: 0; }
+  .app { box-shadow: none; padding: 0; max-width: none; }
+  .no-print { display: none !important; }
+  th { background: #e5e7eb !important; color: #111827 !important; }
+}
+</style>
+</head>
+
+<body>
+<div class="app">
+  <h1>👥 Družstvá</h1>
+  <p class="subtitle">Ako trénujú hráči zo súpisky – týždeň po týždni.</p>
+
+  <div id="roleBanner" class="role-banner no-print" style="display:none;"></div>
+
+  <div class="filter-card no-print" id="ovladanie" style="display:none;">
+    <div class="filter-row">
+      <div class="filter-field">
+        <label>Družstvo</label>
+        <select id="fDruzstvo"></select>
+      </div>
+      <div class="filter-field">
+        <label>Týždeň</label>
+        <div class="tyzden-nav">
+          <button class="secondary" id="btnPred" title="Predchádzajúci týždeň">◀</button>
+          <span class="tyzden-label" id="tyzdenLabel">—</span>
+          <button class="secondary" id="btnDalsi" title="Nasledujúci týždeň">▶</button>
+          <button class="secondary" id="btnTento">Tento týždeň</button>
+        </div>
+      </div>
+      <button class="secondary" onclick="window.print()">🖨 Vytlačiť</button>
+      <button class="secondary" onclick="goHome()">Späť do menu</button>
+    </div>
+  </div>
+
+  <div id="status" class="status">Načítavam...</div>
+
+  <!-- Hlavička pre tlač -->
+  <div id="tlacHlavicka" style="display:none;font-size:15px;font-weight:bold;margin:6px 0 10px;"></div>
+
+  <div id="report" style="display:none;">
+    <div id="priebeh" class="status info" style="display:none;"></div>
+
+    <div class="tiles">
+      <div class="tile"><div class="n" id="tTrenovali">0</div><div class="l">Trénovali</div></div>
+      <div class="tile zel"><div class="n" id="tPravidelne">0</div><div class="l">Pravidelne</div></div>
+      <div class="tile cer"><div class="n" id="tNetrenuju">0</div><div class="l">Netrénujú</div></div>
+      <div class="tile siv"><div class="n" id="tBezUctu">0</div><div class="l">Bez účtu</div></div>
+    </div>
+
+    <div class="table-wrapper">
+      <table>
+        <thead><tr>
+          <th>Š.</th><th>Hráč</th><th class="num">Elo</th>
+          <th>Dni (po–ne)</th><th class="num">Úlohy</th><th class="num">Úspešnosť</th>
+          <th class="num">Elo na platforme</th><th class="num">Zadania</th>
+          <th>Posledný tréning</th><th>4 týždne</th><th>Stav</th>
+        </tr></thead>
+        <tbody id="tbodyReport"></tbody>
+      </table>
+    </div>
+
+    <div class="legenda">
+      <span class="badge zel">Pravidelne</span> trénoval aspoň 3 dni v týždni ·
+      <span class="badge ora">Málo</span> 1–2 dni ·
+      <span class="badge ora">Rýchlo, chybovo</span> veľa chýb s ťahom do 3 sekúnd ·
+      <span class="badge cer">Netrénuje</span> viac ako 10 dní nič ·
+      <span class="badge siv">Bez účtu</span> hráč nie je spárovaný s platformou
+    </div>
+    <div class="pozn">
+      Prehľad ukazuje, kto pravidelne trénuje a ako sa mu darí v úlohách na platforme.
+      Elo na platforme nie je to isté ako forma pri šachovnici – pri zostave ber do úvahy aj výsledky v partiách.
+      Úlohy: klasický tréning (taktika, stratégia, koncovka, mix) + zručnosti. Zadania: splnené / platné od trénera.
+    </div>
+  </div>
+
+  <!-- ─── Súpiska ─────────────────────────────────────────────────────────── -->
+  <div id="supiskaSekcia" class="no-print" style="display:none;">
+    <h2>Súpiska</h2>
+    <div class="table-wrapper">
+      <table>
+        <thead><tr><th>Š.</th><th>Hráč zo súpisky</th><th class="num">Elo</th><th>Na platforme</th><th></th></tr></thead>
+        <tbody id="tbodySupiska"></tbody>
+      </table>
+    </div>
+    <div id="supiskaPrazdna" class="empty" style="display:none;">Súpiska je prázdna. Vlož ju nižšie.</div>
+
+    <div class="vkladanie">
+      <p><b>Vložiť alebo nahradiť súpisku.</b> Skopíruj súpisku (napr. z výsledkového servisu alebo Excelu)
+         a vlož ju sem – jeden hráč na riadok: poradie, priezvisko, meno, Elo.</p>
+      <textarea id="vstupSupiska" placeholder="1 Brojo, Alex 1656&#10;2 Brojo, Marek 1533&#10;3 Sovik, Jan 1546"></textarea>
+      <div style="margin-top:8px;">
+        <button class="secondary" onclick="skontrolujSupisku()">Skontrolovať</button>
+      </div>
+      <div id="nahlad" style="display:none;margin-top:12px;">
+        <div id="nahladChyby" class="nahlad-chyby"></div>
+        <div class="table-wrapper">
+          <table>
+            <thead><tr><th>Š.</th><th>Priezvisko</th><th>Meno</th><th class="num">Elo</th></tr></thead>
+            <tbody id="tbodyNahlad"></tbody>
+          </table>
+        </div>
+        <div style="margin-top:10px;">
+          <button class="primary" id="btnUlozit" onclick="ulozSupisku()">Uložiť súpisku</button>
+          <span class="maly" style="margin-left:8px;">Nahradí celú súpisku. Spárovania pri nezmenených menách ostanú.</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="ziadneDruzstvo" class="empty" style="display:none;">
+    Nemáš priradené žiadne družstvo. Družstvo ti priradí administrátor.
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/auth.js"></script>
+<script src="js/player.js"></script>
+<script>
+// ZNAČKA VERZIE — pri každej úprave tohto súboru prepíš dátum.
+(window.VERZIE = window.VERZIE || {})['druzstvo.html'] = '2026-11-05';
+
+// ==== ČISTÉ FUNKCIE (bez stránky a databázy — dajú sa samostatne otestovať) ====
+
+// Kedy je hráč "pravidelný" a kedy "netrénuje" — tu sa dajú prahy upraviť
+const PRAVIDELNE_DNI = 3;    // aspoň toľko dní tréningu v týždni
+const NETRENUJE_DNI  = 10;   // viac dní bez tréningu = červená
+const RYCHLE_MIN_ULOH = 10;  // "Rýchlo, chybovo" sa posudzuje až od 10 úloh
+
+const NAZVY_KATEGORII = {
+  taktika: 'taktika', strategia: 'stratégia', koncovka: 'koncovka', mix: 'mix',
+  zrucnosti: 'zručnosti', checks: 'šachy', captures: 'brania',
+  direct_attack: 'brania so ziskom', pawn_breakthrough: 'pešiakové prielomy',
+  underdefended: 'slabo pokryté', pin: 'absolútne väzby', relative_pin: 'relatívne väzby',
+  fork: 'vidličky', direct_threat: 'priame hrozby'
+};
+const DNI_TYZDNA = ['pondelok', 'utorok', 'streda', 'štvrtok', 'piatok', 'sobota', 'nedeľa'];
+const TITULY = /^(GM|IM|FM|CM|WGM|WIM|WFM|WCM|NM)\s+/i;
+
+function esc(t) {
+  return String(t ?? '').replace(/[&<>"']/g, c =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+// Dátumy ako text 'RRRR-MM-DD' (bez posunov časových pásiem)
+function pridajDni(iso, n) {
+  const d = new Date(iso + 'T12:00:00Z');
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+function denVTyzdni(iso) {               // 1 = pondelok … 7 = nedeľa
+  return ((new Date(iso + 'T12:00:00Z').getUTCDay() + 6) % 7) + 1;
+}
+function pondelok(iso) { return pridajDni(iso, 1 - denVTyzdni(iso)); }
+function rozdielDni(isoNeskor, isoSkor) {
+  return Math.round((new Date(isoNeskor + 'T12:00:00Z') - new Date(isoSkor + 'T12:00:00Z')) / 86400000);
+}
+function fmtDen(iso, sRokom) {
+  const [r, m, d] = iso.split('-').map(Number);
+  return `${d}. ${m}.` + (sRokom ? ` ${r}` : '');
+}
+function fmtTyzden(od) {
+  const doD = pridajDni(od, 6);
+  return `${fmtDen(od)} – ${fmtDen(doD, true)}`;
+}
+// Miestny dátum z času z databázy
+function miestnyDen(ts) { return new Date(ts).toLocaleDateString('sv-SE'); }
+
+function sklonujDni(n) { return n === 1 ? 'deň' : (n >= 2 && n <= 4 ? 'dni' : 'dní'); }
+function sklonujHracov(n) { return n === 1 ? 'hráč' : (n >= 2 && n <= 4 ? 'hráči' : 'hráčov'); }
+
+// Posledný tréning slovami. V aktuálnom týždni "dnes / včera / pred 3 dňami",
+// pri minulých týždňoch vždy dátum (ref = nedeľa toho týždňa, "dnes" by klamalo).
+function poslednyText(ts, ref, relativne = true) {
+  if (!ts) return 'nikdy';
+  const den = miestnyDen(ts);
+  const n = rozdielDni(ref, den);
+  if (!relativne) return fmtDen(den, den.slice(0, 4) !== ref.slice(0, 4));
+  if (n <= 0) return 'dnes';
+  if (n === 1) return 'včera';
+  if (n <= 6) return `pred ${n} dňami`;
+  return fmtDen(den, den.slice(0, 4) !== ref.slice(0, 4));
+}
+
+// Stav hráča pre manažéra. ref = dátum, ku ktorému sa posudzuje
+// (dnes v aktuálnom týždni, inak nedeľa zobrazeného týždňa).
+function stavHraca(r, ref, jeAktualny) {
+  if (!r.player_id) return { cls: 'siv', txt: 'Bez účtu' };
+  const dniOd = r.posledny_trening ? rozdielDni(ref, miestnyDen(r.posledny_trening)) : null;
+  if (r.pocet_dni === 0 && (dniOd === null || dniOd > NETRENUJE_DNI)) {
+    return { cls: 'cer', txt: dniOd === null ? 'Netrénuje' : `Netrénuje ${dniOd} ${sklonujDni(dniOd)}` };
+  }
+  if (r.uloh >= RYCHLE_MIN_ULOH && r.uspesnost !== null && r.uspesnost < 50
+      && r.rychle_chyby * 3 >= r.uloh) {
+    return { cls: 'ora', txt: 'Rýchlo, chybovo' };
+  }
+  if (r.pocet_dni >= PRAVIDELNE_DNI) return { cls: 'zel', txt: 'Pravidelne' };
+  if (r.pocet_dni === 0) return { cls: 'ora', txt: jeAktualny ? 'Zatiaľ nič' : 'Tento týždeň nič' };
+  return { cls: 'ora', txt: 'Málo' };
+}
+
+// Rozpoznanie vloženej súpisky. Vráti { riadky: [...], chyby: [...] }.
+// Zvláda: "1 Brojo, Alex 1656", "3 Sovik, Jan1546", stĺpce z Excelu (tabulátory),
+// "Brojo Alex 1656" bez čiarky (prvé slovo = priezvisko), riadky bez čísla
+// (ak čísla nemá žiadny riadok, poradie sa dopočíta), tituly GM/IM/FM… pred menom.
+function rozpoznajSupisku(text) {
+  const vstup = String(text || '').split(/\r?\n/)
+    .map(s => s.replace(/\t/g, ' ').replace(/ /g, ' ').replace(/\s+/g, ' ').trim())
+    .filter(s => s.length);
+  const sCislom = vstup.filter(s => /^\d{1,2}[.)]?\s/.test(s)).length;
+  const riadky = [], chyby = [];
+  let dalsie = 1;
+
+  vstup.forEach(s => {
+    const m = s.match(/^(?:(\d{1,2})[.)]?\s+)?(.+?)\s*(\d{3,4})?$/);
+    if (!m) { chyby.push(`Nerozpoznaný riadok: „${s}“`); return; }
+    let poradie = m[1] ? Number(m[1]) : null;
+    if (poradie === null) {
+      if (sCislom > 0) { chyby.push(`Riadok bez poradového čísla: „${s}“`); return; }
+      poradie = dalsie;
+    }
+    dalsie = poradie + 1;
+
+    let meno = m[2].replace(/\b\d{5,}\b/g, ' ')       // FIDE ID a iné dlhé čísla preč
+                   .replace(TITULY, '').replace(/\s+/g, ' ').trim();
+    let priezvisko, krstne;
+    if (meno.includes(',')) {
+      priezvisko = meno.slice(0, meno.indexOf(',')).trim();
+      krstne = meno.slice(meno.indexOf(',') + 1).trim();
+    } else {
+      const slova = meno.split(' ');
+      priezvisko = slova.shift() || '';
+      krstne = slova.join(' ');
+    }
+    if (!/\p{L}/u.test(priezvisko)) { chyby.push(`Chýba priezvisko: „${s}“`); return; }
+
+    const elo = m[3] ? Number(m[3]) : null;
+    if (elo !== null && elo > 3500) { chyby.push(`Nezmyselné Elo ${elo}: „${s}“`); return; }
+    if (poradie < 1 || poradie > 60) { chyby.push(`Poradie musí byť 1 až 60: „${s}“`); return; }
+
+    riadky.push({ poradie, priezvisko, meno: krstne, elo });
+  });
+
+  const videne = {};
+  riadky.forEach(r => { videne[r.poradie] = (videne[r.poradie] || 0) + 1; });
+  Object.keys(videne).filter(k => videne[k] > 1)
+    .forEach(k => chyby.push(`Poradie ${k} je na súpiske viackrát.`));
+  if (riadky.length > 60) chyby.push('Súpiska môže mať najviac 60 hráčov.');
+
+  riadky.sort((a, b) => a.poradie - b.poradie);
+  return { riadky, chyby };
+}
+// ==== KONIEC ČISTÝCH FUNKCIÍ ====
+
+// ─── Stav stránky ─────────────────────────────────────────────────────────────
+let USER_ID = null, USER_ROLE = '';
+let druzstva = [];          // { id, nazov, sutaz, sezona, manazer_id }
+let aktDruzstvo = null;     // id
+let tyzdenOd = null;        // pondelok zobrazeného týždňa 'RRRR-MM-DD'
+let supiska = [];           // riadky súpisky { id, poradie, priezvisko, meno, elo, player_id }
+let rozpoznane = null;      // výsledok rozpoznajSupisku pred uložením
+let otvoreneParovanie = null;
+
+function dnes() { return new Date().toLocaleDateString('sv-SE'); }
+function goHome() { location.href = 'index.html'; }
+
+function setStatus(text, type = '') {
+  const el = document.getElementById('status');
+  el.textContent = text;
+  el.className = 'status' + (type ? ' ' + type : '');
+  el.style.display = text ? '' : 'none';
+}
+
+// Chybu z databázy prelož do ľudskej reči
+function textChyby(error) {
+  const msg = (error && error.message) || String(error || '');
+  if (/duplicate key|supisky_poradie_unique/.test(msg)) return 'Na súpiske je to isté poradie viackrát.';
+  if (/JWT|not authenticated|permission denied/i.test(msg)) return 'Nie si prihlásený alebo na to nemáš oprávnenie. Skús sa odhlásiť a prihlásiť znova.';
+  return msg;
+}
+
+// ─── Načítanie ────────────────────────────────────────────────────────────────
+async function nacitajDruzstva() {
+  const { data, error } = await sbClient.from('druzstva')
+    .select('id,nazov,sutaz,sezona,manazer_id').order('nazov');
+  if (error) throw error;
+  druzstva = data || [];
+}
+
+async function nacitajReport() {
+  setStatus('Načítavam prehľad...');
+  document.getElementById('tyzdenLabel').textContent = fmtTyzden(tyzdenOd);
+  document.getElementById('btnDalsi').disabled = tyzdenOd >= pondelok(dnes());
+  document.getElementById('btnTento').disabled = tyzdenOd === pondelok(dnes());
+
+  const d = druzstva.find(x => x.id === aktDruzstvo);
+  document.getElementById('tlacHlavicka').textContent =
+    `${d ? d.nazov : ''}${d && d.sutaz ? ' · ' + d.sutaz : ''} — týždeň ${fmtTyzden(tyzdenOd)}`;
+
+  const [rep, sup] = await Promise.all([
+    sbClient.rpc('report_druzstva', { p_druzstvo_id: aktDruzstvo, p_den: tyzdenOd }),
+    sbClient.from('supisky').select('id,poradie,priezvisko,meno,elo,player_id')
+      .eq('druzstvo_id', aktDruzstvo).order('poradie')
+  ]);
+  if (rep.error) { setStatus('Prehľad sa nepodarilo načítať: ' + textChyby(rep.error), 'error'); return; }
+  if (sup.error) { setStatus('Súpisku sa nepodarilo načítať: ' + textChyby(sup.error), 'error'); return; }
+
+  supiska = sup.data || [];
+  vykresliReport(rep.data || []);
+  vykresliSupisku();
+  setStatus('');
+}
+
+// ─── Vykreslenie prehľadu ─────────────────────────────────────────────────────
+function vykresliReport(rows) {
+  const jeAktualny = tyzdenOd === pondelok(dnes());
+  const ref = jeAktualny ? dnes() : pridajDni(tyzdenOd, 6);
+  const dnesDen = jeAktualny ? denVTyzdni(dnes()) : 8;
+
+  const priebeh = document.getElementById('priebeh');
+  if (jeAktualny) {
+    priebeh.textContent = `Týždeň ešte prebieha – údaje sú od pondelka po dnes (${DNI_TYZDNA[dnesDen - 1]}).`;
+    priebeh.style.display = '';
+  } else {
+    priebeh.style.display = 'none';
+  }
+
+  document.getElementById('report').style.display = '';
+  document.getElementById('tlacHlavicka').style.display = '';
+  const tb = document.getElementById('tbodyReport');
+
+  if (!rows.length) {
+    tb.innerHTML = '<tr><td colspan="11" class="empty">Súpiska je prázdna – vlož ju nižšie v časti Súpiska.</td></tr>';
+    ['tTrenovali', 'tPravidelne', 'tNetrenuju', 'tBezUctu'].forEach(id =>
+      document.getElementById(id).textContent = '0');
+    return;
+  }
+
+  let trenovali = 0, pravidelne = 0, netrenuju = 0, bezUctu = 0;
+  const sUctom = rows.filter(r => r.player_id).length;
+
+  tb.innerHTML = rows.map(r => {
+    const st = stavHraca(r, ref, jeAktualny);
+    if (st.cls === 'siv') bezUctu++;
+    if (r.player_id && r.pocet_dni > 0) trenovali++;
+    if (st.cls === 'zel') pravidelne++;
+    if (st.cls === 'cer') netrenuju++;
+
+    const hrac = `${esc(r.priezvisko)}${r.meno ? ', ' + esc(r.meno) : ''}`;
+    const elo = r.elo_supiska ?? '';
+    const stav = `<span class="badge ${st.cls}">${esc(st.txt)}</span>`;
+
+    if (!r.player_id) {
+      return `<tr class="bez-uctu"><td>${r.poradie}</td><td>${hrac}</td><td class="num">${elo}</td>
+        <td colspan="7" class="siva">nie je spárovaný s hráčom na platforme (pozri Súpisku nižšie)</td>
+        <td>${stav}</td></tr>`;
+    }
+
+    // Dni tréningu ako 7 bodiek
+    const dni = (r.dni_tyzden || []);
+    const bodky = [1, 2, 3, 4, 5, 6, 7].map(d => {
+      const on = dni.includes(d);
+      const cls = on ? 'on' : (d > dnesDen ? 'buduci' : '');
+      return `<span class="dot ${cls}" title="${DNI_TYZDNA[d - 1]}${on ? ' – trénoval' : ''}"></span>`;
+    }).join('');
+
+    // Úlohy: spolu + rozdelenie
+    const ulohy = r.uloh
+      ? `${r.uloh}<div class="maly">klas. ${r.uloh_klasika} · zruč. ${r.uloh_zrucnosti}</div>`
+      : '<span class="siva">0</span>';
+
+    // Úspešnosť
+    const uspTitle = r.uloh
+      ? `klasický tréning ${r.vyriesene_klasika}/${r.uloh_klasika} · zručnosti ${r.vyriesene_zrucnosti}/${r.uloh_zrucnosti}`
+        + (r.rychle_chyby ? ` · rýchle chyby: ${r.rychle_chyby}` : '')
+      : '';
+    const usp = r.uspesnost !== null && r.uspesnost !== undefined
+      ? `<span title="${esc(uspTitle)}">${r.uspesnost} %</span>` : '<span class="siva">–</span>';
+
+    // Elo na platforme
+    let eloPl = '<span class="siva">–</span>';
+    if (r.elo_kategoria) {
+      const z = r.elo_zmena || 0;
+      const vsetky = r.elo_zmeny
+        ? Object.entries(r.elo_zmeny).map(([k, v]) => `${NAZVY_KATEGORII[k] || k}: ${v > 0 ? '+' : ''}${v}`).join(', ')
+        : '';
+      eloPl = `<span class="${z > 0 ? 'plus' : (z < 0 ? 'minus' : '')}" title="${esc(vsetky)}">${z > 0 ? '+' : ''}${z}</span>
+        <div class="maly">${esc(NAZVY_KATEGORII[r.elo_kategoria] || r.elo_kategoria)}</div>`;
+    }
+
+    // Zadania
+    const zad = r.zadania_aktivne
+      ? `${r.zadania_splnene}/${r.zadania_aktivne}` : '<span class="siva">–</span>';
+
+    // Posledný tréning
+    const posl = r.posledny_trening
+      ? `<span title="${esc(new Date(r.posledny_trening).toLocaleString('sk-SK'))}">${esc(poslednyText(r.posledny_trening, ref, jeAktualny))}</span>`
+      : '<span class="siva">nikdy</span>';
+
+    // 4 predchádzajúce týždne
+    const d4 = r.dni_4_tyzdne || [0, 0, 0, 0];
+    const bars = `<span class="bars" title="${d4.map((n, i) => `pred ${4 - i} ${4 - i === 1 ? 'týždňom' : 'týždňami'}: ${n} ${sklonujDni(n)}`).join('\n')}">`
+      + d4.map(n => `<span style="height:${Math.max(2, Math.round(n / 7 * 22))}px"></span>`).join('')
+      + '</span>';
+
+    return `<tr>
+      <td>${r.poradie}</td><td>${hrac}</td><td class="num">${elo}</td>
+      <td class="dni">${bodky}</td>
+      <td class="num">${ulohy}</td>
+      <td class="num">${usp}</td>
+      <td class="num">${eloPl}</td>
+      <td class="num">${zad}</td>
+      <td>${posl}</td>
+      <td>${bars}</td>
+      <td>${stav}</td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('tTrenovali').textContent = `${trenovali} z ${sUctom}`;
+  document.getElementById('tPravidelne').textContent = pravidelne;
+  document.getElementById('tNetrenuju').textContent = netrenuju;
+  document.getElementById('tBezUctu').textContent = bezUctu;
+}
+
+// ─── Súpiska a párovanie ──────────────────────────────────────────────────────
+function vykresliSupisku() {
+  document.getElementById('supiskaSekcia').style.display = '';
+  const tb = document.getElementById('tbodySupiska');
+  document.getElementById('supiskaPrazdna').style.display = supiska.length ? 'none' : '';
+  tb.innerHTML = supiska.map(s => {
+    const hrac = `${esc(s.priezvisko)}${s.meno ? ', ' + esc(s.meno) : ''}`;
+    const stav = s.player_id
+      ? '<span class="badge zel">✓ spárovaný</span>'
+      : '<span class="badge siv">nespárovaný</span>';
+    const tlac = `<button class="act" onclick="otvorParovanie(${s.id})">${s.player_id ? 'Zmeniť' : 'Spárovať'}</button>`;
+    const kand = otvoreneParovanie === s.id
+      ? `<tr class="kandidati"><td></td><td colspan="4" id="kand-${s.id}">Hľadám hráčov s priezviskom ${esc(s.priezvisko)}...</td></tr>`
+      : '';
+    return `<tr><td>${s.poradie}</td><td>${hrac}</td><td class="num">${s.elo ?? ''}</td>
+      <td>${stav}</td><td style="white-space:nowrap;">${tlac}</td></tr>${kand}`;
+  }).join('');
+  if (otvoreneParovanie) nacitajKandidatov(otvoreneParovanie);
+}
+
+function otvorParovanie(supiskaId) {
+  otvoreneParovanie = otvoreneParovanie === supiskaId ? null : supiskaId;
+  vykresliSupisku();
+}
+
+async function nacitajKandidatov(supiskaId) {
+  const bunka = document.getElementById('kand-' + supiskaId);
+  if (!bunka) return;
+  const s = supiska.find(x => x.id === supiskaId);
+  const { data, error } = await sbClient.rpc('supiska_kandidati', { p_supiska_id: supiskaId });
+  if (error) { bunka.innerHTML = `<span style="color:#b91c1c;">${esc(textChyby(error))}</span>`; return; }
+
+  const zrus = s && s.player_id
+    ? `<button class="act" onclick="sparuj(${supiskaId}, null)">Zrušiť spárovanie</button>` : '';
+  const zavri = `<button class="act" onclick="otvorParovanie(${supiskaId})">Zavrieť</button>`;
+
+  if (!data || !data.length) {
+    bunka.innerHTML = `Na platforme nie je nikto s priezviskom <b>${esc(s ? s.priezvisko : '')}</b>.
+      Hráč si musí založiť účet, alebo je na platforme zapísaný s iným priezviskom – obráť sa na administrátora.
+      <div style="margin-top:6px;">${zrus}${zavri}</div>`;
+    return;
+  }
+  bunka.innerHTML = '<div class="maly" style="margin-bottom:4px;">Vyber hráča z platformy:</div>'
+    + data.map(k => {
+      const akt = s && s.player_id === k.player_id;
+      return `<div class="kandidat${akt ? ' aktualny' : ''}">
+        <span>${esc(k.meno_hraca)}</span>
+        <span class="maly">${k.trener ? 'tréner ' + esc(k.trener) + ' · ' : ''}na platforme od ${esc(fmtDen(k.registrovany, true))}</span>
+        ${akt ? '<span class="badge zel">aktuálne spárovaný</span>'
+              : `<button class="act" onclick="sparuj(${supiskaId}, ${Number(k.player_id)})">Vybrať</button>`}
+      </div>`;
+    }).join('')
+    + `<div style="margin-top:6px;">${zrus}${zavri}</div>`;
+}
+
+async function sparuj(supiskaId, playerId) {
+  const { error } = await sbClient.rpc('supiska_sparuj', { p_supiska_id: supiskaId, p_player_id: playerId });
+  if (error) { setStatus('Spárovanie sa nepodarilo: ' + textChyby(error), 'error'); return; }
+  otvoreneParovanie = null;
+  await nacitajReport();
+  setStatus(playerId ? 'Hráč bol spárovaný.' : 'Spárovanie bolo zrušené.', 'success');
+}
+
+// ─── Vloženie súpisky ─────────────────────────────────────────────────────────
+function skontrolujSupisku() {
+  rozpoznane = rozpoznajSupisku(document.getElementById('vstupSupiska').value);
+  const nahlad = document.getElementById('nahlad');
+  nahlad.style.display = '';
+  document.getElementById('nahladChyby').innerHTML = rozpoznane.chyby.length
+    ? '<b>Oprav, prosím:</b><br>' + rozpoznane.chyby.map(esc).join('<br>') : '';
+  document.getElementById('tbodyNahlad').innerHTML = rozpoznane.riadky.length
+    ? rozpoznane.riadky.map(r => `<tr><td>${r.poradie}</td><td>${esc(r.priezvisko)}</td>
+        <td>${esc(r.meno)}</td><td class="num">${r.elo ?? ''}</td></tr>`).join('')
+    : '<tr><td colspan="4" class="empty">Nenašiel som žiadneho hráča.</td></tr>';
+  document.getElementById('btnUlozit').disabled = !!rozpoznane.chyby.length || !rozpoznane.riadky.length;
+}
+
+async function ulozSupisku() {
+  if (!rozpoznane || rozpoznane.chyby.length || !rozpoznane.riadky.length) return;
+  if (supiska.length && !confirm(`Nahradiť doterajšiu súpisku (${supiska.length} ${sklonujHracov(supiska.length)}) `
+      + `novou (${rozpoznane.riadky.length} ${sklonujHracov(rozpoznane.riadky.length)})?`)) return;
+  const btn = document.getElementById('btnUlozit');
+  btn.disabled = true;
+  const { data, error } = await sbClient.rpc('supiska_uloz',
+    { p_druzstvo_id: aktDruzstvo, p_riadky: rozpoznane.riadky });
+  btn.disabled = false;
+  if (error) { setStatus('Súpiska sa neuložila: ' + textChyby(error), 'error'); return; }
+  document.getElementById('vstupSupiska').value = '';
+  document.getElementById('nahlad').style.display = 'none';
+  rozpoznane = null;
+  otvoreneParovanie = null;
+  await nacitajReport();
+  const nesp = supiska.filter(s => !s.player_id).length;
+  setStatus(`Súpiska uložená – ${data} ${sklonujHracov(data)}.`
+    + (nesp ? ` Nespárovaní: ${nesp} – skontroluj ich v časti Súpiska.` : ''), 'success');
+}
+
+// ─── Inicializácia ────────────────────────────────────────────────────────────
+async function init() {
+  const ok = await refreshSession();
+  if (!ok) { location.href = 'login.html'; return; }
+  if (!sbClient) { setStatus('Stránka sa nenačítala celá. Skús ju načítať znova.', 'error'); return; }
+  USER_ID = sessionStorage.getItem('user_id');
+  USER_ROLE = sessionStorage.getItem('user_role') || '';
+
+  try {
+    await nacitajDruzstva();
+  } catch (e) {
+    setStatus('Družstvá sa nepodarilo načítať: ' + textChyby(e), 'error');
+    return;
+  }
+
+  if (!druzstva.length) {
+    setStatus('');
+    document.getElementById('ziadneDruzstvo').style.display = '';
+    return;
+  }
+
+  // Banner: manažér vs. admin
+  const b = document.getElementById('roleBanner');
+  const moje = druzstva.filter(d => d.manazer_id === USER_ID);
+  if (USER_ROLE === 'admin' && moje.length < druzstva.length) {
+    b.textContent = '🔧 Admin – vidíš všetky družstvá';
+    b.className = 'role-banner admin no-print';
+  } else {
+    b.textContent = `👥 Manažér – ${moje.length === 1 ? 'tvoje družstvo' : 'tvoje družstvá'}`;
+    b.className = 'role-banner manazer no-print';
+  }
+  b.style.display = '';
+
+  // Výber družstva (posledné zvolené si pamätáme)
+  const sel = document.getElementById('fDruzstvo');
+  sel.innerHTML = druzstva.map(d =>
+    `<option value="${d.id}">${esc(d.nazov)}${d.sutaz ? ' · ' + esc(d.sutaz) : ''}${d.sezona ? ' (' + esc(d.sezona) + ')' : ''}</option>`
+  ).join('');
+  let ulozene = null;
+  try { ulozene = Number(localStorage.getItem('druzstvoVybrane')); } catch (e) {}
+  aktDruzstvo = druzstva.some(d => d.id === ulozene) ? ulozene : druzstva[0].id;
+  sel.value = String(aktDruzstvo);
+  sel.addEventListener('change', () => {
+    aktDruzstvo = Number(sel.value);
+    try { localStorage.setItem('druzstvoVybrane', String(aktDruzstvo)); } catch (e) {}
+    otvoreneParovanie = null;
+    nacitajReport();
+  });
+
+  tyzdenOd = pondelok(dnes());
+  document.getElementById('btnPred').onclick  = () => { tyzdenOd = pridajDni(tyzdenOd, -7); nacitajReport(); };
+  document.getElementById('btnDalsi').onclick = () => { tyzdenOd = pridajDni(tyzdenOd, 7);  nacitajReport(); };
+  document.getElementById('btnTento').onclick = () => { tyzdenOd = pondelok(dnes());        nacitajReport(); };
+
+  document.getElementById('ovladanie').style.display = '';
+  await nacitajReport();
+}
+
+init();
+</script>
+</body>
+</html>
