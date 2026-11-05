@@ -114,14 +114,24 @@ button {
 .status.error { background: #fef2f2; border-color: #fca5a5; color: #b91c1c; }
 .status.success { background: #f0fdf4; border-color: #86efac; color: #166534; }
 
+/* Tabuľka sa posúva vo vlastnom okne — zvisle aj vodorovne. Len tak môže
+   hlavička zostať hore a meno s priezviskom vľavo: „prilepené" bunky sa
+   držia okraja okna, v ktorom sa posúvajú. Vedľajší efekt, ktorý pomáha:
+   vodorovný posuvník je vždy viditeľný dole, netreba ho hľadať na konci zoznamu. */
 .table-wrapper {
-  overflow-x: auto;
+  overflow: auto;
+  max-height: 75vh;
   margin-top: 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
 }
 
+/* separate namiesto collapse: pri collapse sa čiary prilepených buniek
+   pri posúvaní odtrhnú a ostávajú na mieste */
 table {
   width: 100%;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
   font-size: 13px;
 }
 
@@ -133,16 +143,32 @@ th {
   font-size: 12px;
   text-transform: uppercase;
   white-space: nowrap;
+  position: sticky;   /* hlavička zostáva hore */
+  top: 0;
+  z-index: 2;
 }
 
 td {
   padding: 9px 8px;
   border-bottom: 1px solid #e2e8f0;
   white-space: nowrap;
+  background: white;  /* nepriehľadné pozadie — inak by cez meno presvitali čísla */
 }
 
 tr:nth-child(even) td { background: #f8fafc; }
 tr:hover td { background: #eff6ff; }
+
+/* Meno a priezvisko zostávajú vľavo. Odsadenie druhého stĺpca (--l2)
+   dopočíta skript podľa skutočnej šírky stĺpca Meno. */
+th:nth-child(1), td:nth-child(1) { position: sticky; left: 0; }
+th:nth-child(2), td:nth-child(2) {
+  position: sticky;
+  left: var(--l2, 0px);
+  box-shadow: 3px 0 4px -2px rgba(15, 23, 42, 0.18);   /* deliaca čiara od posúvaných stĺpcov */
+}
+td:nth-child(1), td:nth-child(2) { z-index: 1; }
+/* Rohové bunky hlavičky musia byť nad všetkým ostatným */
+th:nth-child(1), th:nth-child(2) { z-index: 3; }
 
 .badge {
   display: inline-block;
@@ -413,7 +439,7 @@ tr:hover td { background: #eff6ff; }
 // ZNAČKA VERZIE — pri každej úprave tohto súboru prepíš dátum.
 // Vypíše sa v konzole, alebo na mobile po pridaní ?verzia do adresy.
 // Mechanika je v player.js pri funkcii verzie().
-(window.VERZIE = window.VERZIE || {})['statistika.html'] = '2026-09-11';
+(window.VERZIE = window.VERZIE || {})['statistika.html'] = '2026-11-05';
 
 // ─── Kontext prihláseného používateľa ───────────────────────────────────────
 const USER_ROLE         = sessionStorage.getItem('user_role') || '';
@@ -1009,7 +1035,21 @@ function renderTable() {
     tr.innerHTML = commonCells + eloCells;
     tbody.appendChild(tr);
   });
+
+  nastavPevneStlpce();
 }
+
+// ─── Pevné stĺpce Meno + Priezvisko ─────────────────────────────────────────
+// Stĺpec Priezvisko sa musí prilepiť presne tam, kde končí stĺpec Meno.
+// Šírka Mena závisí od najdlhšieho mena v zozname, preto sa zmeria až po
+// vykreslení tabuľky (skrytá tabuľka má šírku 0, preto nie skôr).
+function nastavPevneStlpce() {
+  const table = document.getElementById('statsTable');
+  const prvy  = table.querySelector('thead th:nth-child(1)');
+  if (!prvy || table.style.display === 'none') return;
+  table.style.setProperty('--l2', prvy.getBoundingClientRect().width + 'px');
+}
+window.addEventListener('resize', nastavPevneStlpce);
 
 // ─── XLSX export ──────────────────────────────────────────────────────────────
 function exportXlsx() {
