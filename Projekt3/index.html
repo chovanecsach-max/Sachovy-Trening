@@ -623,6 +623,9 @@ async function initPage() {
   const nick = user.nick || user.name || user.email || '?';
   const role = user.role;
 
+  // Kto je LEN manažér družstva (nie hráč ani tréner), ide rovno na prehľad družstva
+  if (role === 'manazer') { location.replace('druzstvo.html'); return; }
+
   document.getElementById('userAvatar').textContent = nick.charAt(0).toUpperCase();
   document.getElementById('userName').textContent = nick;
 

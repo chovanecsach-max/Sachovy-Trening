@@ -541,6 +541,40 @@ button {
     <div id="tpStatus" style="font-size:13px;margin-top:8px;"></div>
   </div>
 
+  <!-- Družstvá a ich manažéri (prehľad pre manažérov je na stránke druzstvo.html) -->
+  <div class="card" style="margin-bottom:16px;">
+    <h2>👥 Družstvá a manažéri</h2>
+    <div class="tip" style="margin-top:-6px;margin-bottom:10px;">
+      Manažér družstva vidí na stránke Družstvá týždenný prehľad tréningu hráčov zo svojej
+      súpisky a súpisku si vkladá sám. Manažérom môže byť ktokoľvek s účtom — hráč, tréner aj rodič.
+      Kto je <b>len</b> manažér: nech sa zaregistruje bežne, potom mu v zozname používateľov
+      zmeň rolu na „Manažér družstva“ a nastav platnosť (napr. do konca sezóny).
+    </div>
+    <div class="edit-grid">
+      <div class="edit-field">
+        <label>Názov družstva *</label>
+        <input type="text" id="drNazov" maxlength="100" placeholder="napr. B družstvo">
+      </div>
+      <div class="edit-field">
+        <label>Súťaž</label>
+        <input type="text" id="drSutaz" maxlength="100" placeholder="napr. 3. liga">
+      </div>
+      <div class="edit-field">
+        <label>Sezóna</label>
+        <input type="text" id="drSezona" maxlength="20" placeholder="napr. 2026/27">
+      </div>
+      <div class="edit-field">
+        <label>Manažér *</label>
+        <select id="drManazer"><option value="">— najprv načítaj používateľov —</option></select>
+      </div>
+    </div>
+    <div class="actions">
+      <button class="success" onclick="drZaloz()">➕ Založiť družstvo</button>
+    </div>
+    <div id="drStatus" style="font-size:13px;margin-top:8px;"></div>
+    <div id="drZoznam" style="margin-top:12px;"></div>
+  </div>
+
   <!-- Ručná registrácia hráča (bez potvrdzovacieho mailu) -->
   <div class="card" style="margin-bottom:16px;">
     <h2>➕ Ručne zaregistrovať hráča</h2>
@@ -636,6 +670,7 @@ button {
             <option value="hrac">Hráč</option>
             <option value="trener">Tréner</option>
             <option value="hlavny_trener">Hlavný tréner</option>
+            <option value="manazer">Manažér družstva</option>
             <option value="admin">Admin</option>
           </select>
         </div>
@@ -745,7 +780,7 @@ button {
 // ZNAČKA VERZIE — pri každej úprave tohto súboru prepíš dátum.
 // Vypíše sa v konzole, alebo na mobile po pridaní ?verzia do adresy.
 // Mechanika je v player.js pri funkcii verzie().
-(window.VERZIE = window.VERZIE || {})['admin.html'] = '2026-10-09';
+(window.VERZIE = window.VERZIE || {})['admin.html'] = '2026-11-05';
 
 // SUPABASE_URL a SUPABASE_KEY poskytuje js/auth.js (nedeklarovať znova!)
 
@@ -1551,6 +1586,155 @@ async function tpUloz() {
   }
 }
 
+// ─── Družstvá a manažéri ─────────────────────────────────────────────────────
+// Tabuľky druzstva a supisky (skripty krok1 až krok4). Manažér vidí len svoje
+// družstvá na stránke druzstvo.html; zakladať, meniť a mazať ich smie len admin.
+// Zápis si vždy vypýta späť dotknutý riadok — RLS by inak odmietnutú zmenu
+// ticho "prijala" a stránka by hlásila úspech, hoci sa nestalo nič.
+
+const DR_ROLY = { hrac: 'hráč', trener: 'tréner', hlavny_trener: 'hlavný tréner',
+                  admin: 'admin', manazer: 'manažér' };
+let drDruzstva = [];
+
+function drMenoPouzivatela(id) {
+  const u = (allUsers || []).find(x => x.id === id);
+  return u ? menoPouzivatela(u) : null;
+}
+
+// Ponuka manažérov: všetci používatelia (manažérom môže byť ktokoľvek s účtom)
+function drMoznosti(vybrany) {
+  const zoznam = (allUsers || []).slice()
+    .sort((a, b) => menoPouzivatela(a).localeCompare(menoPouzivatela(b), 'sk'));
+  return '<option value="">— vyber manažéra —</option>' + zoznam.map(u =>
+    `<option value="${u.id}"${u.id === vybrany ? ' selected' : ''}>`
+    + `${escapeHtml(menoPouzivatela(u))} · ${DR_ROLY[u.role] || escapeHtml(u.role)} · ${escapeHtml(u.email)}</option>`
+  ).join('');
+}
+
+function drNaplnManazerov() {
+  const sel = document.getElementById('drManazer');
+  if (!sel) return;
+  const doterajsi = sel.value;
+  sel.innerHTML = drMoznosti(doterajsi);
+}
+
+function drHlas(text, typ) {
+  const st = document.getElementById('drStatus');
+  st.textContent = text;
+  st.style.color = typ === 'error' ? '#b91c1c' : typ === 'ok' ? '#166534' : '#64748b';
+}
+
+async function drNacitaj() {
+  const box = document.getElementById('drZoznam');
+  if (!box) return;
+  try {
+    const [druz, sup] = await Promise.all([
+      sbFetch('druzstva?select=id,nazov,sutaz,sezona,manazer_id&order=nazov.asc'),
+      sbFetch('supisky?select=druzstvo_id,player_id')
+    ]);
+    drDruzstva = druz || [];
+    const pocty = {};
+    (sup || []).forEach(s => {
+      const p = pocty[s.druzstvo_id] || (pocty[s.druzstvo_id] = { spolu: 0, sparovani: 0 });
+      p.spolu++;
+      if (s.player_id) p.sparovani++;
+    });
+
+    if (!drDruzstva.length) {
+      box.innerHTML = '<div class="tip">Zatiaľ nie je založené žiadne družstvo.</div>';
+      return;
+    }
+    box.innerHTML = drDruzstva.map(d => {
+      const p = pocty[d.id] || { spolu: 0, sparovani: 0 };
+      const manazer = d.manazer_id ? drMenoPouzivatela(d.manazer_id) : null;
+      const info = [d.sutaz, d.sezona].filter(Boolean).map(escapeHtml).join(' · ');
+      return `<div style="border:1px solid #e2e8f0;border-radius:10px;padding:10px 14px;margin-bottom:8px;background:white;">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+          <div style="flex:1;min-width:200px;">
+            <span style="font-weight:bold;">${escapeHtml(d.nazov)}</span>
+            ${info ? `<span style="font-size:12px;color:#64748b;"> · ${info}</span>` : ''}
+            <div style="font-size:12px;color:#64748b;">
+              ${manazer ? 'manažér: ' + escapeHtml(manazer)
+                        : '<span style="color:#b91c1c;font-weight:bold;">⚠️ bez manažéra</span>'}
+              · súpiska: ${p.spolu} ${p.spolu === 1 ? 'hráč' : (p.spolu >= 2 && p.spolu <= 4 ? 'hráči' : 'hráčov')}
+              ${p.spolu ? `(spárovaných ${p.sparovani})` : ''}
+            </div>
+          </div>
+          <button class="secondary" style="padding:6px 12px;font-size:13px;"
+                  onclick="location.href='druzstvo.html?druzstvo=${d.id}'">Otvoriť prehľad</button>
+          <button class="danger" style="padding:6px 12px;font-size:13px;" onclick="drZmaz(${d.id})">🗑️</button>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px;">
+          <label style="font-size:12px;color:#64748b;white-space:nowrap;">Zmeniť manažéra:</label>
+          <select id="drMan-${d.id}" style="flex:1;min-width:200px;padding:6px 10px;font-size:13px;">${drMoznosti(d.manazer_id)}</select>
+          <button class="primary" style="padding:6px 12px;font-size:13px;" onclick="drZmenManazera(${d.id})">Uložiť</button>
+        </div>
+      </div>`;
+    }).join('');
+  } catch (e) {
+    box.innerHTML = '<div class="tip">Družstvá sa nepodarilo načítať — sú v Supabase spustené skripty krok1 až krok4? ('
+      + escapeHtml(e.message) + ')</div>';
+  }
+}
+
+async function drZaloz() {
+  const nazov   = document.getElementById('drNazov').value.trim();
+  const sutaz   = document.getElementById('drSutaz').value.trim();
+  const sezona  = document.getElementById('drSezona').value.trim();
+  const manazer = document.getElementById('drManazer').value;
+  if (!nazov)   return drHlas('Zadaj názov družstva.', 'error');
+  if (!manazer) return drHlas('Vyber manažéra.', 'error');
+
+  drHlas('Zakladám...');
+  try {
+    const nove = await sbFetch('druzstva?select=id', {
+      method: 'POST', prefer: 'return=representation',
+      body: JSON.stringify({ nazov, sutaz: sutaz || null, sezona: sezona || null, manazer_id: manazer })
+    });
+    if (!nove || !nove.length) return drHlas('Databáza založenie odmietla.', 'error');
+    document.getElementById('drNazov').value = '';
+    document.getElementById('drSutaz').value = '';
+    document.getElementById('drManazer').value = '';
+    drHlas(`✅ Družstvo „${nazov}“ je založené. Manažér si súpisku vloží na stránke Družstvá.`, 'ok');
+    await drNacitaj();
+  } catch (e) {
+    drHlas('Chyba pri zakladaní: ' + e.message, 'error');
+  }
+}
+
+async function drZmenManazera(id) {
+  const manazer = document.getElementById('drMan-' + id).value;
+  if (!manazer) return drHlas('Vyber manažéra.', 'error');
+  try {
+    const zmenene = await sbFetch(`druzstva?id=eq.${id}&select=id`, {
+      method: 'PATCH', prefer: 'return=representation',
+      body: JSON.stringify({ manazer_id: manazer })
+    });
+    if (!zmenene || !zmenene.length) return drHlas('Databáza zmenu odmietla.', 'error');
+    drHlas(`✅ Manažér zmenený na ${drMenoPouzivatela(manazer) || 'vybraného používateľa'}.`, 'ok');
+    await drNacitaj();
+  } catch (e) {
+    drHlas('Chyba pri zmene manažéra: ' + e.message, 'error');
+  }
+}
+
+async function drZmaz(id) {
+  const d = drDruzstva.find(x => x.id === id);
+  if (!d) return;
+  if (!confirm(`Zmazať družstvo „${d.nazov}“ aj s jeho súpiskou?\n\n`
+             + 'Tréningové údaje hráčov ostanú nedotknuté. Akcia sa nedá vrátiť.')) return;
+  try {
+    const zmazane = await sbFetch(`druzstva?id=eq.${id}&select=id`, {
+      method: 'DELETE', prefer: 'return=representation'
+    });
+    if (!zmazane || !zmazane.length) return drHlas('Databáza zmazanie odmietla.', 'error');
+    drHlas(`✅ Družstvo „${d.nazov}“ bolo zmazané.`, 'ok');
+    await drNacitaj();
+  } catch (e) {
+    drHlas('Chyba pri mazaní: ' + e.message, 'error');
+  }
+}
+
 async function loadUsers() {
   setUserStatus('Načítavam používateľov...');
   try {
@@ -1580,6 +1764,8 @@ async function loadUsers() {
     renderUserList(playerMap);
     populateTrenerSelect('mrTrener');
     tpNaplnTrenerov();
+    drNaplnManazerov();
+    drNacitaj();
     setUserStatus(`Načítaných ${allUsers.length} používateľov`, 'success');
   } catch(e) {
     setUserStatus('Chyba: ' + e.message, 'error');
@@ -1825,13 +2011,15 @@ function renderUserList(playerMap) {
     admin:         'background:#fff7ed;color:#c2410c;border:1px solid #fdba74;',
     trener:        'background:#f0fdf4;color:#166534;border:1px solid #86efac;',
     hlavny_trener: 'background:#faf5ff;color:#6b21a8;border:1px solid #d8b4fe;',
-    hrac:          'background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;'
+    hrac:          'background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;',
+    manazer:       'background:#ecfeff;color:#0e7490;border:1px solid #a5f3fc;'
   };
   const roleLabels = {
     admin:         '👑 Admin',
     trener:        '🧑‍🏫 Tréner',
     hlavny_trener: '🏆 Hlavný tréner',
-    hrac:          '♟ Hráč'
+    hrac:          '♟ Hráč',
+    manazer:       '👥 Manažér'
   };
 
   // Mapa trénerov id → meno
@@ -1866,7 +2054,7 @@ function renderUserList(playerMap) {
         <span style="padding:3px 10px;border-radius:999px;font-size:12px;font-weight:bold;${roleStyle}">${roleLabel}</span>
         <button class="secondary" style="padding:6px 12px;font-size:13px;" onclick="openUserEdit('${u.id}')">Upraviť</button>
         <button class="danger" style="padding:6px 12px;font-size:13px;" onclick="deleteUser('${u.id}', '${escapeHtml(displayName).replace(/&#39;/g, '')}')">🗑️</button>
-        ${(u.role === 'hrac' || u.role === 'trener') ? validityBadge(u) : ''}
+        ${(u.role === 'hrac' || u.role === 'trener' || u.role === 'manazer') ? validityBadge(u) : ''}
       </div>
     `;
   }).join('');
@@ -1918,9 +2106,9 @@ async function openUserEdit(userId) {
 
   onUserRoleChange();
 
-  // Platnosť — zobraziť len pre hráča a trénera
+  // Platnosť — zobraziť pre hráča, trénera a manažéra družstva
   const validityWrap = document.getElementById('uValidityWrap');
-  if (selectedUser.role === 'hrac' || selectedUser.role === 'trener') {
+  if (selectedUser.role === 'hrac' || selectedUser.role === 'trener' || selectedUser.role === 'manazer') {
     validityWrap.style.display = 'block';
     const fmtDate = iso => iso ? new Date(iso).toLocaleDateString('sk-SK') : '—';
     document.getElementById('uValidFrom').textContent = fmtDate(selectedUser.valid_from);

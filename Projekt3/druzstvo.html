@@ -119,7 +119,7 @@ textarea { width: 100%; box-sizing: border-box; min-height: 180px; padding: 10px
         </div>
       </div>
       <button class="secondary" onclick="window.print()">🖨 Vytlačiť</button>
-      <button class="secondary" onclick="goHome()">Späť do menu</button>
+      <button class="secondary" id="btnMenu" onclick="goHome()">Späť do menu</button>
     </div>
   </div>
 
@@ -142,8 +142,8 @@ textarea { width: 100%; box-sizing: border-box; min-height: 180px; padding: 10px
       <table>
         <thead><tr>
           <th>Š.</th><th>Hráč</th><th class="num">Elo</th>
-          <th>Dni (po–ne)</th><th class="num">Úlohy</th><th class="num">Úspešnosť</th>
-          <th class="num">Elo na platforme</th><th class="num">Zadania</th>
+          <th>Dni (po–ne)</th><th class="num">Úlohy</th><th class="num">Vizualizácia</th><th class="num">Úspešnosť</th>
+          <th class="num">Elo na platforme</th><th class="num" title="splnené v tomto týždni / zadania platné v týždni">Zadania</th>
           <th>Posledný tréning</th><th>4 týždne</th><th>Stav</th>
         </tr></thead>
         <tbody id="tbodyReport"></tbody>
@@ -160,7 +160,9 @@ textarea { width: 100%; box-sizing: border-box; min-height: 180px; padding: 10px
     <div class="pozn">
       Prehľad ukazuje, kto pravidelne trénuje a ako sa mu darí v úlohách na platforme.
       Elo na platforme nie je to isté ako forma pri šachovnici – pri zostave ber do úvahy aj výsledky v partiách.
-      Úlohy: klasický tréning (taktika, stratégia, koncovka, mix) + zručnosti. Zadania: splnené / platné od trénera.
+      Dni tréningu rátajú úlohy aj vizualizáciu. Úlohy: klasický tréning (taktika, stratégia, koncovka, mix) + zručnosti.
+      Vizualizácia: počet šprintov, pri nastavení myši aj najlepšie skóre.
+      Zadania od trénera: splnené v tomto týždni / zadania, ktoré v týždni platili.
     </div>
   </div>
 
@@ -225,6 +227,18 @@ const NAZVY_KATEGORII = {
   fork: 'vidličky', direct_threat: 'priame hrozby'
 };
 const DNI_TYZDNA = ['pondelok', 'utorok', 'streda', 'štvrtok', 'piatok', 'sobota', 'nedeľa'];
+const VIZ_TYPY = {
+  polia: 'Nájdi pole', farba: 'Farba poľa', diagonala: 'Diagonála',
+  jazdec: 'Cesta jazdca', stvorec: 'Pravidlo štvorca', mix: 'Mix'
+};
+// {"farba_60": 25, …} → "Farba poľa 60 s: 25 b. · …"
+function vizNajlepsieText(obj) {
+  if (!obj) return '';
+  return Object.entries(obj).map(([k, v]) => {
+    const [typ, dlzka] = k.split('_');
+    return `${VIZ_TYPY[typ] || typ} ${dlzka} s: ${v} b.`;
+  }).join(' · ');
+}
 const TITULY = /^(GM|IM|FM|CM|WGM|WIM|WFM|WCM|NM)\s+/i;
 
 function esc(t) {
@@ -420,7 +434,7 @@ function vykresliReport(rows) {
   const tb = document.getElementById('tbodyReport');
 
   if (!rows.length) {
-    tb.innerHTML = '<tr><td colspan="11" class="empty">Súpiska je prázdna – vlož ju nižšie v časti Súpiska.</td></tr>';
+    tb.innerHTML = '<tr><td colspan="12" class="empty">Súpiska je prázdna – vlož ju nižšie v časti Súpiska.</td></tr>';
     ['tTrenovali', 'tPravidelne', 'tNetrenuju', 'tBezUctu'].forEach(id =>
       document.getElementById(id).textContent = '0');
     return;
@@ -442,7 +456,7 @@ function vykresliReport(rows) {
 
     if (!r.player_id) {
       return `<tr class="bez-uctu"><td>${r.poradie}</td><td>${hrac}</td><td class="num">${elo}</td>
-        <td colspan="7" class="siva">nie je spárovaný s hráčom na platforme (pozri Súpisku nižšie)</td>
+        <td colspan="8" class="siva">nie je spárovaný s hráčom na platforme (pozri Súpisku nižšie)</td>
         <td>${stav}</td></tr>`;
     }
 
@@ -457,6 +471,11 @@ function vykresliReport(rows) {
     // Úlohy: spolu + rozdelenie
     const ulohy = r.uloh
       ? `${r.uloh}<div class="maly">klas. ${r.uloh_klasika} · zruč. ${r.uloh_zrucnosti}</div>`
+      : '<span class="siva">0</span>';
+
+    // Vizualizácia
+    const viz = r.viz_sprintov
+      ? `<span title="${esc(vizNajlepsieText(r.viz_najlepsie))}">${r.viz_sprintov}</span><div class="maly">${r.viz_minut} min</div>`
       : '<span class="siva">0</span>';
 
     // Úspešnosť
@@ -497,6 +516,7 @@ function vykresliReport(rows) {
       <td>${r.poradie}</td><td>${hrac}</td><td class="num">${elo}</td>
       <td class="dni">${bodky}</td>
       <td class="num">${ulohy}</td>
+      <td class="num">${viz}</td>
       <td class="num">${usp}</td>
       <td class="num">${eloPl}</td>
       <td class="num">${zad}</td>
@@ -617,6 +637,13 @@ async function init() {
   USER_ID = sessionStorage.getItem('user_id');
   USER_ROLE = sessionStorage.getItem('user_role') || '';
 
+  // Kto je len manažér, nemá kam ísť späť — hlavné menu ho pošle sem
+  if (USER_ROLE === 'manazer') {
+    const bm = document.getElementById('btnMenu');
+    bm.textContent = 'Odhlásiť sa';
+    bm.onclick = () => logout();
+  }
+
   try {
     await nacitajDruzstva();
   } catch (e) {
@@ -647,8 +674,11 @@ async function init() {
   sel.innerHTML = druzstva.map(d =>
     `<option value="${d.id}">${esc(d.nazov)}${d.sutaz ? ' · ' + esc(d.sutaz) : ''}${d.sezona ? ' (' + esc(d.sezona) + ')' : ''}</option>`
   ).join('');
-  let ulozene = null;
-  try { ulozene = Number(localStorage.getItem('druzstvoVybrane')); } catch (e) {}
+  // Družstvo z adresy (?druzstvo=ID, odkaz z admin panelu), inak posledné zvolené
+  let ulozene = Number(new URLSearchParams(location.search).get('druzstvo')) || null;
+  if (!druzstva.some(d => d.id === ulozene)) {
+    try { ulozene = Number(localStorage.getItem('druzstvoVybrane')); } catch (e) {}
+  }
   aktDruzstvo = druzstva.some(d => d.id === ulozene) ? ulozene : druzstva[0].id;
   sel.value = String(aktDruzstvo);
   sel.addEventListener('change', () => {
