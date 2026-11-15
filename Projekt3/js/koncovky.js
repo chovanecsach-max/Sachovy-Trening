@@ -34,7 +34,7 @@ const egPieces = s => s.Q + s.R + s.B + s.N;   // figúry bez kráľa a pešiako
 const egMinors = s => s.B + s.N;               // ľahké figúry
 const egOne    = (s, k) => s[k] === 1 && egPieces(s) === 1;   // práve jedna figúra daného druhu
 const egAnyP   = (a, b) => (a.P + b.P) >= 1;   // aspoň jedna strana má pešiaka
-const egHeavy  = (s, q, r) => s.Q === q && s.R === r && egMinors(s) === 0;  // presne q dám a r veží, bez ľahkých figúr
+const egSklad  = (s, q, r, l) => s.Q === q && s.R === r && egMinors(s) === l;  // presne q dám, r veží a l ľahkých figúr
 
 const ENDGAME_RULES = [
   // Jedna strana má len figúru bez vlastných pešiakov proti pešiakom súpera
@@ -62,9 +62,15 @@ const ENDGAME_RULES = [
   ['Zmiešané',                      (a,b)=> egPieces(a) === 1 && egPieces(b) === 1 && egAnyP(a,b) &&
                                             !['Q','R','B','N'].every(k => a[k] === b[k])],
 
-  // Ťažké figúry na oboch stranách (počet pešiakov nerozhoduje)
-  ['Dáma a veža',                   (a,b)=> egHeavy(a,1,1) && egHeavy(b,1,1) && egAnyP(a,b)],
-  ['Dáma a dve veže',               (a,b)=> egHeavy(a,1,2) && egHeavy(b,1,2) && egAnyP(a,b)],
+  // Viac figúr na každej strane (počet pešiakov nerozhoduje; ľahká figúra = strelec alebo jazdec)
+  //                                                       dámy veže ľahké      dámy veže ľahké
+  ['Dáma a veža',                                 (a,b)=> egSklad(a, 1, 1, 0) && egSklad(b, 1, 1, 0) && egAnyP(a,b)],
+  ['Dáma a dve veže',                             (a,b)=> egSklad(a, 1, 2, 0) && egSklad(b, 1, 2, 0) && egAnyP(a,b)],
+  ['Dáma, veža a ľahká figúra',                   (a,b)=> egSklad(a, 1, 1, 1) && egSklad(b, 1, 1, 1) && egAnyP(a,b)],
+  ['Veža a ľahká figúra',                         (a,b)=> egSklad(a, 0, 1, 1) && egSklad(b, 0, 1, 1) && egAnyP(a,b)],
+  ['Dve veže',                                    (a,b)=> egSklad(a, 0, 2, 0) && egSklad(b, 0, 2, 0) && egAnyP(a,b)],
+  ['Dáma, veža a ľahká figúra proti dáme a veži', (a,b)=> egSklad(a, 1, 1, 1) && egSklad(b, 1, 1, 0) && egAnyP(a,b)],
+  ['Dáma a dve veže proti dáme a veži',           (a,b)=> egSklad(a, 1, 2, 0) && egSklad(b, 1, 1, 0) && egAnyP(a,b)],
 ];
 
 // Zoznam typov vrátane zberného koša — použiteľný na naplnenie filtrov
