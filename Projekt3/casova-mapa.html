@@ -163,7 +163,7 @@ table.map td.last { text-align: center; padding: 6px 8px; border-radius: 5px; wh
 // ZNAČKA VERZIE — pri každej úprave tohto súboru prepíš dátum.
 // Vypíše sa v konzole, alebo na mobile po pridaní ?verzia do adresy.
 // Mechanika je v player.js pri funkcii verzie().
-(window.VERZIE = window.VERZIE || {})['casova-mapa.html'] = '2026-09-07';
+(window.VERZIE = window.VERZIE || {})['casova-mapa.html'] = '2026-11-15';
 
 const USER_ROLE        = sessionStorage.getItem('user_role') || '';
 const USER_ID          = sessionStorage.getItem('user_id') || '';
@@ -189,6 +189,12 @@ const CIEL_KEY = 'casovaMapaDennyCiel';
 let mapPlayers = [];
 let mapLog     = [];    // surové záznamy z training_log — prepočet bez nového dotazu
 let scaleMode  = 'limit';
+
+// Kategória každej úlohy z klasického tréningu (id úlohy → Taktika/Strategia/Koncovka).
+// Dohľadá sa raz a pamätá sa počas celej návštevy stránky — zmena denného cieľa,
+// farieb ani návrat k už zobrazenej skupine sa na ňu znova nepýta.
+// Pri zručnostiach sa nedohľadáva nič: v mape idú všetky do jedného riadku „Zručnosti".
+const katUloh = new Map();
 
 // ─── Pomôcky ────────────────────────────────────────────────────────────────
 function goHome()      { location.href = 'index.html'; }
@@ -238,13 +244,11 @@ function fmtDatum(d) {
 // splnil denný cieľ. Pravidelnosť je pri tréningu cennejšia než objem — kto
 // odtrénuje dve hodiny raz za týždeň, má rovnaký čas ako ten, kto trénuje
 // dvadsať minút denne, ale návyk si nevybuduje.
-async function spocitaj(players, log) {
+// Výpočet beží len v prehliadači — kategórie úloh sú už v katUloh (nacitajKategorie).
+function spocitaj(players, log) {
   const ciel = dennyCiel() * 60;                 // v sekundách
   const teraz = Date.now();
   const stats = {};
-
-  // Kategórie úloh — bez nich sa čas nedá rozdeliť na taktiku, stratégiu…
-  const meta = await loadAssignmentPuzzleMeta(log);
 
   players.forEach(p => {
     stats[p.id] = { posledny: null };
@@ -300,7 +304,7 @@ async function spocitaj(players, log) {
       }
 
       // Rozdelenie času a využitia limitu podľa kategórie úlohy
-      const kk = kategoriaUlohy(r, meta);
+      const kk = kategoriaUlohy(r);
       if (!c.kat[kk]) c.kat[kk] = { cas: 0, uloh: 0, vSucet: 0, vPocet: 0 };
       c.kat[kk].cas += cas;
       c.kat[kk].uloh += 1;
@@ -337,9 +341,9 @@ function farba(podiel, ziadnaAktivita) {
 // typoch — na to je slabinová mapa; tu ide o rozdelenie tréningového ČASU.
 const KAT_PORADIE = ['Taktika', 'Stratégia', 'Koncovka', 'Mix', 'Zručnosti'];
 
-function kategoriaUlohy(r, meta) {
+function kategoriaUlohy(r) {
   if (r.source === 'skill_puzzles') return 'Zručnosti';
-  const cat = meta?.puzzles?.get(r.puzzle_id)?.category;
+  const cat = katUloh.get(r.puzzle_id);
   if (!cat) return 'Mix';          // bez kategórie = mix alebo neznáma
   if (cat === 'Strategia') return 'Stratégia';
   return cat;
@@ -459,8 +463,8 @@ function prepniRozpis(id) {
 }
 
 // ─── Vykreslenie ────────────────────────────────────────────────────────────
-async function render(players, log) {
-  const stats = await spocitaj(players, log);
+function render(players, log) {
+  const stats = spocitaj(players, log);
   window._stats = stats;   // prepínač obdobia si ich vyžiada pri prekreslení
   const ciel  = dennyCiel();
 
@@ -588,6 +592,25 @@ function showBelow() {
 }
 
 // ─── Načítanie ──────────────────────────────────────────────────────────────
+// Kategórie úloh z klasického tréningu. Pýta sa len na úlohy, ktoré ešte nie sú
+// v katUloh, a len na stĺpec category — po 300 id v jednom dopyte, aby adresa
+// nebola pridlhá.
+async function nacitajKategorie(log) {
+  const chybaju = [...new Set((log || [])
+    .filter(r => r.source === 'puzzles' && r.puzzle_id != null && !katUloh.has(r.puzzle_id))
+    .map(r => r.puzzle_id))];
+  const BATCH = 300;
+  for (let i = 0; i < chybaju.length; i += BATCH) {
+    const chunk = chybaju.slice(i, i + BATCH);
+    try {
+      const rows = await sbFetch(`puzzles?id=in.(${chunk.join(',')})&select=id,category`) || [];
+      rows.forEach(p => katUloh.set(p.id, p.category));
+    } catch (e) {
+      console.error('Načítanie kategórií úloh zlyhalo:', e);
+    }
+  }
+}
+
 async function fetchPlayers(trenerFilter) {
   const cols = 'id,name,surname,profile:profiles!user_id(role)';
   let q = `players?select=${cols}&order=surname.asc,name.asc`;
@@ -618,6 +641,10 @@ async function loadMap() {
     const log = await sbFetchAll(
       `training_log?player_id=in.(${ids})&created_at=gte.${od}&select=player_id,puzzle_id,time_spent,created_at,time_limit,first_move_ms,result,source`
     );
+
+    // Kategórie dohľadať RAZ tu — render() potom už na server nesiaha,
+    // takže zmena denného cieľa či farieb je okamžitá a bez dopytov.
+    await nacitajKategorie(log);
 
     mapPlayers = players;
     mapLog     = log || [];
