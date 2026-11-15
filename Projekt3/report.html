@@ -206,8 +206,11 @@ async function build() {
     // tej istej pozície sa počíta ako jeden výsledok), source na oddelenie
     // klasického tréningu od zručností. POZOR: puzzles.id a skill_puzzles.id sa
     // prekrývajú, takže úloha je jednoznačná až párom source + puzzle_id.
+    // order=id.asc je NUTNÉ: záznamy sa sťahujú po 1000 a bez pevného poradia
+    // by databáza každú stránku vrátila inak — časť záznamov by prišla dvakrát
+    // a iné vôbec (overené na časovej mape: 37 207 riadkov, z toho len 30 330 rôznych).
     const log = await sbFetchAll(
-      `training_log?player_id=in.(${ids})&created_at=gte.${startISO}&created_at=lt.${endISO}&select=player_id,puzzle_id,source,result,time_spent,loss_reason,created_at`
+      `training_log?player_id=in.(${ids})&created_at=gte.${startISO}&created_at=lt.${endISO}&select=player_id,puzzle_id,source,result,time_spent,loss_reason,created_at&order=id.asc`
     );
 
     // 3) História ELO do konca mesiaca (na výpočet stavu pred obdobím aj po ňom)
@@ -216,7 +219,7 @@ async function build() {
     );
 
     // 4) Zadania
-    const asg = await sbFetchAll(`assignments?player_id=in.(${ids})&select=*`);
+    const asg = await sbFetchAll(`assignments?player_id=in.(${ids})&select=*&order=id.asc`);
 
     // 5) Kategórie úloh — aby sa neúspechy dali rozdeliť podľa toho, KDE vznikli.
     // Samotný počet („6 neúspešných pokusov") sa nedá použiť: šesť chýb

@@ -154,7 +154,7 @@ input[type="text"] { min-width: 190px; }
 // ZNAČKA VERZIE — pri každej úprave tohto súboru prepíš dátum.
 // Vypíše sa v konzole, alebo na mobile po pridaní ?verzia do adresy.
 // Mechanika je v player.js pri funkcii verzie().
-(window.VERZIE = window.VERZIE || {})['koncovky-mapa.html'] = '2026-09-07';
+(window.VERZIE = window.VERZIE || {})['koncovky-mapa.html'] = '2026-11-15';
 
 const USER_ROLE        = sessionStorage.getItem('user_role') || '';
 const USER_ID          = sessionStorage.getItem('user_id') || '';
@@ -328,9 +328,12 @@ async function loadMap() {
 
     // Len klasický tréning (source='puzzles') — zručnosti sem nepatria.
     // created_at treba na prepočet zvoleného obdobia priamo v prehliadači.
+    // order=id.asc je NUTNÉ: záznamy sa sťahujú po 1000 a bez pevného poradia
+    // by databáza každú stránku vrátila inak — časť záznamov by prišla dvakrát
+    // a iné vôbec (overené na časovej mape: 37 207 riadkov, z toho len 30 330 rôznych).
     const ids = players.map(p => p.id).join(',');
     const log = await sbFetchAll(
-      `training_log?source=eq.puzzles&player_id=in.(${ids})&select=player_id,puzzle_id,result,created_at`
+      `training_log?source=eq.puzzles&player_id=in.(${ids})&select=player_id,puzzle_id,result,created_at&order=id.asc`
     );
 
     mapLog = log || [];
