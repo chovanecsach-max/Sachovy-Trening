@@ -163,7 +163,7 @@ table.map td.last { text-align: center; padding: 6px 8px; border-radius: 5px; wh
 // ZNAČKA VERZIE — pri každej úprave tohto súboru prepíš dátum.
 // Vypíše sa v konzole, alebo na mobile po pridaní ?verzia do adresy.
 // Mechanika je v player.js pri funkcii verzie().
-(window.VERZIE = window.VERZIE || {})['casova-mapa.html'] = '2026-11-15';
+(window.VERZIE = window.VERZIE || {})['casova-mapa.html'] = '2026-11-15b';
 
 const USER_ROLE        = sessionStorage.getItem('user_role') || '';
 const USER_ID          = sessionStorage.getItem('user_id') || '';
@@ -187,14 +187,8 @@ const OBDOBIA = [
 const CIEL_KEY = 'casovaMapaDennyCiel';
 
 let mapPlayers = [];
-let mapLog     = [];    // surové záznamy z training_log — prepočet bez nového dotazu
+let mapStats   = null;  // hotové čísla z databázy (funkcia casova_mapa) — prekreslenie bez nového dotazu
 let scaleMode  = 'limit';
-
-// Kategória každej úlohy z klasického tréningu (id úlohy → Taktika/Strategia/Koncovka).
-// Dohľadá sa raz a pamätá sa počas celej návštevy stránky — zmena denného cieľa,
-// farieb ani návrat k už zobrazenej skupine sa na ňu znova nepýta.
-// Pri zručnostiach sa nedohľadáva nič: v mape idú všetky do jedného riadku „Zručnosti".
-const katUloh = new Map();
 
 // ─── Pomôcky ────────────────────────────────────────────────────────────────
 function goHome()      { location.href = 'index.html'; }
@@ -244,84 +238,40 @@ function fmtDatum(d) {
 // splnil denný cieľ. Pravidelnosť je pri tréningu cennejšia než objem — kto
 // odtrénuje dve hodiny raz za týždeň, má rovnaký čas ako ten, kto trénuje
 // dvadsať minút denne, ale návyk si nevybuduje.
-// Výpočet beží len v prehliadači — kategórie úloh sú už v katUloh (nacitajKategorie).
-function spocitaj(players, log) {
-  const ciel = dennyCiel() * 60;                 // v sekundách
-  const teraz = Date.now();
+//
+// Čísla počíta databáza (funkcia casova_mapa v casova_mapa.sql) a pošle len
+// výsledok — nie desaťtisíce surových záznamov z training_log. Využitie limitu
+// je v nej ODDELENE pre klasický tréning (K) a zručnosti (Z), čas do prvého
+// ťahu len z klasického tréningu — rovnako ako predtým v prehliadači.
+
+// Obdobie bez tréningu — rovnaký tvar, aký vracia databáza
+function prazdneObdobie() {
+  return { cas: 0, uloh: 0, dniAktivne: 0, dniCiel: 0,
+           vyuzitieK: 0, vyuzitieKn: 0, vyuzitieZ: 0, vyuzitieZn: 0,
+           prvySucet: 0, prvyPocet: 0, kat: {} };
+}
+
+// Jeden dopyt pre celú skupinu. Volá sa pri otvorení, zmene skupiny
+// a zmene denného cieľa (od neho závisí počet dní so splneným cieľom).
+async function nacitajStats(players) {
+  const data = await sbFetch('rpc/casova_mapa', {
+    method: 'POST',
+    body: JSON.stringify({
+      p_hraci:    players.map(p => p.id),
+      p_ciel_min: dennyCiel(),
+      p_obdobia:  OBDOBIA.map(o => o.dni),
+    }),
+  }) || [];
+
+  const zDb = new Map(data.map(h => [h.id, h]));
   const stats = {};
-
   players.forEach(p => {
-    stats[p.id] = { posledny: null };
-    OBDOBIA.forEach(o => { stats[p.id][o.key] = { cas: 0, uloh: 0, poDnoch: {},
-      // Využitie limitu sa počíta ODDELENE pre klasický tréning a zručnosti.
-      // Limity vznikajú inak (pri klasickom z hodnoty úlohy, pri zručnostiach
-      // z tabuľky podľa ELA a počtu riešení) a hráč býva v jednom rýchly
-      // a v druhom pomalý — spoločný priemer by to zamaskoval.
-      vyuzitieK: 0, vyuzitieKn: 0, vyuzitieZ: 0, vyuzitieZn: 0,
-      prvySucet: 0, prvyPocet: 0,
-      // Rozpis po kategóriách — rozbalí sa kliknutím na meno hráča.
-      // Do bunky sa nezmestí: bolo by to 12 čísel krát päť období.
-      kat: {} }; });
-  });
-
-  (log || []).forEach(r => {
-    const s = stats[r.player_id];
-    if (!s) return;
-    const t = new Date(r.created_at).getTime();
-    if (isNaN(t)) return;
-    const cas = Math.max(0, Number(r.time_spent) || 0);
-    const den = localDay(r.created_at);
-
-    if (!s.posledny || t > s.posledny) s.posledny = t;
-
+    const h = zDb.get(p.id);
+    stats[p.id] = { posledny: h ? h.posledny : null };
     OBDOBIA.forEach(o => {
-      if (teraz - t > o.dni * 86400000) return;
-      const c = s[o.key];
-      c.cas  += cas;
-      c.uloh += 1;
-      c.poDnoch[den] = (c.poDnoch[den] || 0) + cas;
-
-      // Využitie limitu — počíta sa LEN z vyriešených úloh. Pri neúspechu
-      // hráč často vyčerpá celý limit, čo by priemer skreslilo nahor.
-      const limit = Number(r.time_limit) || 0;
-      if (r.result === 'win' && limit > 0) {
-        const podiel = Math.min(1, cas / limit);
-        if (r.source === 'skill_puzzles') { c.vyuzitieZ += podiel; c.vyuzitieZn += 1; }
-        else                              { c.vyuzitieK += podiel; c.vyuzitieKn += 1; }
-      }
-      // Čas do prvého ťahu — rozvaha pred rozhodnutím. Počíta sa LEN
-      // z klasického tréningu. Pri zručnostiach má hráč na celú úlohu rádovo
-      // desiatky sekúnd a zadanie znie nájsť riešenia rýchlo, takže krátky čas
-      // tam nie je impulzívnosť, ale splnená úloha. V spoločnom priemere by
-      // každá odtrénovaná zručnosť ťahala číslo nadol a to isté číslo by
-      // u dvoch hráčov znamenalo niečo iné podľa toho, čoho odtrénovali viac.
-      if (r.source !== 'skill_puzzles') {
-        const prvy = Number(r.first_move_ms);
-        if (Number.isFinite(prvy) && prvy >= 0) {
-          c.prvySucet += prvy;
-          c.prvyPocet += 1;
-        }
-      }
-
-      // Rozdelenie času a využitia limitu podľa kategórie úlohy
-      const kk = kategoriaUlohy(r);
-      if (!c.kat[kk]) c.kat[kk] = { cas: 0, uloh: 0, vSucet: 0, vPocet: 0 };
-      c.kat[kk].cas += cas;
-      c.kat[kk].uloh += 1;
-      if (r.result === 'win' && limit > 0) {
-        c.kat[kk].vSucet += Math.min(1, cas / limit);
-        c.kat[kk].vPocet += 1;
-      }
+      stats[p.id][o.key] = Object.assign(prazdneObdobie(), h?.obdobia?.[String(o.dni)] || {});
     });
   });
-
-  // dni so splneným cieľom
-  players.forEach(p => OBDOBIA.forEach(o => {
-    const c = stats[p.id][o.key];
-    c.dniCiel = Object.values(c.poDnoch).filter(x => x >= ciel).length;
-    c.dniAktivne = Object.keys(c.poDnoch).length;
-  }));
-
   return stats;
 }
 
@@ -337,17 +287,9 @@ function farba(podiel, ziadnaAktivita) {
   return { bg: '#fee2e2', fg: '#7f1d1d', border: '1px solid #fca5a5' };
 }
 
-// Do ktorej kategórie úloha patrí. Zručnosti sa nerozpisujú po jednotlivých
+// Poradie kategórií v rozpise. Zručnosti sa nerozpisujú po jednotlivých
 // typoch — na to je slabinová mapa; tu ide o rozdelenie tréningového ČASU.
 const KAT_PORADIE = ['Taktika', 'Stratégia', 'Koncovka', 'Mix', 'Zručnosti'];
-
-function kategoriaUlohy(r) {
-  if (r.source === 'skill_puzzles') return 'Zručnosti';
-  const cat = katUloh.get(r.puzzle_id);
-  if (!cat) return 'Mix';          // bez kategórie = mix alebo neznáma
-  if (cat === 'Strategia') return 'Stratégia';
-  return cat;
-}
 
 function bunka(c, o, maxVSkupine) {
   const ciel = dennyCiel();
@@ -463,8 +405,8 @@ function prepniRozpis(id) {
 }
 
 // ─── Vykreslenie ────────────────────────────────────────────────────────────
-function render(players, log) {
-  const stats = spocitaj(players, log);
+function render(players) {
+  const stats = mapStats;
   window._stats = stats;   // prepínač obdobia si ich vyžiada pri prekreslení
   const ciel  = dennyCiel();
 
@@ -592,25 +534,6 @@ function showBelow() {
 }
 
 // ─── Načítanie ──────────────────────────────────────────────────────────────
-// Kategórie úloh z klasického tréningu. Pýta sa len na úlohy, ktoré ešte nie sú
-// v katUloh, a len na stĺpec category — po 300 id v jednom dopyte, aby adresa
-// nebola pridlhá.
-async function nacitajKategorie(log) {
-  const chybaju = [...new Set((log || [])
-    .filter(r => r.source === 'puzzles' && r.puzzle_id != null && !katUloh.has(r.puzzle_id))
-    .map(r => r.puzzle_id))];
-  const BATCH = 300;
-  for (let i = 0; i < chybaju.length; i += BATCH) {
-    const chunk = chybaju.slice(i, i + BATCH);
-    try {
-      const rows = await sbFetch(`puzzles?id=in.(${chunk.join(',')})&select=id,category`) || [];
-      rows.forEach(p => katUloh.set(p.id, p.category));
-    } catch (e) {
-      console.error('Načítanie kategórií úloh zlyhalo:', e);
-    }
-  }
-}
-
 async function fetchPlayers(trenerFilter) {
   const cols = 'id,name,surname,profile:profiles!user_id(role)';
   let q = `players?select=${cols}&order=surname.asc,name.asc`;
@@ -631,24 +554,12 @@ async function loadMap() {
     const players = await fetchPlayers(filter);
     if (!players.length) { setStatus('Táto skupina nemá žiadnych hráčov.', 'error'); return; }
 
-    // Najdlhšie zobrazované obdobie je rok — starší záznam netreba sťahovať.
-    const od = new Date(Date.now() - 366 * 86400000).toISOString();
-    const ids = players.map(p => p.id).join(',');
-
-    // Berie sa SÚČET training_log, nie players.total_time. Ten sa totiž počíta
-    // len za prvý pokus o úlohu (aby opakovanie neskresľovalo pokrok), kým tu
-    // ide o skutočne odrobený čas vrátane opakovaní.
-    const log = await sbFetchAll(
-      `training_log?player_id=in.(${ids})&created_at=gte.${od}&select=player_id,puzzle_id,time_spent,created_at,time_limit,first_move_ms,result,source`
-    );
-
-    // Kategórie dohľadať RAZ tu — render() potom už na server nesiaha,
-    // takže zmena denného cieľa či farieb je okamžitá a bez dopytov.
-    await nacitajKategorie(log);
-
+    // Berie sa SÚČET training_log (v databáze), nie players.total_time. Ten sa
+    // totiž počíta len za prvý pokus o úlohu (aby opakovanie neskresľovalo
+    // pokrok), kým tu ide o skutočne odrobený čas vrátane opakovaní.
+    mapStats   = await nacitajStats(players);
     mapPlayers = players;
-    mapLog     = log || [];
-    render(mapPlayers, mapLog);
+    render(mapPlayers);
   } catch (e) {
     console.error(e);
     setStatus('Chyba pri načítaní: ' + e.message, 'error');
@@ -672,9 +583,22 @@ async function init() {
   const ulozeny = localStorage.getItem(CIEL_KEY);
   if (ulozeny) document.getElementById('dennyCiel').value = ulozeny;
 
-  document.getElementById('dennyCiel').addEventListener('change', () => {
+  // Zmena cieľa mení „dni so splneným cieľom" — tie počíta databáza, preto
+  // jeden malý dopyt. Pri rýchlom klikaní na šípky sa vykreslí len posledný.
+  let poradieCiela = 0;
+  document.getElementById('dennyCiel').addEventListener('change', async () => {
     localStorage.setItem(CIEL_KEY, String(dennyCiel()));
-    if (mapPlayers.length) render(mapPlayers, mapLog);
+    if (!mapPlayers.length) return;
+    const moje = ++poradieCiela;
+    try {
+      const stats = await nacitajStats(mapPlayers);
+      if (moje !== poradieCiela) return;
+      mapStats = stats;
+      render(mapPlayers);
+    } catch (e) {
+      console.error(e);
+      setStatus('Chyba pri prepočte: ' + e.message, 'error');
+    }
   });
 
   document.querySelectorAll('#scaleSeg button').forEach(btn => {
@@ -682,7 +606,7 @@ async function init() {
       document.querySelectorAll('#scaleSeg button').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       scaleMode = btn.dataset.scale;
-      if (mapPlayers.length) render(mapPlayers, mapLog);
+      if (mapStats) render(mapPlayers);
     });
   });
 
