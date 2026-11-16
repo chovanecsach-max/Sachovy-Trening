@@ -995,8 +995,17 @@ async function loadKoncovkyTypes() {
   if (koncovkyLoaded) return;
   koncovkyLoaded = true;
   try {
-    const rows = await sbFetch('puzzles?category=eq.Koncovka&select=endgame_type');
-    if (!rows || !rows.length) return;
+    // Po dávkach 1000 — Supabase vráti v jednej odpovedi najviac 1000 riadkov,
+    // bez stránkovania by počty boli len z prvej tisícky koncoviek.
+    const BATCH = 1000;
+    let rows = [];
+    for (let offset = 0; ; offset += BATCH) {
+      const d = await sbFetch(`puzzles?category=eq.Koncovka&select=endgame_type&order=id.asc&limit=${BATCH}&offset=${offset}`);
+      if (!d || !d.length) break;
+      rows = rows.concat(d);
+      if (d.length < BATCH) break;
+    }
+    if (!rows.length) return;
     const counts = {};
     rows.forEach(r => { const t = r.endgame_type || 'Neklasifikované'; counts[t] = (counts[t] || 0) + 1; });
     const menu = document.getElementById('koncovkySubmenu');
