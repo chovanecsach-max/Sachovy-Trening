@@ -18,10 +18,20 @@ async function getExcludedPuzzleIds(playerId) {
     // POZOR na source=eq.puzzles: puzzles.id aj skill_puzzles.id sú int4 od 1,
     // takže id sa medzi tabuľkami prekrývajú. Bez tohto filtra by vyriešená
     // zručnosť č. N vylúčila z klasického tréningu úlohu č. N.
-    const data = await sbFetch(
-      `training_log?player_id=eq.${playerId}&source=eq.puzzles&select=puzzle_id,result,created_at&order=created_at.desc`
-    );
-    if (!data) return [];
+    // Po dávkach 1000 — Supabase vráti v jednej odpovedi najviac 1000 riadkov.
+    // Bez stránkovania by hráč s viac ako 1000 pokusmi dostával znova staršie,
+    // už vyriešené úlohy (do výberu by sa započítalo len posledných 1000).
+    const BATCH = 1000;
+    let data = [];
+    for (let offset = 0; ; offset += BATCH) {
+      const d = await sbFetch(
+        `training_log?player_id=eq.${playerId}&source=eq.puzzles&select=puzzle_id,result,created_at&order=created_at.desc&limit=${BATCH}&offset=${offset}`
+      );
+      if (!d || !d.length) break;
+      data = data.concat(d);
+      if (d.length < BATCH) break;
+    }
+    if (!data.length) return [];
 
     const lastByPuzzle = new Map();   // puzzle_id → { result, created_at } (len najnovší záznam)
     for (const row of data) {
