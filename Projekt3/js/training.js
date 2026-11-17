@@ -87,11 +87,16 @@ let poslednyDovodVyberu = null;
 //
 // Keď server zlyhá (výpadok siete, funkcia ešte nie je nasadená), použije sa
 // pôvodný výber v prehliadači — tréning sa kvôli tomu nezastaví.
-async function vyberUlohuNaServeri(mode, endgame) {
+async function vyberUlohuNaServeri(mode, endgame, motiv) {
   return await sbFetch('rpc/vyber_ulohu', {
     method: 'POST',
-    body: JSON.stringify({ p_mode: mode || null, p_endgame: endgame || null })
+    body: JSON.stringify({ p_mode: mode || null, p_endgame: endgame || null, p_motiv: motiv || null })
   });
+}
+
+// Taktický motív z adresy (?motiv=Vidlička) — platí len v režime taktika
+function getTrainingMotiv() {
+  return new URLSearchParams(window.location.search).get("motiv");
 }
 
 // Riadok z databázy (snake_case) → objekt, s ktorým pracuje training.html
@@ -104,6 +109,7 @@ function _objektUlohy(p) {
     prompt: p.prompt,
     category: p.category,
     endgame_type: p.endgame_type,
+    motivy: p.motivy,
     elo: p.elo,
     time: p.time,
     solutionTree: p.solution_tree
@@ -114,10 +120,11 @@ async function pickPuzzleForPlayer(player, puzzles) {
   poslednyDovodVyberu = null;
   const mode = getTrainingMode();
   const endgame = new URLSearchParams(window.location.search).get("endgame");
+  const motiv = getTrainingMotiv();
 
   let r;
   try {
-    r = await vyberUlohuNaServeri(mode, endgame);
+    r = await vyberUlohuNaServeri(mode, endgame, motiv);
   } catch (e) {
     // Vypršaný prístup: záložný výber by úlohu síce ponúkol, ale výsledok by
     // server aj tak nezapísal. Povie sa to hneď a jasne.
@@ -161,6 +168,11 @@ async function pickPuzzleVPrehliadaci(player, puzzles) {
   let filtered = puzzles;
   if (mode === "taktika") {
     filtered = puzzles.filter(p => p.category === "Taktika");
+    // Nepovinne len jeden motív (?motiv=Vidlička) — rovnako ako typ koncovky
+    const motiv = getTrainingMotiv();
+    if (motiv) {
+      filtered = filtered.filter(p => Array.isArray(p.motivy) && p.motivy.includes(motiv));
+    }
   } else if (mode === "strategia") {
     filtered = puzzles.filter(p => p.category === "Strategia");
   } else if (mode === "koncovka") {
@@ -224,13 +236,13 @@ async function loadPuzzlesFromSupabase() {
     // Len pre záložný výber (pickPuzzleVPrehliadaci) — bežne vyberá server.
     // Načítavaj po dávkach 1000 — Supabase Free má limit 1000 riadkov/request.
     // Sťahujú sa len ľahké stĺpce potrebné na výber úlohy (id, category, elo,
-    // endgame_type) — plný záznam s riešením sa doťahuje len pre vybranú úlohu.
+    // endgame_type, motivy) — plný záznam s riešením sa doťahuje len pre vybranú úlohu.
     const BATCH = 1000;
     let allData = [];
     let offset = 0;
     while (true) {
       const data = await sbFetch(
-        `puzzles?select=id,category,elo,endgame_type&order=id.asc&limit=${BATCH}&offset=${offset}`
+        `puzzles?select=id,category,elo,endgame_type,motivy&order=id.asc&limit=${BATCH}&offset=${offset}`
       );
       if (!data || !data.length) break;
       allData = allData.concat(data);
