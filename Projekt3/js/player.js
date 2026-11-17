@@ -441,7 +441,7 @@ async function loadAssignmentPuzzleMeta(logRows) {
     }
   }
 
-  await fetchByIds('puzzles', idsOf('puzzles'), 'id,category,endgame_type',
+  await fetchByIds('puzzles', idsOf('puzzles'), 'id,category,endgame_type,motivy',
     p => meta.puzzles.set(p.id, p));
   await fetchByIds('skill_puzzles', idsOf('skill_puzzles'), 'id,skill_type',
     p => meta.skills.set(p.id, p.skill_type));
@@ -452,9 +452,12 @@ async function loadAssignmentPuzzleMeta(logRows) {
 // Počet úloh vyriešených na prvý pokus po zadaní.
 // logRows musia byť zoradené vzostupne podľa created_at (tak ich vracia
 // loadAssignmentLog) — prvý nájdený záznam o úlohe je ten rozhodujúci.
+// Zadanie s motívom (assignment.motiv, napr. 'Vidlička') počíta len úlohy
+// taktiky s týmto motívom — rovnako ako typ koncovky pri koncovkách.
 function countFirstAttemptWins(logRows, assignment, meta) {
   const since        = new Date(assignment.created_at);
   const wantEndgame  = assignment.endgame_type || null;
+  const wantMotiv    = assignment.motiv || null;
   const wantCategory = BASIC_ASSIGNMENT_CATEGORY[assignment.skill] || null;
 
   const firstByPuzzle = new Map();
@@ -468,6 +471,10 @@ function countFirstAttemptWins(logRows, assignment, meta) {
       if (r.source !== 'puzzles') continue;
       const p = meta.puzzles.get(r.puzzle_id);
       if (!p || (p.endgame_type || 'Neklasifikované') !== wantEndgame) continue;
+    } else if (wantMotiv) {
+      if (r.source !== 'puzzles') continue;
+      const p = meta.puzzles.get(r.puzzle_id);
+      if (!p || p.category !== 'Taktika' || !Array.isArray(p.motivy) || !p.motivy.includes(wantMotiv)) continue;
     } else if (wantCategory) {
       if (r.source !== 'puzzles') continue;
       const p = meta.puzzles.get(r.puzzle_id);
