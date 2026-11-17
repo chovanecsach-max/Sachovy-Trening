@@ -518,12 +518,19 @@ function showBelow() {
   const d = new Date(); d.setDate(d.getDate() + 14);
   const defDeadline = localDay(d);
 
+  const pk = podkategoriaPre(col);
+  const podkatHtml = pk ? `
+        <div class="filter-field">
+          <label>${pk.nadpis}</label>
+          <select id="asgSub"><option value="">${pk.vsetky}</option></select>
+        </div>` : '';
+
   el.innerHTML = `
     <div class="below-head">${col.full} — pod prahom ${thr}: ${below.length} z ${mapPlayers.length}</div>
     <div class="below-tools"><a onclick="checkAll(true)">Označiť všetkých</a><a onclick="checkAll(false)">Zrušiť označenie</a></div>
     <ul class="below-list">${items}</ul>
     <div class="assign-box">
-      <div class="filter-row">
+      <div class="filter-row">${podkatHtml}
         <div class="filter-field">
           <label>Typ cieľa</label>
           <select id="asgType">
@@ -555,10 +562,71 @@ function showBelow() {
     v.value = (this.value === 'count') ? 20 : thr;
     v.step  = (this.value === 'count') ? 5 : 10;
   };
+
+  if (pk) pripravPodkategoriu(pk);
 }
 
 function checkAll(state) {
   document.querySelectorAll('.pchk').forEach(b => { b.checked = state; });
+}
+
+// ─── Podkategória zadania: motív taktiky / typ koncovky ─────────────────────
+// Pri základných kategóriách sa dá zadať aj len jeden motív taktiky (Vidlička,
+// Mat 2. ťahom, …) alebo jeden typ koncovky (Vežové, …). Cieľ je vtedy vždy
+// počet úloh — vlastné ELO pre motív ani typ koncovky neexistuje.
+// Zoznamy s počtami dodá server jednou požiadavkou (pocty_motivov,
+// pocty_typov_koncoviek), načítajú sa až keď treba a len raz.
+const PODKATEGORIE = {
+  elo_taktika:  { druh: 'motiv', nadpis: 'Motív',        vsetky: 'Všetky taktiky',  rpc: 'pocty_motivov',         kluc: 'motiv' },
+  elo_koncovka: { druh: 'typ',   nadpis: 'Typ koncovky', vsetky: 'Všetky koncovky', rpc: 'pocty_typov_koncoviek', kluc: 'typ' }
+};
+const _podkategorie = {};
+
+function podkategoriaPre(col) {
+  return (colSet === 'basic' && col && PODKATEGORIE[col.field]) || null;
+}
+
+function nacitajPodkategorie(pk) {
+  if (!_podkategorie[pk.rpc]) {
+    _podkategorie[pk.rpc] = sbFetch('rpc/' + pk.rpc, { method: 'POST', body: '{}' })
+      .then(d => {
+        const zoznam = (Array.isArray(d) ? d : []).filter(x => x && x[pk.kluc] && x.pocet > 0);
+        // Maty za motívmi v poradí 1., 2., 3. ťahom — rovnako ako v menu Taktika
+        const jeMat = x => /^Mat \d/.test(x[pk.kluc]);
+        return zoznam.filter(x => !jeMat(x)).concat(
+          zoznam.filter(jeMat).sort((a, b) => a[pk.kluc].localeCompare(b[pk.kluc], 'sk', { numeric: true })));
+      })
+      .catch(e => {
+        console.warn('Podkategórie sa nenačítali:', e);
+        delete _podkategorie[pk.rpc];      // pri ďalšom otvorení skús znova
+        return [];
+      });
+  }
+  return _podkategorie[pk.rpc];
+}
+
+// Naplní výber podkategórie a prepojí ho s typom cieľa
+async function pripravPodkategoriu(pk) {
+  const sel = document.getElementById('asgSub');
+  if (!sel) return;
+  const zoznam = await nacitajPodkategorie(pk);
+  if (document.getElementById('asgSub') !== sel) return;   // panel sa medzitým prekreslil
+  zoznam.forEach(x => {
+    const o = document.createElement('option');
+    o.value = x[pk.kluc];
+    o.textContent = `${x[pk.kluc]} (${x.pocet})`;
+    sel.appendChild(o);
+  });
+  sel.onchange = function () {
+    const typ = document.getElementById('asgType');
+    const elo = typ.querySelector('option[value="elo"]');
+    if (this.value) {
+      elo.disabled = true;
+      if (typ.value !== 'count') { typ.value = 'count'; typ.onchange(); }
+    } else {
+      elo.disabled = false;
+    }
+  };
 }
 
 function setAsgStatus(text, type) {
@@ -581,15 +649,25 @@ async function createAssignments() {
   const value = Number(document.getElementById('asgValue').value);
   const dl    = document.getElementById('asgDeadline').value || null;
   const note  = (document.getElementById('asgNote').value || '').trim() || null;
+  const pk    = podkategoriaPre(col);
+  const subEl = document.getElementById('asgSub');
+  const sub   = (pk && subEl) ? subEl.value : '';
 
+  if (sub && type !== 'count')                 { setAsgStatus('Pri motíve alebo type koncovky môže byť cieľ len počet úloh.', 'err'); return; }
   if (!value || value <= 0)                    { setAsgStatus('Zadaj platnú hodnotu cieľa.', 'err'); return; }
   if (type === 'elo'   && (value < 800 || value > 2600)) { setAsgStatus('ELO cieľ musí byť medzi 800 a 2600.', 'err'); return; }
   if (type === 'count' && value > 500)         { setAsgStatus('Počet úloh je príliš vysoký (max 500).', 'err'); return; }
 
+  // Motív taktiky:  skill 'taktika' + motiv
+  // Typ koncovky:    skill prázdne + endgame_type (rovnako ako z Mapy koncoviek)
+  // Všetky kľúče musia byť v každom riadku rovnaké — PostgREST pri hromadnom
+  // vkladaní berie stĺpce z prvého riadku.
   const rows = boxes.map(b => ({
     player_id:    Number(b.value),
     trener_id:    USER_ID,
-    skill:        skill,
+    skill:        (sub && pk.druh === 'typ') ? null : skill,
+    motiv:        (sub && pk.druh === 'motiv') ? sub : null,
+    endgame_type: (sub && pk.druh === 'typ') ? sub : null,
     target_type:  type,
     target_value: value,
     baseline_elo: Number(b.dataset.val),
@@ -607,7 +685,7 @@ async function createAssignments() {
     const cielText = (type === 'elo')
       ? `dosiahnuť ELO ${value}`
       : `vyriešiť ${value} úloh`;
-    setAsgStatus(`✅ Zadané ${rows.length} hráčom — ${col.full}: ${cielText}${dl ? ', termín ' + dl : ''}.`, 'ok');
+    setAsgStatus(`✅ Zadané ${rows.length} hráčom — ${col.full}${sub ? ' — ' + sub : ''}: ${cielText}${dl ? ', termín ' + dl : ''}.`, 'ok');
   } catch (e) {
     setAsgStatus('Chyba pri zadávaní: ' + e.message, 'err');
   }

@@ -121,7 +121,7 @@ tr.late td { background: #fffbfa; }
 // ZNAČKA VERZIE — pri každej úprave tohto súboru prepíš dátum.
 // Vypíše sa v konzole, alebo na mobile po pridaní ?verzia do adresy.
 // Mechanika je v player.js pri funkcii verzie().
-(window.VERZIE = window.VERZIE || {})['zadania-prehlad.html'] = '2026-10-07';
+(window.VERZIE = window.VERZIE || {})['zadania-prehlad.html'] = '2026-11-17';
 
 const USER_ROLE        = sessionStorage.getItem('user_role') || '';
 const USER_NICK        = sessionStorage.getItem('user_nick') || sessionStorage.getItem('user_name') || '';
@@ -146,6 +146,17 @@ const ELO_FIELDS = [...new Set(Object.keys(SKILL_NAMES).map(k => 'elo_' + k))];
 Object.assign(SKILL_NAMES, VizZadania.NAZVY_ZRUCNOSTI);
 
 let allRows = [];   // { a, player, prog, state }
+
+// Čo zadanie trénuje — kľúč pre filter a názov na zobrazenie.
+// Typ koncovky a motív taktiky sú samostatné položky filtra.
+function klucZadania(a) {
+  return a.endgame_type || (a.motiv ? 'motiv:' + a.motiv : a.skill);
+}
+function nazovZadania(a) {
+  if (a.endgame_type) return '♚ ' + a.endgame_type;
+  if (a.motiv)        return '⚔ Taktika — ' + a.motiv;
+  return SKILL_NAMES[a.skill] || a.skill;
+}
 
 function goHome() { location.href = 'index.html'; }
 function goMap()  { location.href = 'slabinova-mapa.html'; }
@@ -260,9 +271,11 @@ async function load() {
     // Naplň filter zručností podľa toho, čo sa reálne vyskytuje
     const sk = document.getElementById('fSkill');
     if (sk.options.length === 1) {
-      [...new Set(allRows.map(x => x.a.endgame_type || x.a.skill))].forEach(k => {
+      const nazvy = new Map();
+      allRows.forEach(x => { const k = klucZadania(x.a); if (!nazvy.has(k)) nazvy.set(k, nazovZadania(x.a)); });
+      nazvy.forEach((nazov, k) => {
         const o = document.createElement('option');
-        o.value = k; o.textContent = SKILL_NAMES[k] || k;
+        o.value = k; o.textContent = nazov;
         sk.appendChild(o);
       });
     }
@@ -279,13 +292,13 @@ function render() {
   const fS = document.getElementById('fStatus').value;
   const fK = document.getElementById('fSkill').value;
 
-  let rows = allRows.filter(x => !fK || (x.a.endgame_type || x.a.skill) === fK);
+  let rows = allRows.filter(x => !fK || klucZadania(x.a) === fK);
   if (fS === 'open') rows = rows.filter(x => !x.done);
   if (fS === 'done') rows = rows.filter(x =>  x.done);
   if (fS === 'late') rows = rows.filter(x =>  x.late);
 
   // Súhrn počítame zo všetkých (po filtri zručnosti), nie z filtra stavu
-  const base = allRows.filter(x => !fK || (x.a.endgame_type || x.a.skill) === fK);
+  const base = allRows.filter(x => !fK || klucZadania(x.a) === fK);
   document.getElementById('tRun').textContent  = base.filter(x => !x.done).length;
   document.getElementById('tLate').textContent = base.filter(x =>  x.late).length;
   document.getElementById('tDone').textContent = base.filter(x =>  x.done).length;
@@ -332,7 +345,7 @@ function render() {
     }
     return `<tr class="${cls}">
       <td>${escapeHtml(nm)}</td>
-      <td>${a.endgame_type ? '♚ ' + a.endgame_type : (SKILL_NAMES[a.skill] || a.skill)}</td>
+      <td>${escapeHtml(nazovZadania(a))}</td>
       <td>${goal}</td>
       <td><div class="bar"><span class="${bcls}" style="width:${Math.round(x.prog.pct * 100)}%"></span></div>
           <div class="prog-txt">${x.prog.txt}</div></td>

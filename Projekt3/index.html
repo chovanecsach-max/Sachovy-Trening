@@ -948,7 +948,7 @@ async function loadAssignmentBadge() {
   try {
     const player = await getCurrentPlayer();
     if (!player) return;
-    const rows = await sbFetch(`assignments?player_id=eq.${player.id}&select=skill,endgame_type,target_type,target_value,created_at,completed_at,viz_dlzka,viz_min_skore`);
+    const rows = await sbFetch(`assignments?player_id=eq.${player.id}&select=skill,endgame_type,motiv,target_type,target_value,created_at,completed_at,viz_dlzka,viz_min_skore`);
     if (!rows || !rows.length) return;
 
     // Má aspoň jedno zadanie — zobraz tlačidlo aj trénerovi/adminovi

@@ -82,7 +82,7 @@ button { padding: 10px 16px; border: none; border-radius: 10px; cursor: pointer;
 <script src="js/vizualizacia-zadania.js"></script>
 <script>
 // ZNAČKA VERZIE — pri každej úprave tohto súboru prepíš dátum.
-(window.VERZIE = window.VERZIE || {})['zadania.html'] = '2026-10-07';
+(window.VERZIE = window.VERZIE || {})['zadania.html'] = '2026-11-17';
 
 // Slovenské názvy zručností (kľúč = hodnota v assignments.skill)
 const SKILL_NAMES = {
@@ -104,6 +104,7 @@ function goHome()  { location.href = 'index.html'; }
 function goTrain(a) {
   if (VizZadania.je(a)) { location.href = VizZadania.odkaz(a); return; }   // rovno do správneho šprintu
   if (a.endgame_type) { location.href = 'training.html?mode=koncovka&endgame=' + encodeURIComponent(a.endgame_type); return; }
+  if (a.motiv)        { location.href = 'training.html?mode=taktika&motiv=' + encodeURIComponent(a.motiv); return; }
   location.href = BASIC_MODES.includes(a.skill)
     ? 'training.html?mode=' + a.skill
     : 'skills.html?type=' + a.skill;
@@ -130,7 +131,8 @@ function clamp01(x) { return Math.max(0, Math.min(1, x)); }
 // 'elo'   → podľa aktuálneho players.elo_<zručnosť> oproti baseline a cieľu
 // 'count' → podľa počtu úloh vyriešených NA PRVÝ POKUS po zadaní
 //           (opakované riešenie ani výhra po chybe sa nepočítajú)
-// Koncovky fungujú rovnako, len sa filtrujú podľa endgame_type.
+// Koncovky fungujú rovnako, len sa filtrujú podľa endgame_type,
+// taktika podľa motívu (motiv) — vtedy je cieľ vždy počet úloh.
 // 'sprint' → vizualizácia: počet šprintov s aspoň Y bodmi po zadaní
 function computeProgress(a, player, logRows, meta, sprinty) {
   if (VizZadania.je(a)) {
@@ -187,7 +189,9 @@ function renderCard(a, prog) {
 
   return `<div class="asg ${cls}">
     <div class="asg-top">
-      <span class="asg-skill">${escapeHtml(a.endgame_type ? '♚ ' + a.endgame_type : (SKILL_NAMES[a.skill] || a.skill))}</span>
+      <span class="asg-skill">${escapeHtml(a.endgame_type ? '♚ ' + a.endgame_type
+                                          : a.motiv ? '⚔ Taktika — ' + a.motiv
+                                          : (SKILL_NAMES[a.skill] || a.skill))}</span>
       ${badge}
     </div>
     <div class="asg-goal">${prog.text}</div>
@@ -195,7 +199,7 @@ function renderCard(a, prog) {
     ${a.note ? `<div class="asg-note">💬 ${escapeHtml(a.note)}</div>` : ''}
     <div class="asg-meta">
       <span>${dl}</span>
-      ${prog.done ? '' : `<button class="train-btn" onclick='goTrain(${JSON.stringify({skill:a.skill,endgame_type:a.endgame_type,
+      ${prog.done ? '' : `<button class="train-btn" onclick='goTrain(${JSON.stringify({skill:a.skill,endgame_type:a.endgame_type,motiv:a.motiv,
           target_type:a.target_type,target_value:a.target_value,viz_dlzka:a.viz_dlzka,viz_min_skore:a.viz_min_skore})})'>Trénovať →</button>`}
     </div>
   </div>`;
