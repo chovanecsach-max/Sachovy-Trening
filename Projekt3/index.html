@@ -190,6 +190,7 @@ body {
 /* Podmenu trénera má len 3 položky — nech sa netiahnu cez celú šírku */
 .submenu-trener { grid-template-columns: repeat(4, 1fr); }
 .submenu-koncovky { grid-template-columns: repeat(4, 1fr); }
+.submenu-taktika { grid-template-columns: repeat(4, 1fr); }
 .submenu-hry { grid-template-columns: repeat(4, 1fr); }
 .submenu-knihy { grid-template-columns: repeat(4, 1fr); }
 .sub-pozn { display: block; font-size: 10.5px; color: #94a3b8; font-weight: 400; margin-top: 3px; }
@@ -309,6 +310,7 @@ body {
   .submenu { grid-template-columns: repeat(5, 1fr); gap: 8px; padding: 10px; }
   .submenu-trener { grid-template-columns: repeat(3, 1fr); }
   .submenu-koncovky { grid-template-columns: repeat(2, 1fr); }
+  .submenu-taktika { grid-template-columns: repeat(2, 1fr); }
   .submenu-hry { grid-template-columns: repeat(2, 1fr); }
   .submenu-knihy { grid-template-columns: repeat(2, 1fr); }
   .sub-btn { padding: 12px 4px; font-size: 11px; gap: 6px; min-height: 74px;
@@ -324,6 +326,7 @@ body {
   .submenu { grid-template-columns: repeat(4, 1fr); }
   .submenu-trener { grid-template-columns: repeat(3, 1fr); }
   .submenu-koncovky { grid-template-columns: repeat(2, 1fr); }
+  .submenu-taktika { grid-template-columns: repeat(2, 1fr); }
   .submenu-hry { grid-template-columns: repeat(2, 1fr); }
   .submenu-knihy { grid-template-columns: repeat(2, 1fr); }
   .leaderboards { grid-template-columns: 1fr; }
@@ -409,7 +412,7 @@ body {
       <div class="nav-icon i-viz">👁️</div>
       Vizualizácia
     </button>
-    <button class="nav-btn" onclick="goTraining('taktika')">
+    <button class="nav-btn" id="btnTaktika" onclick="toggleTaktikaMenu()">
       <div class="nav-icon i-taktika">⚔</div>
       Taktika
     </button>
@@ -495,6 +498,13 @@ body {
   <div id="koncovkySubmenu" class="submenu submenu-koncovky">
     <button class="sub-btn" onclick="goKoncovka('')">
       <div class="sub-icon i-koncovka">♚</div>Všetky koncovky
+    </button>
+  </div>
+
+  <!-- Submenu taktiky — motívy a maty; napĺňa sa až pri prvom otvorení -->
+  <div id="taktikaSubmenu" class="submenu submenu-taktika">
+    <button class="sub-btn" onclick="goTaktika('')">
+      <div class="sub-icon i-taktika">⚔</div>Všetky taktiky
     </button>
   </div>
 
@@ -1024,11 +1034,76 @@ async function loadKoncovkyTypes() {
   }
 }
 
+// ─── Taktika podľa motívov ──────────────────────────────────────────────────
+// Rovnaký princíp ako typy koncoviek. Počty dodá server (pocty_motivov),
+// takže sa nesťahuje zoznam úloh. Kým žiadna úloha nemá motív (alebo keby
+// server neodpovedal), dlaždica Taktika ide rovno do tréningu ako predtým.
+function goTaktika(motiv) {
+  location.href = "training.html?mode=taktika" + (motiv ? "&motiv=" + encodeURIComponent(motiv) : "");
+}
+
+// Maty idú za motívmi v poradí 1., 2., 3. ťahom; motívy od najväčšieho počtu
+function jeMat(m) { return /^Mat \d/.test(m); }
+
+let taktikaMotivy = null;   // null = ešte nenačítané, [] = žiadne motívy
+let _taktikaNacitanie = null;
+function loadTaktikaMotivy() {
+  // Jedno načítanie aj pri dvojkliku — inak by sa dlaždice pridali dvakrát
+  if (!_taktikaNacitanie) _taktikaNacitanie = _nacitajTaktikaMotivy();
+  return _taktikaNacitanie;
+}
+async function _nacitajTaktikaMotivy() {
+  try {
+    const d = await sbFetch('rpc/pocty_motivov', { method: 'POST', body: '{}' });
+    taktikaMotivy = Array.isArray(d) ? d.filter(x => x && x.motiv && x.pocet > 0) : [];
+  } catch (e) {
+    console.warn('Motívy taktiky sa nenačítali:', e);
+    taktikaMotivy = [];
+  }
+  const motivy = taktikaMotivy.filter(x => !jeMat(x.motiv));
+  const maty   = taktikaMotivy.filter(x => jeMat(x.motiv))
+                              .sort((a, b) => a.motiv.localeCompare(b.motiv, 'sk', { numeric: true }));
+  const menu = document.getElementById('taktikaSubmenu');
+  motivy.concat(maty).forEach(x => {
+    const b = document.createElement('button');
+    b.className = 'sub-btn';
+    b.onclick = () => goTaktika(x.motiv);
+    const ikona = document.createElement('div');
+    ikona.className = 'sub-icon i-taktika';
+    ikona.textContent = jeMat(x.motiv) ? '#' : '⚔';
+    const pocet = document.createElement('span');
+    pocet.className = 'sub-count';
+    pocet.textContent = x.pocet;
+    b.append(ikona, document.createTextNode(x.motiv), pocet);
+    menu.appendChild(b);
+  });
+  return taktikaMotivy;
+}
+
+async function toggleTaktikaMenu() {
+  const menu = document.getElementById('taktikaSubmenu');
+  const btn  = document.getElementById('btnTaktika');
+  const isOpen = menu.classList.contains('open');
+  closeSkillsMenu(); closeTrenerMenu(); closeHryMenu(); closeKnihyMenu(); closeKoncovkyMenu();
+  if (isOpen) { closeTaktikaMenu(); return; }
+  const motivy = await loadTaktikaMotivy();
+  if (!motivy.length) { goTraining('taktika'); return; }   // bez motívov ako predtým
+  menu.classList.add('open');
+  btn.classList.add('active');
+}
+
+function closeTaktikaMenu() {
+  const m = document.getElementById('taktikaSubmenu');
+  const b = document.getElementById('btnTaktika');
+  if (m) m.classList.remove('open');
+  if (b) b.classList.remove('active');
+}
+
 function toggleKoncovkyMenu() {
   const menu = document.getElementById('koncovkySubmenu');
   const btn  = document.getElementById('btnKoncovky');
   const isOpen = menu.classList.contains('open');
-  closeSkillsMenu(); closeTrenerMenu(); closeHryMenu(); closeKnihyMenu();
+  closeSkillsMenu(); closeTrenerMenu(); closeHryMenu(); closeKnihyMenu(); closeTaktikaMenu();
   menu.classList.toggle('open');
   btn.classList.toggle('active', !isOpen);
   if (!isOpen) loadKoncovkyTypes();
@@ -1045,7 +1120,7 @@ function toggleSkillsMenu() {
   const menu = document.getElementById('skillsSubmenu');
   const btn  = document.getElementById('btnSkills');
   const isOpen = menu.classList.contains('open');
-  closeTrenerMenu(); closeKoncovkyMenu(); closeHryMenu(); closeKnihyMenu();
+  closeTrenerMenu(); closeKoncovkyMenu(); closeHryMenu(); closeKnihyMenu(); closeTaktikaMenu();
   menu.classList.toggle('open');
   btn.classList.toggle('active', !isOpen);
 }
@@ -1054,7 +1129,7 @@ function toggleTrenerMenu() {
   const menu = document.getElementById('trenerSubmenu');
   const btn  = document.getElementById('trenerBtn');
   const isOpen = menu.classList.contains('open');
-  closeSkillsMenu(); closeKoncovkyMenu(); closeHryMenu(); closeKnihyMenu();
+  closeSkillsMenu(); closeKoncovkyMenu(); closeHryMenu(); closeKnihyMenu(); closeTaktikaMenu();
   menu.classList.toggle('open');
   btn.classList.toggle('active', !isOpen);
 }
@@ -1068,7 +1143,7 @@ function toggleHryMenu() {
   const menu = document.getElementById('hrySubmenu');
   const btn  = document.getElementById('btnHry');
   const isOpen = menu.classList.contains('open');
-  closeSkillsMenu(); closeKoncovkyMenu(); closeTrenerMenu(); closeKnihyMenu();
+  closeSkillsMenu(); closeKoncovkyMenu(); closeTrenerMenu(); closeKnihyMenu(); closeTaktikaMenu();
   menu.classList.toggle('open');
   btn.classList.toggle('active', !isOpen);
 }
@@ -1084,7 +1159,7 @@ function toggleKnihyMenu() {
   const menu = document.getElementById('knihySubmenu');
   const btn  = document.getElementById('btnKnihy');
   const isOpen = menu.classList.contains('open');
-  closeSkillsMenu(); closeKoncovkyMenu(); closeTrenerMenu(); closeHryMenu();
+  closeSkillsMenu(); closeKoncovkyMenu(); closeTrenerMenu(); closeHryMenu(); closeTaktikaMenu();
   menu.classList.toggle('open');
   btn.classList.toggle('active', !isOpen);
 }

@@ -1380,9 +1380,16 @@ function startPuzzleTimer(seconds) {
 function inferCategory(puzzle) {
   if (puzzle.category) {
     // Pri koncovkách doplň aj typ podľa materiálu (napr. "Koncovka — Vežové")
-    return (puzzle.category === 'Koncovka' && puzzle.endgame_type)
-      ? `${puzzle.category} — ${puzzle.endgame_type}`
-      : puzzle.category;
+    if (puzzle.category === 'Koncovka' && puzzle.endgame_type) {
+      return `${puzzle.category} — ${puzzle.endgame_type}`;
+    }
+    // Pri tréningu podľa motívu ukáž zvolený motív (napr. "Taktika — Vidlička").
+    // Vo „Všetkých taktikách" sa motív zámerne neprezrádza.
+    const motiv = new URLSearchParams(window.location.search).get('motiv');
+    if (puzzle.category === 'Taktika' && motiv) {
+      return `${puzzle.category} — ${motiv}`;
+    }
+    return puzzle.category;
   }
 
   const prompt = (puzzle.prompt || '').toLowerCase();
@@ -2428,7 +2435,9 @@ function oznamZiadnaUloha() {
   if (poslednyDovodVyberu === 'platnost') return;
   const mode = getTrainingMode();
   const endgame = new URLSearchParams(window.location.search).get('endgame');
+  const motiv = new URLSearchParams(window.location.search).get('motiv');
   const kde = endgame ? `v koncovkách typu „${endgame}"`
+            : (motiv && mode === 'taktika') ? `v motíve „${motiv}"`
             : mode === 'taktika'   ? 'v taktike'
             : mode === 'strategia' ? 'v stratégii'
             : mode === 'koncovka'  ? 'v koncovkách'
