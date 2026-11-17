@@ -76,10 +76,84 @@ function getTrainingMode() {
 //   'ziadne-nove'      — v kategórii sú úlohy, ale všetky už vyriešil
 //   'prazdna-kategoria'— v kategórii nie sú žiadne úlohy
 //   'chyba'            — nepodarilo sa načítať
+//   'platnost'         — hráčovi vypršal prístup (stránka to už oznámila)
 let poslednyDovodVyberu = null;
+
+// ─── Výber úlohy na serveri ─────────────────────────────────────────────────
+// Od 17. 11. 2026 vyberá úlohu databázová funkcia vyber_ulohu
+// (03-vyber-ulohy.sql) — rovnakými pravidlami ako pôvodný výber nižšie.
+// Prehliadač dostane jedinú úlohu aj s riešením, namiesto sťahovania zoznamu
+// všetkých úloh (po dávkach 1000) a celej histórie hráča pri každom štarte.
+//
+// Keď server zlyhá (výpadok siete, funkcia ešte nie je nasadená), použije sa
+// pôvodný výber v prehliadači — tréning sa kvôli tomu nezastaví.
+async function vyberUlohuNaServeri(mode, endgame) {
+  return await sbFetch('rpc/vyber_ulohu', {
+    method: 'POST',
+    body: JSON.stringify({ p_mode: mode || null, p_endgame: endgame || null })
+  });
+}
+
+// Riadok z databázy (snake_case) → objekt, s ktorým pracuje training.html
+function _objektUlohy(p) {
+  return {
+    id: p.id,
+    title: p.title,
+    fen: p.fen,
+    turnText: p.turn_text,
+    prompt: p.prompt,
+    category: p.category,
+    endgame_type: p.endgame_type,
+    elo: p.elo,
+    time: p.time,
+    solutionTree: p.solution_tree
+  };
+}
 
 async function pickPuzzleForPlayer(player, puzzles) {
   poslednyDovodVyberu = null;
+  const mode = getTrainingMode();
+  const endgame = new URLSearchParams(window.location.search).get("endgame");
+
+  let r;
+  try {
+    r = await vyberUlohuNaServeri(mode, endgame);
+  } catch (e) {
+    // Vypršaný prístup: záložný výber by úlohu síce ponúkol, ale výsledok by
+    // server aj tak nezapísal. Povie sa to hneď a jasne.
+    if (String(e && e.message).includes('Platnosť prístupu vypršala')) {
+      poslednyDovodVyberu = 'platnost';
+      if (typeof vyzadujPlatnost === 'function') await vyzadujPlatnost();
+      return null;
+    }
+    console.error('Výber úlohy na serveri zlyhal, použijem záložný výber:', e);
+    if (typeof reportPlayerError === 'function') reportPlayerError('vyber_ulohu zlyhal', e);
+    return pickPuzzleVPrehliadaci(player, puzzles);
+  }
+
+  if (r && r.uloha) return _objektUlohy(r.uloha);
+  if (r && (r.dovod === 'ziadne-nove' || r.dovod === 'prazdna-kategoria')) {
+    poslednyDovodVyberu = r.dovod;
+    return null;
+  }
+  // Neočakávaná odpoveď — radšej záložný výber než prázdna obrazovka
+  console.error('Neočakávaná odpoveď vyber_ulohu:', r);
+  return pickPuzzleVPrehliadaci(player, puzzles);
+}
+
+// ─── Záložný výber v prehliadači (pôvodný spôsob) ───────────────────────────
+// Používa sa len keď zlyhá server. Zoznam úloh sa stiahne až vtedy, keď ho
+// naozaj treba, a len raz za návštevu stránky.
+let _zalohaUloh = null;
+
+async function pickPuzzleVPrehliadaci(player, puzzles) {
+  poslednyDovodVyberu = null;
+  if (!Array.isArray(puzzles) || !puzzles.length) {
+    if (!_zalohaUloh || !_zalohaUloh.length) _zalohaUloh = await loadPuzzlesFromSupabase();
+    puzzles = _zalohaUloh;
+  }
+  if (!puzzles.length) { poslednyDovodVyberu = 'chyba'; return null; }
+
   const excluded = await getExcludedPuzzleIds(player.id);
   const mode = getTrainingMode();
 
@@ -136,20 +210,8 @@ async function pickPuzzleForPlayer(player, puzzles) {
   // sa sťahuje len pre jedinú vybranú úlohu, nie pre celú databázu.
   try {
     const rows = await sbFetch(`puzzles?id=eq.${picked.id}&limit=1`);
-    if (!rows || !rows.length) return null;
-    const p = rows[0];
-    return {
-      id: p.id,
-      title: p.title,
-      fen: p.fen,
-      turnText: p.turn_text,
-      prompt: p.prompt,
-      category: p.category,
-      endgame_type: p.endgame_type,
-      elo: p.elo,
-      time: p.time,
-      solutionTree: p.solution_tree
-    };
+    if (!rows || !rows.length) { poslednyDovodVyberu = 'chyba'; return null; }
+    return _objektUlohy(rows[0]);
   } catch (e) {
     console.error("Chyba pri načítaní úlohy:", e);
     poslednyDovodVyberu = 'chyba';
@@ -159,10 +221,10 @@ async function pickPuzzleForPlayer(player, puzzles) {
 
 async function loadPuzzlesFromSupabase() {
   try {
+    // Len pre záložný výber (pickPuzzleVPrehliadaci) — bežne vyberá server.
     // Načítavaj po dávkach 1000 — Supabase Free má limit 1000 riadkov/request.
-    // OPTIMALIZÁCIA: sťahujú sa len ľahké stĺpce potrebné na výber úlohy
-    // (id, category, elo) — plný záznam s riešením sa doťahuje lenivo
-    // v pickPuzzleForPlayer. Šetrí ~95 % objemu dát pri štarte tréningu.
+    // Sťahujú sa len ľahké stĺpce potrebné na výber úlohy (id, category, elo,
+    // endgame_type) — plný záznam s riešením sa doťahuje len pre vybranú úlohu.
     const BATCH = 1000;
     let allData = [];
     let offset = 0;
