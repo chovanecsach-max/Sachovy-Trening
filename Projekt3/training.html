@@ -2424,6 +2424,8 @@ function loadPuzzleObject(puzzle, isAdmin = false) {
 // prázdna, alebo či v nej hráč už všetko vyriešil — druhý prípad nastáva
 // bežne pri úzkych filtroch, napríklad pri type koncovky s pár úlohami.
 function oznamZiadnaUloha() {
+  // Vypršaný prístup už oznámila vyzadujPlatnost — stránka je nahradená správou
+  if (poslednyDovodVyberu === 'platnost') return;
   const mode = getTrainingMode();
   const endgame = new URLSearchParams(window.location.search).get('endgame');
   const kde = endgame ? `v koncovkách typu „${endgame}"`
@@ -2453,6 +2455,12 @@ async function loadPuzzleForPlayer() {
     alert("Nie je vybraný hráč.");
     location.href = "index.html";
     return;
+  }
+
+  // Poistka pri nasadení: keby prehliadač mal ešte starý js/training.js
+  // (bez výberu na serveri), potrebuje zoznam úloh ako predtým.
+  if (typeof vyberUlohuNaServeri !== 'function' && !puzzles.length) {
+    puzzles = await loadPuzzlesFromSupabase();
   }
 
   const puzzle = await pickPuzzleForPlayer(currentPlayer, puzzles);
@@ -2488,7 +2496,6 @@ async function nextPuzzle() {
     return;
   }
 
-  if (!puzzles.length) return;
   await opustitUlohu();
   loadPuzzleForPlayer();
 }
@@ -2563,20 +2570,14 @@ async function init() {
     return;
   }
 
-  try {
-    puzzles = await loadPuzzlesFromSupabase();
-    if (!Array.isArray(puzzles) || !puzzles.length) {
-      throw new Error('Žiadne puzzle v databáze');
-    }
-  } catch (e) {
-    setStatus('Chyba pri načítaní puzzle: ' + e.message, 'error');
-    return;
-  }
+  // Zoznam všetkých úloh sa pri štarte už nesťahuje — úlohu vyberá server
+  // (vyber_ulohu, js/training.js). Zoznam stiahne len záložný výber, keď
+  // server zlyhá. Odpadla aj história hráča (loadExcludedPuzzleIds): o ELO
+  // rozhoduje zapis_vysledok na serveri a isEloEligible sa nikde nevolá.
 
   loadStats();
   updateStatsUI();
   await updatePlayerUI();
-  await loadExcludedPuzzleIds(); // ELO len za úlohy, ktoré sú legitímne vo výbere
   initSessionStats();
   loadLeaderboard(); // načítaj rebríček
 
