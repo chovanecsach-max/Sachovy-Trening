@@ -121,7 +121,7 @@ tr.late td { background: #fffbfa; }
 // ZNAČKA VERZIE — pri každej úprave tohto súboru prepíš dátum.
 // Vypíše sa v konzole, alebo na mobile po pridaní ?verzia do adresy.
 // Mechanika je v player.js pri funkcii verzie().
-(window.VERZIE = window.VERZIE || {})['zadania-prehlad.html'] = '2026-11-17';
+(window.VERZIE = window.VERZIE || {})['zadania-prehlad.html'] = '2026-11-20';
 
 const USER_ROLE        = sessionStorage.getItem('user_role') || '';
 const USER_NICK        = sessionStorage.getItem('user_nick') || sessionStorage.getItem('user_name') || '';
@@ -174,11 +174,16 @@ function daysLeft(d) {
 }
 function clamp01(x) { return Math.max(0, Math.min(1, x)); }
 
-// ─── Pokrok (rovnaká logika ako na stránke hráča) ───────────────────────────
-function computeProgress(a, player, logRows, meta, sprinty) {
-  if (VizZadania.je(a)) {                       // vizualizácia: šprinty s aspoň Y bodmi po zadaní
-    const p = VizZadania.pokrok(sprinty, a, player?.user_id);
-    return { pct: p.pct, done: p.done, txt: `${Math.min(p.n, a.target_value)} / ${a.target_value} šprintov` };
+// ─── Pokrok (rovnaké pravidlá ako na stránke hráča) ─────────────────────────
+// pocty = Map(id zadania → číslo) z databázovej funkcie pokrok_zadani:
+//   počet úloh / koncoviek / motívu → úlohy vyriešené na prvý pokus po zadaní
+//   vizualizácia → šprinty daného typu a dĺžky s aspoň Y bodmi po zadaní
+// Cieľ na ELO sa počíta tu, z aktuálneho ELO hráča.
+function computeProgress(a, player, pocty) {
+  if (VizZadania.je(a)) {
+    const n = pocty.get(a.id) || 0;
+    const x = Math.max(1, Number(a.target_value) || 1);
+    return { pct: clamp01(n / x), done: n >= x, txt: `${Math.min(n, a.target_value)} / ${a.target_value} šprintov` };
   }
   if (a.target_type === 'elo' && !a.endgame_type) {
     const cur  = Number(player?.['elo_' + a.skill] ?? 1000);   // od 1. 9. 2026 je základ 1000
@@ -190,7 +195,7 @@ function computeProgress(a, player, logRows, meta, sprinty) {
   }
 
   // Počítajú sa len úlohy vyriešené na prvý pokus po zadaní
-  const n    = countFirstAttemptWins(logRows, a, meta);
+  const n    = pocty.get(a.id) || 0;
   const unit = a.endgame_type ? 'koncoviek' : 'úloh';
   return { pct: clamp01(n / a.target_value), done: n >= a.target_value,
            txt: `${n} / ${a.target_value} ${unit}` };
@@ -228,40 +233,32 @@ async function load() {
       return;
     }
 
-    // História pre ciele typu "počet úloh" — jeden dotaz pre všetkých hráčov.
-    // Čas normalizujeme cez toISOString(), lebo "+" z PostgREST by sa v URL
-    // čítal ako medzera a dotaz by zlyhal.
-    // Pokrok pri cieľoch na počet úloh (vrátane koncoviek) — z training_log.
-    // Načítavajú sa aj neúspechy, inak by sa nedalo rozlíšiť riešenie na prvý
-    // pokus od výhry po chybe.
-    let logRows = [], meta = { puzzles: new Map(), skills: new Map() };
+    // Pokrok pri cieľoch na počet úloh (aj koncovky a motívy) a pri vizualizácii
+    // spočíta databáza jednou požiadavkou (funkcia pokrok_zadani, krok 8).
+    // Predtým sa sem sťahoval celý tréning hráčov po 1000 riadkoch a kategórie
+    // úloh po 300 — pri desiatkach požiadaviek za sebou sa prehľad načítaval
+    // čoraz pomalšie. Funkcia beží s právami prihláseného trénera, takže vráti
+    // pokrok len pre zadania, ktoré tréner vidí aj tu.
+    const pocty = new Map();
     let chybaPokroku = '';      // hláška musí ostať viditeľná aj po vykreslení tabuľky
-    const needLog = rows.filter(r => r.target_type === 'count' || r.endgame_type);
-    if (needLog.length) {
-      const from = new Date(needLog.map(r => r.created_at).sort()[0]).toISOString();
-      const pids = [...new Set(needLog.map(r => r.player_id))];
+    const ids = rows
+      .filter(r => r.target_type === 'count' || r.endgame_type || VizZadania.je(r))
+      .map(r => r.id);
+    if (ids.length) {
       try {
-        logRows = await loadAssignmentLog(pids, from);
-        meta    = await loadAssignmentPuzzleMeta(logRows);
+        const vysledok = await sbFetch('rpc/pokrok_zadani', {
+          method: 'POST',
+          body: JSON.stringify({ p_ids: ids })
+        }) || [];
+        vysledok.forEach(x => pocty.set(x.id, x.pocet));
       } catch (e) {
-        chybaPokroku = 'Pokrok pri cieľoch „počet úloh" sa nepodarilo načítať.';
-      }
-    }
-
-    // Zadania vizualizácie: šprinty hráčov od najstaršieho takého zadania
-    let sprinty = [];
-    const needViz = rows.filter(VizZadania.je);
-    if (needViz.length) {
-      try {
-        sprinty = await VizZadania.nacitaj(needViz.map(r => r.player?.user_id),
-                                           needViz.map(r => r.created_at).sort()[0]);
-      } catch (e) {
-        chybaPokroku = 'Pokrok pri zadaniach vizualizácie sa nepodarilo načítať.';
+        console.error('Pokrok zadaní sa nenačítal:', e);
+        chybaPokroku = 'Pokrok zadaní sa nepodarilo načítať. Obnov stránku; ak to pretrváva, daj vedieť administrátorovi.';
       }
     }
 
     allRows = rows.map(a => {
-      const prog = computeProgress(a, a.player, logRows, meta, sprinty);
+      const prog = computeProgress(a, a.player, pocty);
       // Ručne uzavreté zadanie sa berie ako splnené bez ohľadu na výpočet
       const done = !!a.completed_at || prog.done;
       const late = !done && a.deadline && daysLeft(a.deadline) < 0;
