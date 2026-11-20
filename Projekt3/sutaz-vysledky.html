@@ -119,6 +119,9 @@ button { padding: 10px 16px; border: none; border-radius: 10px; cursor: pointer;
 <script src="js/auth.js"></script>
 <script src="js/player.js"></script>
 <script>
+// ZNAČKA VERZIE — pri každej úprave tohto súboru prepíš dátum.
+(window.VERZIE = window.VERZIE || {})['sutaz-vysledky.html'] = '2026-11-20';
+
 // Tlačidlo Trénovať má zmysel len pre hráča — personál sa do súťaže nepočíta
 const jeHrac = (sessionStorage.getItem('user_role') || '') === 'hrac';
 
@@ -450,21 +453,32 @@ async function nacitaj() {
     return x ? (x.nick_name || `${x.surname || ''} ${x.name || ''}`.trim()) : 'bez trénera';
   };
 
-  const ids = hraci.map(p => p.id).join(',');
   let hodnoty = new Map();
 
   try {
     if (s.typ === 'pocet') {
       // Počítajú sa len úlohy vyriešené na prvý pokus v období súťaže.
+      // Poradie spočíta databáza (funkcia sutaz_vysledky_pocet, krok 9) a vráti
+      // len čísla. Tréning ostatných hráčov sa do prehliadača neposiela — hráč
+      // smie čítať len svoj vlastný tréning.
       const odISO  = new Date(s.datum_od + 'T00:00:00').toISOString();
       const doISO  = new Date(s.datum_do + 'T23:59:59.999').toISOString();
-      const log = await sbFetchAll(
-        `training_log?player_id=in.(${ids})&created_at=gte.${odISO}&created_at=lte.${doISO}`
-        + `&select=player_id,puzzle_id,source,result,created_at`);
-      const meta = await loadAssignmentPuzzleMeta(log);
-      hodnoty = countFirstWinsByPlayer(log, s.kategoria, odISO, doISO, meta);
-      // Odložíme na rozpis pokusov, ktorý sa rozbalí po kliknutí na vlastný riadok
-      rozpisData = { log, meta, odISO, doISO, kategoria: s.kategoria };
+      const vysl = await sbFetch('rpc/sutaz_vysledky_pocet', {
+        method: 'POST',
+        body: JSON.stringify({ p_sutaz_id: s.id })
+      }) || [];
+      hodnoty = new Map(vysl.map(x => [x.player_id, x.pocet]));
+
+      // Rozpis pokusov (rozbalí sa po kliknutí na vlastný riadok) — len z vlastného tréningu
+      const mojUser = sessionStorage.getItem('user_id');
+      const jaVSutazi = hraci.find(p => p.user_id === mojUser);
+      if (jaVSutazi) {
+        const log = await sbFetchAll(
+          `training_log?player_id=eq.${jaVSutazi.id}&created_at=gte.${odISO}&created_at=lte.${doISO}`
+          + `&select=player_id,puzzle_id,source,result,created_at&order=created_at.asc,id.asc`);
+        const meta = await loadAssignmentPuzzleMeta(log);
+        rozpisData = { log, meta, odISO, doISO, kategoria: s.kategoria };
+      }
     } else {
       // Nárast oproti odfotenému stavu na začiatku súťaže
       const stlpec = sutazEloStlpec(s.kategoria);
